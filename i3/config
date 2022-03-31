@@ -161,11 +161,11 @@ mode "$mode_system" {
   bindsym l exec --no-startup-id $i3lockwall, mode "default"
   bindsym e exec --no-startup-id i3-msg exit, mode "default"
   bindsym r exec --no-startup-id sudo systemctl reboot, mode "default"
-  bindsym s exec --no-startup-id $i3lockwall && (sleep 0.5 && systemctl suspend), \
+  bindsym s exec --no-startup-id $i3lockwall && (sleep 0.5 && sudo systemctl suspend), \
     mode "default"
-  bindsym h exec --no-startup-id $i3lockwall && systemctl hibernate, \
+  bindsym h exec --no-startup-id $i3lockwall && sudo systemctl hibernate, \
     mode "default"
-  bindsym CTRL+s exec --no-startup-id systemctl poweroff -i, \
+  bindsym CTRL+s exec --no-startup-id sudo systemctl poweroff -i, \
     mode "default"
 
   #to close the menu: Enter or Escape
