@@ -36,3 +36,12 @@ name = 'shell'
 default_position = 'top'
 default_height = 30
 
+[[layers]]
+name = 'fzf'
+#name = 'denite'
+
+[[layers]]
+name = 'git'
+[[layers]]
+name = 'VersionControl'
+
