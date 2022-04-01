@@ -1,6 +1,8 @@
 *.foreground: #C6C6C6
 *.background: #1C1C1C
-*.cursorColor: #444444
+!in dark mode need light color like white
+!*.cursorColor: #444444
+*.cursorColor: #ffffff
 
 ! black 236 238
 *.color0: #303030
@@ -33,6 +35,8 @@ URxvt*externalBorder: 0
 URxvt*internalBorder: 4
 URxvt*scrollBar: false
 URxvt*saveLines: 5000
+URxvt*cursorBlink: true
+URxvt*cursorUnderline: true
   
 URxvt*perl-ext-common: default,tabbedex
 
