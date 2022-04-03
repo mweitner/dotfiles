@@ -18,7 +18,7 @@
     colorscheme_bg = "dark"
     # Disable guicolors in basic mode, many terminal do not support 24bit
     # true colors
-    enable_guicolors = true
+    enable_guicolors = false
     # Disable statusline separator, if you want to use other value, please
     # install nerd fonts
     statusline_separator = "arrow"
@@ -26,6 +26,13 @@
     buffer_index_type = 4
     enable_tabline_filetype_icon = true
     enable_statusline_mode = false
+    guifont = 'Inconsolata Nerd Font Mono:style=Medium'
+    terminalfont = 'Inconsolata Nerd Font Mono:style=Medium'
+
+[[layers]]
+name = 'core'
+#filetree_opened_icon = ''
+#filetree_closed_icon = ''
 
 # Enable autocomplete layer
 [[layers]]
