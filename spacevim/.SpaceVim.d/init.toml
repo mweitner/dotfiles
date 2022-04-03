@@ -8,6 +8,9 @@
 
 # All SpaceVim option below [option] section
 [options]
+    # enable bootstrap functions
+    bootstrap_before = 'mwengspacevim#before'
+    bootstrap_after = 'mwengspacevim#after'
     # set spacevim theme. by default colorscheme layer is not loaded,
     # if you want to use more colorscheme, please load the colorscheme
     # layer
@@ -23,7 +26,6 @@
     buffer_index_type = 4
     enable_tabline_filetype_icon = true
     enable_statusline_mode = false
-    #filemanager = "nerdtree"
 
 # Enable autocomplete layer
 [[layers]]
