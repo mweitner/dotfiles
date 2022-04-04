@@ -1,0 +1,14 @@
+session_name: dotfiles
+start_directory: $HOME/dotfiles
+
+windows:
+  - window_name: spacevim dotfiles
+    layout: tiled
+    panes:
+      - vim
+  - window_name: terms
+    layout: tiled
+    panes:
+      -
+      - ls -lah
+      -

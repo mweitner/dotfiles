@@ -1,0 +1,5 @@
+[user]
+	name = Michael Weitner
+	email = michael@weitnerembeddedsystem.com
+[core]
+	pager = diff-so-fancy | less --tabs=4 -RFX

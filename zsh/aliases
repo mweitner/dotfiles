@@ -2,9 +2,12 @@ alias ll='ls -lah'
 alias d='dirs -v'
 for index ({1..9}) alias "$index"="cd +${index}"; unset index
 
+alias vi='vim'
+
 #git
 alias ga='git add'
 alias gc='git commit'
 alias gp='git push'
+alias gl='git log --decorate --oneline --graph --all'
 
 

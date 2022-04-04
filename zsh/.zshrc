@@ -17,6 +17,11 @@ bindkey -M menuselect 'k' vi-up-line-or-history
 bindkey -M menuselect 'l' vi-forward-char  
 bindkey -M menuselect 'j' vi-down-line-or-history 
 
+#remap clear-screen as Ctrl-l is used by tmux to navigate pane left
+bindkey -r '^l'
+bindkey -r '^g'
+bindkey -s '^g' "\nclear\n"
+
 #initialize completion system
 autoload -U compinit; compinit
 #autocomplete hidden files
@@ -49,6 +54,8 @@ source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zs
 source "$DOTFILES/zsh/external/bd.zsh"
 #source custom scripts
 source "$DOTFILES/zsh/scripts.sh"
+#always list tmuxp sessions
+ftmuxp
 
 #start i3
 if [ "$(tty)" = "/dev/tty1" ]; then
