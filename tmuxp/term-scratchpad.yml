@@ -1,0 +1,9 @@
+session_name: term-scratchpad
+start_directory: /tmp/
+
+windows:
+  - window_name: vim doc
+    layout: tiled
+    panes:
+      - vim '/tmp/vim-tmp.md'
+

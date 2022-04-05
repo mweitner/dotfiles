@@ -61,3 +61,10 @@ ln -sf "$DOTFILES/tmux/tmux.conf" "$XDG_CONFIG_HOME/tmux/tmux.conf"
 rm -rf "$XDG_CONFIG_HOME/tmuxp"
 ln -sf "$DOTFILES/tmuxp" "$XDG_CONFIG_HOME"
 
+###############
+# qutebrowser #
+###############
+
+rm -f "$XDG_CONFIG_HOME/qutebrowser/config.py"
+ln -sf "$DOTFILES/qutebrowser/config.py" "$XDG_CONFIG_HOME/qutebrowser/"
+

@@ -54,11 +54,14 @@ source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zs
 source "$DOTFILES/zsh/external/bd.zsh"
 #source custom scripts
 source "$DOTFILES/zsh/scripts.sh"
-#always list tmuxp sessions
-ftmuxp
 
 #start i3
 if [ "$(tty)" = "/dev/tty1" ]; then
   pgrep i3 || exec startx "$XDG_CONFIG_HOME/X11/.xinitrc"
+fi
+
+if [ ! "$(tty)" = "/dev/tty1" ]; then
+  #always list tmuxp sessions
+  #ftmuxp
 fi
 

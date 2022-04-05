@@ -294,18 +294,22 @@ for_window [class="URxvt*"] border pixel 1
 # Terminal scratchpad
 for_window [instance="urxvt_scratchpad"] move to scratchpad, border none
 bindsym $mod+Shift+t [instance="urxvt_scratchpad"] scratchpad show
-#alternative starting tmux natively in terminal scratchpad is using tmuxp session
-# which would be simple -e tmuxp load sratchpad (dotfiles repo sratchpad.yml)
-exec urxvtc -name urxvt_scratchpad \
--e tmux new-session -d -s scratchpad \; \
-new-window -n vim 'vim /tmp/vim-tmp.md' \; \
-attach-session -d -t scratchpad
+#exec urxvtc -name urxvt_scratchpad -e vim '/tmp/vim-tmp.md'
+exec urxvtc -name urxvt_scratchpad -e tmuxp load term-scratchpad
 
 # htop scratchpad
 for_window [instance="htop_scratchpad"] move to scratchpad, border none
 bindsym $mod+Shift+p [instance="htop_scratchpad"] scratchpad show
 exec urxvtc -name htop_scratchpad -e htop
 
+# qutebrowser scratchpad
+for_window [instance="qutebrowser"] floating enable
+for_window [instance="qutebrowser"] resize 825 800
+# move qutebrowser window to scratchpad which hides it automatically
+for_window [instance="qutebrowser"] move scratchpad
+for_window [instance="qutebrowser"] border none
+exec --no-startup-id qutebrowser --target window
+bindsym $mod+Shift+i [instance="qutebrowser"] scratchpad show ; [instance="qutebrowser"] move position center
 
 set $mode_display Config monitor resolution - Default config (d)
 
