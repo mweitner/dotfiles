@@ -117,7 +117,7 @@ bindsym $mod+a focus parent
 set $wsterms "1. terms"
 set $wsweb "2. web"
 set $ws3 "3"
-set $ws4 "4"
+set $wsvm "4. vm"
 set $ws5 "5"
 set $ws6 "6"
 set $ws7 "7"
@@ -129,7 +129,7 @@ set $ws10 "10"
 bindsym $mod+1 workspace $wsterms
 bindsym $mod+2 workspace $wsweb
 bindsym $mod+3 workspace number $ws3
-bindsym $mod+4 workspace number $ws4
+bindsym $mod+4 workspace number $wsvm
 bindsym $mod+5 workspace number $ws5
 bindsym $mod+6 workspace number $ws6
 bindsym $mod+7 workspace number $ws7
@@ -138,10 +138,10 @@ bindsym $mod+9 workspace number $ws9
 bindsym $mod+0 workspace number $ws10
 
 # move focused container to workspace
-bindsym $mod+Shift+1 move container to workspace number $ws1
-bindsym $mod+Shift+2 move container to workspace number $ws2
+bindsym $mod+Shift+1 move container to workspace number $wsterm
+bindsym $mod+Shift+2 move container to workspace number $wsweb
 bindsym $mod+Shift+3 move container to workspace number $ws3
-bindsym $mod+Shift+4 move container to workspace number $ws4
+bindsym $mod+Shift+4 move container to workspace number $wsvm
 bindsym $mod+Shift+5 move container to workspace number $ws5
 bindsym $mod+Shift+6 move container to workspace number $ws6
 bindsym $mod+Shift+7 move container to workspace number $ws7
@@ -241,6 +241,18 @@ for_window [window_role="pop-up"] floating enable
 for_window [window_role="task_dialog"] floating enable
 for_window [class="Arandr"] floating enable
 for_window [class="Pavucontrol"] floating enable
+# virtual box manager, 
+# WM_NAME("Oracle VM VirtualBox Manager")
+# WM_CLASS("VirtualBox Manager", *)
+#for_window [class="VirtualBox Manager"] floating enabled
+assign [class="VirtualBox Manager" instance="VirtualBox Manager"] $wsvm
+
+# KVM Virtual Machine Manager
+# WM_NAME("Virtual Machine Manager")
+# WM_CLASS("virt-manager", "Virt-manager")
+# important use second param as class which starts with big letter V
+#for_window [class="Virt-manager"] floating enabled
+assign [class="Virt-manager"] $wsvm
 
 ########
 # design resources
