@@ -8,8 +8,8 @@ export XDG_DATA_HOME="$XDG_CONFIG_HOME/local/share"
 export XDG_CACHE_HOME="$XDG_CONFIG_HOME/cache"
 
 #make sure we launch favorite editor
-export EDITOR="vim"
-export VISUAL="vim"
+export EDITOR="nvim"
+export VISUAL="nvim"
 
 #zsh config location
 export ZDOTDIR="$XDG_CONFIG_HOME/zsh"

@@ -61,6 +61,13 @@ ln -sf "$DOTFILES/tmux/tmux.conf" "$XDG_CONFIG_HOME/tmux/tmux.conf"
 rm -rf "$XDG_CONFIG_HOME/tmuxp"
 ln -sf "$DOTFILES/tmuxp" "$XDG_CONFIG_HOME"
 
+########
+# dhex #
+########
+
+rm -f "$HOME/.dhexrc"
+ln -sf "$DOTFILES/dhex/.dhexrc" "$HOME"
+
 ###############
 # qutebrowser #
 ###############

@@ -86,11 +86,12 @@ bindsym $mod+Shift+Right move right
 
 # split in horizontal orientation
 #mweitner for me is horizontal split left/right
-bindsym $mod+CTRL+v split h
+bindsym $mod+Control+v split h
 
 # split in vertical orientation
 #mweitner for me is vertical split down/up
-bindsym $mod+CTRL+h split v
+# changed from h (horizontal) to n because Control+h already used
+bindsym $mod+Control+n split v
 
 # enter fullscreen mode for the focused container
 bindsym $mod+f fullscreen toggle
@@ -114,10 +115,10 @@ bindsym $mod+a focus parent
 
 # Define names for default workspaces for which we configure key bindings later on.
 # We use variables to avoid repeating the names in multiple places.
-set $wsterms "1. terms"
-set $wsweb "2. web"
-set $ws3 "3"
-set $wsvm "4. vm"
+set $ws1terms "1. terms"
+set $ws2web "2. web"
+set $ws3dev "3. dev"
+set $ws4vm "4. vm"
 set $ws5 "5"
 set $ws6 "6"
 set $ws7 "7"
@@ -126,10 +127,10 @@ set $ws9 "9"
 set $ws10 "10"
 
 # switch to workspace
-bindsym $mod+1 workspace $wsterms
-bindsym $mod+2 workspace $wsweb
-bindsym $mod+3 workspace number $ws3
-bindsym $mod+4 workspace number $wsvm
+bindsym $mod+1 workspace $ws1terms
+bindsym $mod+2 workspace $ws2web
+bindsym $mod+3 workspace $ws3dev
+bindsym $mod+4 workspace $ws4vm
 bindsym $mod+5 workspace number $ws5
 bindsym $mod+6 workspace number $ws6
 bindsym $mod+7 workspace number $ws7
@@ -138,16 +139,28 @@ bindsym $mod+9 workspace number $ws9
 bindsym $mod+0 workspace number $ws10
 
 # move focused container to workspace
-bindsym $mod+Shift+1 move container to workspace number $wsterm
-bindsym $mod+Shift+2 move container to workspace number $wsweb
-bindsym $mod+Shift+3 move container to workspace number $ws3
-bindsym $mod+Shift+4 move container to workspace number $wsvm
+bindsym $mod+Shift+1 move container to workspace $ws1term
+bindsym $mod+Shift+2 move container to workspace $ws2web
+bindsym $mod+Shift+3 move container to workspace $ws3dev
+bindsym $mod+Shift+4 move container to workspace $ws4vm
 bindsym $mod+Shift+5 move container to workspace number $ws5
 bindsym $mod+Shift+6 move container to workspace number $ws6
 bindsym $mod+Shift+7 move container to workspace number $ws7
 bindsym $mod+Shift+8 move container to workspace number $ws8
 bindsym $mod+Shift+9 move container to workspace number $ws9
 bindsym $mod+Shift+0 move container to workspace number $ws10
+
+# move focused window and swap to that screen
+bindsym $mod+Control+1 move container to workspace $ws1term; workspace $ws1term
+bindsym $mod+Control+2 move container to workspace $ws2web; workspace $ws2web
+bindsym $mod+Control+3 move container to workspace $ws3dev; workspace $ws3dev
+bindsym $mod+Control+4 move container to workspace $ws4vm; workspace $ws4vm
+
+# move workspace between monitors
+bindsym $mod+Control+m move workspace to output primary
+bindsym $mod+Control+s move workspace to output HDMI-1
+bindsym $mod+Control+l move workspace to output right
+bindsym $mod+Control+h move workspace to output left
 
 # reload the configuration file
 bindsym $mod+Shift+c reload
@@ -168,7 +181,7 @@ mode "$mode_system" {
     mode "default"
   bindsym h exec --no-startup-id $i3lockwall && sudo systemctl hibernate, \
     mode "default"
-  bindsym CTRL+s exec --no-startup-id sudo systemctl poweroff -i, \
+  bindsym Control+s exec --no-startup-id sudo systemctl poweroff -i, \
     mode "default"
 
   #to close the menu: Enter or Escape
@@ -228,11 +241,13 @@ bar {
 }
 
 workspace_auto_back_and_forth yes
-assign [class="firefox" instance="Navigator"] $wsweb
+assign [class="firefox" instance="Navigator"] $ws2web
+#make sure google meet works, otherwise it opens in new window and blocks
+for_window [class="firefox" title="Share your new meeting*"] floating enabled
 #do not want mouse set window in focus
 focus_follows_mouse no
 set $i3lockwall sh "$HOME/.config/i3/scripts/lock.sh"
-bindsym $mod+CTRL+Shift+l exec --no-startup-id $i3lockwall
+bindsym $mod+Control+Shift+l exec --no-startup-id $i3lockwall
 #wallpaper
 exec --no-startup-id feh --no-fehbg --bg-fill \
   "$HOME/.config/i3/feh/nature-g2658ad761_1920.jpg"
@@ -245,14 +260,14 @@ for_window [class="Pavucontrol"] floating enable
 # WM_NAME("Oracle VM VirtualBox Manager")
 # WM_CLASS("VirtualBox Manager", *)
 #for_window [class="VirtualBox Manager"] floating enabled
-assign [class="VirtualBox Manager" instance="VirtualBox Manager"] $wsvm
+assign [class="VirtualBox Manager" instance="VirtualBox Manager"] $ws4vm
 
 # KVM Virtual Machine Manager
 # WM_NAME("Virtual Machine Manager")
 # WM_CLASS("virt-manager", "Virt-manager")
 # important use second param as class which starts with big letter V
 #for_window [class="Virt-manager"] floating enabled
-assign [class="Virt-manager"] $wsvm
+assign [class="Virt-manager"] $ws4vm
 
 ########
 # design resources
@@ -323,16 +338,31 @@ for_window [instance="qutebrowser"] border none
 exec --no-startup-id qutebrowser --target window
 bindsym $mod+Shift+i [instance="qutebrowser"] scratchpad show ; [instance="qutebrowser"] move position center
 
-set $mode_display Config monitor resolution - Default config (d)
-
+set $mode_display \
+      Config monitor resolution -\
+      Default config (d), Home laptop (l)
 mode "$mode_display" {
     bindsym d exec --no-startup-id sh "$HOME/.config/X11/monitor.sh", mode "default"
+    bindsym l exec --no-startup-id sh "$HOME/.config/X11/monitor-home-laptop.sh", mode "default"
 
     # back to normal: Enter or Escape
     bindsym Return mode "default"
     bindsym Escape mode "default"
 }
 bindsym $mod+x mode "$mode_display"
+
+set $mode_workspace \
+      Workspace layout -\
+      Default layout (d), Development (f)
+mode "$mode_workspace" {
+  bindsym d exec --no-startup-id sh "$HOME/.config/i3/scripts/load-default-ws.sh", mode default
+  bindsym f exec --no-startup-id sh "$HOME/.config/i3/scripts/load-dev-ws.sh", mode default
+
+  # back to normal: Enter or Escape
+  bindsym Return mode "default"
+  bindsym Escape mode "default"
+}
+bindsym $mod+c mode "$mode_workspace"
 
 exec --no-startup-id dunst
 
