@@ -9,12 +9,12 @@
        "y": 0
     },
     "marks": [],
-    "name": "urxvt",
+    "name": "urxvt-term",
     "percent": 1,
     "swallows": [
        {
         "class": "^URxvt$",
-        "instance": "^urxvt-terms$"
+        "instance": "^urxvt-term$"
        }
     ],
     "type": "con"

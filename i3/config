@@ -115,10 +115,10 @@ bindsym $mod+a focus parent
 
 # Define names for default workspaces for which we configure key bindings later on.
 # We use variables to avoid repeating the names in multiple places.
-set $ws1terms "1. terms"
-set $ws2web "2. web"
-set $ws3dev "3. dev"
-set $ws4vm "4. vm"
+set $ws1term "term"
+set $ws2web "web"
+set $ws3dev "dev"
+set $ws4vm "vm"
 set $ws5 "5"
 set $ws6 "6"
 set $ws7 "7"
@@ -127,10 +127,10 @@ set $ws9 "9"
 set $ws10 "10"
 
 # switch to workspace
-bindsym $mod+1 workspace $ws1terms
-bindsym $mod+2 workspace $ws2web
-bindsym $mod+3 workspace $ws3dev
-bindsym $mod+4 workspace $ws4vm
+bindsym $mod+1 workspace number 1 $ws1term
+bindsym $mod+2 workspace number 2 $ws2web
+bindsym $mod+3 workspace number 3 $ws3dev
+bindsym $mod+4 workspace number 4 $ws4vm
 bindsym $mod+5 workspace number $ws5
 bindsym $mod+6 workspace number $ws6
 bindsym $mod+7 workspace number $ws7
@@ -139,10 +139,10 @@ bindsym $mod+9 workspace number $ws9
 bindsym $mod+0 workspace number $ws10
 
 # move focused container to workspace
-bindsym $mod+Shift+1 move container to workspace $ws1term
-bindsym $mod+Shift+2 move container to workspace $ws2web
-bindsym $mod+Shift+3 move container to workspace $ws3dev
-bindsym $mod+Shift+4 move container to workspace $ws4vm
+bindsym $mod+Shift+1 move container to workspace number 1 $ws1term
+bindsym $mod+Shift+2 move container to workspace number 2 $ws2web
+bindsym $mod+Shift+3 move container to workspace number 3 $ws3dev
+bindsym $mod+Shift+4 move container to workspace number 4 $ws4vm
 bindsym $mod+Shift+5 move container to workspace number $ws5
 bindsym $mod+Shift+6 move container to workspace number $ws6
 bindsym $mod+Shift+7 move container to workspace number $ws7
@@ -151,10 +151,10 @@ bindsym $mod+Shift+9 move container to workspace number $ws9
 bindsym $mod+Shift+0 move container to workspace number $ws10
 
 # move focused window and swap to that screen
-bindsym $mod+Control+1 move container to workspace $ws1term; workspace $ws1term
-bindsym $mod+Control+2 move container to workspace $ws2web; workspace $ws2web
-bindsym $mod+Control+3 move container to workspace $ws3dev; workspace $ws3dev
-bindsym $mod+Control+4 move container to workspace $ws4vm; workspace $ws4vm
+bindsym $mod+Control+1 move container to workspace number 1 $ws1term; workspace number 1 $ws1term
+bindsym $mod+Control+2 move container to workspace number 2 $ws2web; workspace number 2 $ws2web
+bindsym $mod+Control+3 move container to workspace number 3 $ws3dev; workspace number 3 ws3dev
+bindsym $mod+Control+4 move container to workspace number 4 $ws4vm; workspace number 4 $ws4vm
 
 # move workspace between monitors
 bindsym $mod+Control+m move workspace to output primary
@@ -241,7 +241,7 @@ bar {
 }
 
 workspace_auto_back_and_forth yes
-assign [class="firefox" instance="Navigator"] $ws2web
+assign [class="firefox" instance="Navigator"] 2 $ws2web
 #make sure google meet works, otherwise it opens in new window and blocks
 for_window [class="firefox" title="Share your new meeting*"] floating enabled
 #do not want mouse set window in focus
@@ -260,14 +260,14 @@ for_window [class="Pavucontrol"] floating enable
 # WM_NAME("Oracle VM VirtualBox Manager")
 # WM_CLASS("VirtualBox Manager", *)
 #for_window [class="VirtualBox Manager"] floating enabled
-assign [class="VirtualBox Manager" instance="VirtualBox Manager"] $ws4vm
+assign [class="VirtualBox Manager" instance="VirtualBox Manager"] 4 $ws4vm
 
 # KVM Virtual Machine Manager
 # WM_NAME("Virtual Machine Manager")
 # WM_CLASS("virt-manager", "Virt-manager")
 # important use second param as class which starts with big letter V
 #for_window [class="Virt-manager"] floating enabled
-assign [class="Virt-manager"] $ws4vm
+assign [class="Virt-manager"] 4 $ws4vm
 
 ########
 # design resources
