@@ -125,9 +125,13 @@ prompt_purification_setup() {
     ZSH_THEME_GIT_PROMPT_BEHIND="%B%F{red}%f%b "
     ZSH_THEME_GIT_PROMPT_AHEAD="%B%F{green}%f%b "
 
-    prompt_git_branch
-    RPROMPT='$(prompt_git_info) $(git_prompt_status)'
-    PROMPT=$'%F{white}%~ %B%F{blue}>%f%b '
+    # Do not want git on right hand side of prompt
+    #prompt_git_branch
+    #RPROMPT='$(prompt_git_info) $(git_prompt_status)'
+    #PROMPT=$'%F{white}%~ %B%F{blue}>%f%b '
+    # I rather have :
+    # michael@snake: ~/dotfiles $  
+    PROMPT='%(?.%F{blue}√.%F{red}?%?)%f %B%F{240}%n@%m: %~%f%b $ '
 }
 
 prompt_purification_setup

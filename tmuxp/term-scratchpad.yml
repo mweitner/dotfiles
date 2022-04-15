@@ -6,4 +6,8 @@ windows:
     layout: tiled
     panes:
       - vim '/tmp/vim-tmp.md'
+  - window_name: kernel logs
+    layout: tiled
+    panes:
+      - sudo dmesg -w
 

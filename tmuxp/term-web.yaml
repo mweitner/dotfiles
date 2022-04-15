@@ -1,0 +1,18 @@
+session_name: term-web
+windows:
+- focus: 'true'
+  layout: b1c1,135x60,0,0,4
+  options:
+    automatic-rename: 'off'
+  panes:
+  - pane
+  start_directory: /home/michael
+  window_name: first
+- layout: b1c2,135x60,0,0,5
+  options:
+    automatic-rename: 'off'
+  panes:
+  - focus: 'true'
+    shell_command: zsh
+  start_directory: /home/michael
+  window_name: second
