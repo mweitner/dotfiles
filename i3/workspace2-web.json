@@ -39,12 +39,12 @@
                "y": 0
             },
             "marks": [],
-            "name": "urxvt-web",
+            "name": "term-web",
             "percent": 1,
             "swallows": [
                {
                 "class": "^URxvt$",
-                "instance": "^urxvt-web$"
+                "instance": "^term-web$"
                }
             ],
             "type": "con"

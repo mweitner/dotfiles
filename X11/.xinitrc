@@ -1,5 +1,5 @@
 xrdb -merge "$HOME/.config/X11/.Xresources"
 urxvtd -o -q -f
-udiskie &
+udiskie -A &
 exec i3
 

@@ -1,0 +1,11 @@
+session_name: term-ws1
+windows:
+- focus: 'true'
+  layout: b1de,273x60,0,0,1
+  options:
+    automatic-rename: 'off'
+  panes:
+  - focus: 'true'
+    shell_command:
+  start_directory: /home/michael
+  window_name: w1

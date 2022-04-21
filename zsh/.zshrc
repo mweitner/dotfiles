@@ -45,11 +45,29 @@ bindkey -M vicmd v edit-command-line
 
 #enable fzf
 if [ $(command -v "fzf") ]; then
-  source /usr/share/fzf/completion.zsh
-  source /usr/share/fzf/key-bindings.zsh
+  if [ -f "/usr/share/fzf/completion.zsh" ]; then
+    source /usr/share/fzf/completion.zsh
+  fi
+  if [ -f "/usr/share/fzf/key-bindings.zsh" ]; then
+    source /usr/share/fzf/key-bindings.zsh
+  fi
+  #ubuntu installation stores it at /usr/share/doc/fzf/examples/
+  if [ -f "/usr/share/doc/fzf/examples/completion.zsh" ]; then
+    source /usr/share/doc/fzf/examples/completion.zsh
+  fi
+  if [ -f "/usr/share/doc/fzf/examples/key-bindings.zsh" ]; then
+    source /usr/share/doc/fzf/examples/key-bindings.zsh
+  fi
 fi
 #source at end to enable all above using syntax highlighting
-source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+if [ -f "/usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]; then
+  source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+fi
+#ubuntu stores zsh-syntax-highlighting at 
+if [ -f "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]; then
+  source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+fi
+
 #source bd function jumping to parent folders
 source "$DOTFILES/zsh/external/bd.zsh"
 #source custom scripts
