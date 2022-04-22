@@ -28,6 +28,13 @@ ln -sf $HOME/dotfiles/bash/.bashrc $HOME/.bashrc
 #mkdir -p "$XDG_CONFIG_HOME/git"
 #ln -sf "$DOTFILES/git/config" "$XDG_CONFIG_HOME/git/config"
 
+######
+# i3 #
+######
+
+rm -rf "$HOME/.config/i3"
+ln -s "$DOTFILES/i3" "$HOME/.config"
+
 #########################
 #SpaceVim global config #
 #########################
