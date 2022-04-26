@@ -339,6 +339,15 @@ for_window [instance="qutebrowser"] border none
 exec --no-startup-id qutebrowser --target window
 bindsym $mod+Shift+i [instance="qutebrowser"] scratchpad show ; [instance="qutebrowser"] move position center
 
+# pavucontrol scratchpad
+for_window [instance="pavucontrol"] floating enable
+for_window [instance="pavucontrol"] resize 825 800
+# move pavucontrol window to scratchpad which hides it automatically
+for_window [instance="pavucontrol"] move scratchpad
+for_window [instance="pavucontrol"] border none
+exec --no-startup-id pavucontrol --target window
+bindsym $mod+Shift+a [instance="pavucontrol"] scratchpad show ; [instance="pavucontrol"] move position center
+
 set $mode_display \
       Config monitor resolution -\
       Default config (d), Home laptop (l)

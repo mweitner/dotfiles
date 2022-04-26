@@ -3,3 +3,5 @@ urxvtd -o -q -f
 udiskie -A &
 exec i3
 
+# as of wiki.archlinux.org xinitrc
+. /etc/X11/Xsession

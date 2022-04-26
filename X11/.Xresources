@@ -42,12 +42,21 @@ URxvt*letterSpace: -1
   
 URxvt*perl-ext-common: default,tabbedex
 
+!changed keybind as need for vim and tmux
 URxvt.keysym.Control-Shift-N: perl:tabbedex:new_tab
-URxvt.keysym.Control-Shift-K: perl:tabbedex:next_tab
-URxvt.keysym.Control-Shift-J: perl:tabbedex:prev_tab
+!URxvt.keysym.Control-Shift-K: perl:tabbedex:next_tab
+URxvt.keysym.Control-Shift-D: perl:tabbedex:next_tab
+!URxvt.keysym.Control-Shift-J: perl:tabbedex:prev_tab
+URxvt.keysym.Control-Shift-S: perl:tabbedex:prev_tab
 URxvt.keysym.Control-Shift-R: perl:tabbedex:rename_tab
-URxvt.keysym.Control-Shift-H: perl:tabbedex:move_tab_left
-URxvt.keysym.Control-Shift-L: perl:tabbedex:move_tab_right
+!URxvt.keysym.Control-Shift-H: perl:tabbedex:move_tab_left
+URxvt.keysym.Control-Shift-A: perl:tabbedex:move_tab_left
+!URxvt.keysym.Control-Shift-L: perl:tabbedex:move_tab_right
+URxvt.keysym.Control-Shift-F: perl:tabbedex:move_tab_right
+
+!disable basic-and keycap picture insert mode
+URxvt.iso14755: false
+URxvt.iso14755_52: false
 
 URxvt*tabbedex.tabbar-fg: 15
 URxvt*tabbedex.tabbar-bg: 236

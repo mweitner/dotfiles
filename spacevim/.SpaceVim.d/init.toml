@@ -28,11 +28,19 @@
     enable_statusline_mode = false
     guifont = 'Inconsolata Nerd Font Mono:style=Medium'
     terminalfont = 'Inconsolata Nerd Font Mono:style=Medium'
+    # file manager plugins supported in SpaceVim:
+    # - nerdtree (default)
+    # - vimfiler: you need to build the vimproc.vim in bundle/vimproc.vim directory
+    # - defx: requires +py3 feature
+    #filemanager = "nerdtree"
+    filemanager = "nerdtree"
+    #filetree_direction = "right" #default
+    filetree_direction = "right"
 
 [[layers]]
 name = 'core'
-#filetree_opened_icon = ''
-#filetree_closed_icon = ''
+#filetree_opened_icon = '>'
+#filetree_closed_icon = '<'
 
 # Enable autocomplete layer
 [[layers]]
