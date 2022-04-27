@@ -29,6 +29,38 @@ ftmuxp() {
     fi
 }
 
+tmux-new-window() {
+  #
+  # param[1] session - name
+  # param[2] wd - working directory (full path)
+  # param[3, optional] window - name (default: wd last path name)
+  #
+  if [[ -z "$TMUX" ]]; then
+    return
+  fi
+
+  session=$1
+  wd=$2
+  window=$3
+  if [[ -z "$window" ]]; then
+    window=$(basename $wd)
+  fi
+
+  last_window_name=$(tmux list-windows -t $session -F \#w | tail -n1)
+  if [[ -z "$last_window_name" ]]; then
+    echo "no window must not be possible as there is always window:0"
+  fi
+
+  echo "create new window: session: $session:$window, wd: $wd"
+  tmux new-window -t $session -n $window
+  tmux send-keys -t $session:$window "cd $wd" Enter
+  tmux send-keys -t $session:$window "vim" Enter
+  tmux split-window -v -t $session:$window -p 30
+  #pane index starts with 1
+  tmux send-keys -t $session:$window.2 "cd $wd" Enter C-g
+  tmux select-pane -t $session:$window.1
+}
+
 wikipedia() {
   #lynx -vikeys -accept_all_cookies "https://en.wikipedia.org/wiki?search=$@"
   qutebrowser "https://en.wikipedia.org/wiki?search=$@"
