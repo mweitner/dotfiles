@@ -257,7 +257,9 @@ for_window [window_role="pop-up"] floating enable
 for_window [window_role="task_dialog"] floating enable
 for_window [class="Arandr"] floating enable
 for_window [class="Pavucontrol"] floating enable
-# virtual box manager, 
+for_window [class="Spotify"] floating enable
+
+# virtual box mmnager, 
 # WM_NAME("Oracle VM VirtualBox Manager")
 # WM_CLASS("VirtualBox Manager", *)
 #for_window [class="VirtualBox Manager"] floating enabled
@@ -315,7 +317,7 @@ client.focused 		#333333 $black2 $white2 #285577
 client.focused_inactive #333333 $background $foreground #484e50
 client.unfocused 	#333333 #222222 #888888 #292d2e #222222
 client.urgent 		$red1 $red1 $white2 $red1 $red1
-client.placeholder 	#000000 #0c0c0c $white2 #000000 0c0c0c
+client.placeholder 	#000000 #0c0c0c $white2 #000000 #0c0c0c
 
 for_window [class="URxvt*"] border pixel 1
 
@@ -348,6 +350,15 @@ for_window [instance="pavucontrol"] border none
 exec --no-startup-id pavucontrol --target window
 bindsym $mod+Shift+a [instance="pavucontrol"] scratchpad show ; [instance="pavucontrol"] move position center
 
+# spotify scratchpad
+for_window [instance="spotify"] floating enable
+for_window [instance="spotify"] resize 825 800
+# move spotify window to scratchpad which hides it automatically
+for_window [instance="spotify"] move scratchpad
+for_window [instance="spotify"] border none
+exec --no-startup-id spotify --target window
+bindsym $mod+Shift+m [instance="spotify"] scratchpad show ; [instance="spotify"] move position center
+
 set $mode_display \
       Config monitor resolution -\
       Default config (d), Home laptop (l)
@@ -366,7 +377,8 @@ set $mode_workspace \
       Default layout (d), Development (f), Kill all (k)
 mode "$mode_workspace" {
   bindsym d exec --no-startup-id sh "$HOME/.config/i3/scripts/load-default-ws.sh", mode default
-  bindsym f exec --no-startup-id sh "$HOME/.config/i3/scripts/load-dev-ws.sh", mode default
+# bindsym f exec --no-startup-id sh "$HOME/.config/i3/scripts/load-dev-ws.sh", mode default
+  bindsym f exec --no-startup-id "$HOME/.config/i3/scripts/load-audiocontrol.sh", mode default
   bindsym k exec --no-startup-id sh "$HOME/.config/i3/scripts/kill-ws.sh", mode default
 
   # back to normal: Enter or Escape
