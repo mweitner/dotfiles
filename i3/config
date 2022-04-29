@@ -347,7 +347,7 @@ for_window [instance="pavucontrol"] resize 825 800
 # move pavucontrol window to scratchpad which hides it automatically
 for_window [instance="pavucontrol"] move scratchpad
 for_window [instance="pavucontrol"] border none
-exec --no-startup-id pavucontrol --target window
+#exec --no-startup-id pavucontrol --target window
 bindsym $mod+Shift+a [instance="pavucontrol"] scratchpad show ; [instance="pavucontrol"] move position center
 
 # spotify scratchpad
@@ -356,8 +356,17 @@ for_window [instance="spotify"] resize 825 800
 # move spotify window to scratchpad which hides it automatically
 for_window [instance="spotify"] move scratchpad
 for_window [instance="spotify"] border none
-exec --no-startup-id spotify --target window
+#exec --no-startup-id spotify --target window
 bindsym $mod+Shift+m [instance="spotify"] scratchpad show ; [instance="spotify"] move position center
+
+# whatsapp-app scratchpad
+for_window [instance="whatsapp-app"] floating enable
+for_window [instance="whatsapp-app"] resize 825 800
+# move whatsapp-app window to scratchpad which hides it automatically
+for_window [instance="whatsapp-app"] move scratchpad
+for_window [instance="whatsapp-app"] border none
+#exec --no-startup-id whatsapp-app --target window
+bindsym $mod+Shift+n [instance="whatsapp-app"] scratchpad show ; [instance="whatsapp-app"] move position center
 
 set $mode_display \
       Config monitor resolution -\

@@ -43,7 +43,7 @@ tmux-new-window() {
   wd=$2
   window=$3
   if [[ -z "$window" ]]; then
-    window=$(basename $wd)
+    window=$(basename $wd | sed 's/-//g; s/\.//g')
   fi
 
   last_window_name=$(tmux list-windows -t $session -F \#w | tail -n1)

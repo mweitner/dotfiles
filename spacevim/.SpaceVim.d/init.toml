@@ -32,7 +32,6 @@
     # - nerdtree (default)
     # - vimfiler: you need to build the vimproc.vim in bundle/vimproc.vim directory
     # - defx: requires +py3 feature
-    #filemanager = "nerdtree"
     filemanager = "nerdtree"
     #filetree_direction = "right" #default
     filetree_direction = "right"
@@ -59,6 +58,7 @@ name = 'fzf'
 
 [[layers]]
 name = 'git'
+
 [[layers]]
 name = 'VersionControl'
 
