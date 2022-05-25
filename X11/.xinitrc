@@ -4,4 +4,5 @@ udiskie -A &
 exec i3
 
 # as of wiki.archlinux.org xinitrc
-. /etc/X11/Xsession
+# mweitner however uncommented now because had not effect
+#. /etc/X11/Xsession

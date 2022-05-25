@@ -258,6 +258,7 @@ for_window [window_role="task_dialog"] floating enable
 for_window [class="Arandr"] floating enable
 for_window [class="Pavucontrol"] floating enable
 for_window [class="Spotify"] floating enable
+for_window [class="vlc"] floating enable
 
 # virtual box mmnager, 
 # WM_NAME("Oracle VM VirtualBox Manager")
