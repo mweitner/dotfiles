@@ -73,6 +73,28 @@ source "$DOTFILES/zsh/external/bd.zsh"
 #source custom scripts
 source "$DOTFILES/zsh/scripts.sh"
 
+#
+# Adapt PATH
+# append:
+# path+=('/home/michael/my/bin')
+# or prepend
+# path=('/home/michael/my/bin' $path)
+# export to sub-processes (make it inherited by child processes)
+# export PATH
+#
+
+# User-specific executable shall be stored at ~/.local/bin
+# - defined by XDG Base Directory specification
+#
+# For example needed for python3 installed by pip3 --user
+# important make sure $HOME is not used as string
+path+=($HOME'/.local/bin')
+
+# make sure no duplicates
+typeset -U path
+export PATH
+
+
 #start i3
 if [ "$(tty)" = "/dev/tty1" ]; then
   pgrep i3 || exec startx "$XDG_CONFIG_HOME/X11/.xinitrc"
