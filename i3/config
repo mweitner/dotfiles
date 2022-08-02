@@ -14,7 +14,9 @@ set $mod Mod4
 # Font for window titles. Will also be used by the bar unless a different font
 # is used in the bar {} block below.
 #font pango:monospace 8
-font pango:Inconsolata NF 12
+#font pango:Inconsolata NF 12
+# next try to activate DroidSansMono
+font pango:DroidSansMonoForPowerline Nerd Font, FontAwesome, 9
 
 # This font is widely installed, provides lots of unicode glyphs, right-to-left
 # text rendering and scalability on retina/hidpi displays (thanks to pango).
@@ -371,7 +373,7 @@ bindsym $mod+Shift+n [instance="whatsapp-app"] scratchpad show ; [instance="what
 
 set $mode_display \
       Config monitor resolution -\
-      Default config (d), Home laptop (l)
+      Default config (d), Home laptop ()
 mode "$mode_display" {
     bindsym d exec --no-startup-id sh "$HOME/.config/X11/monitor.sh", mode "default"
     bindsym l exec --no-startup-id sh "$HOME/.config/X11/monitor-home-laptop.sh", mode "default"

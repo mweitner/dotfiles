@@ -26,8 +26,12 @@
     buffer_index_type = 4
     enable_tabline_filetype_icon = true
     enable_statusline_mode = false
-    guifont = 'Inconsolata Nerd Font Mono:style=Medium'
-    terminalfont = 'Inconsolata Nerd Font Mono:style=Medium'
+    #guifont = 'Inconsolata Nerd Font Mono:style=Medium'
+    #guifont = 'DroidSansMono Nerd Font Mono:style=Medium'
+    guifont = 'DroidSansMonoForPowerline Nerd Font, FontAwesome, 9'
+    #terminalfont = 'Inconsolata Nerd Font Mono:style=Medium'
+    #terminalfont = 'DroidSansMono Nerd Font Mono:style=Medium'
+    terminalfont = 'DroidSansMonoForPowerline Nerd Font, FontAwesome, 9'
     # file manager plugins supported in SpaceVim:
     # - nerdtree (default)
     # - vimfiler: you need to build the vimproc.vim in bundle/vimproc.vim directory
@@ -61,4 +65,7 @@ name = 'git'
 
 [[layers]]
 name = 'VersionControl'
+
+[[layers]]
+name = 'sudo'
 

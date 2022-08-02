@@ -1,3 +1,7 @@
+! inspired by terminal.sexy
+! Scheme Browser: mocha.dark
+! Exported: Xresources
+!
 *.foreground: #C6C6C6
 *.background: #1C1C1C
 !in dark mode need light color like white
@@ -29,8 +33,33 @@
 *.color7: #e4e4e4
 *.color15: #ffffff
 
-!URxvt*font: xft:DejaVuSansMono:size=14:antialias=true
-URxvt*font: xft:Inconsolata Nerd Font Mono:style=Medium:size=14:pixelsize=16:antialias=true
+!
+! inspiration from
+! https://smarttech101.com/urxvt-installation-color-scheme-fonts-resize-etc/#urxvt-fonts
+!
+URxvt*font: \
+            xft:DroidSansMono Nerd Font Mono:antialias=true:size=16, \
+            xft:Comic Mono:style=Normal:antialias=true:size=12:minspace=False, \
+            xft:DroidSansMono Droid Sans Mono:antialias=true:size=16, \
+            xft:UbuntuMono Nerd Font Mono:style=Regular:antialias=true:size=16:minspace=False, \
+            xft:SauceCodePro Nerd Font:style=Regular:antialias=true:size=16:minspace=False, \
+            xft:DejaVuSansMono Nerd Font:antialias=true:size=16:minspace=False, \
+            xft:FuraMono NF:size=16:antialias=true:minspace=False, \
+            xft:RobotoMono Nerd Font:antialias=true:size=16:minspace=False, \
+            xft:Noto Sans Mono:antialias=true:size=16:minspace=False, \
+            xft:Monospace:style=Medium:antialias=true:minspace=False
+URxvt*boldFont: \
+            xft:DroidSansMono Nerd Font Mono:antialias=true:size=16, \
+            xft:Comic Mono:style=Bold:antialias=true:size=18:minspace=False, \
+            xft:UbuntuMono Nerd Font Mono:style=Regular:antialias=true:size=16:minspace=False, \
+            xft:SauceCodePro Nerd Font:style=Medium:antialias=true:size=16:minspace=False, \
+            xft:DejaVuSansMono Nerd Font:antialias=true:size=16:minspace=False, \
+            xft:FuraMono NF:size=16:antialias=true:minspace=False, \
+            xft:RobotoMono Nerd Font:antialias=true:size=16:minspace=False, \
+            xft:Noto Sans Mono:antialias=true:size=16:minspace=False, \
+            xft:Monospace:style=Medium:antialias=true:minspace=False
+! show boldness only by boldness and nothing else: intensityStyles: false
+URxvt*intensityStyles: false
 URxvt*borderLess: false
 URxvt*externalBorder: 0
 URxvt*internalBorder: 4
@@ -38,7 +67,7 @@ URxvt*scrollBar: false
 URxvt*saveLines: 5000
 URxvt*cursorBlink: false
 URxvt*cursorUnderline: true
-URxvt*letterSpace: -1
+URxvt*letterSpace: -2
   
 URxvt*perl-ext-common: default,tabbedex
 
