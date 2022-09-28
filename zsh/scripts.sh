@@ -71,3 +71,14 @@ duckduckgo() {
   qutebrowser "https://lite.duckduckgo.com/lite/?q='$@'"
 }
 
+setupwifi() {
+  wifi_index=$1
+  if [[ -z "$wifi_index" ]]; then
+    wifi_index="1"
+  fi
+
+  wifi_device_name="wlan${wifi_index}"
+  sudo ip link set down ${wifi_device_name}
+  sudo ip link set ${wifi_device_name} name wlan0
+  sudo ip link set up wlan0
+}
