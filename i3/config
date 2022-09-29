@@ -172,8 +172,8 @@ bindsym $mod+Shift+r restart
 #bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'You pressed the exit shortcut. Do you really want to exit i3? This will end your X session.' -B 'Yes, exit i3' 'i3-msg exit'"
 # replaced by shutdown / restart / suspend menu
 set $mode_system \
-      System (1) lock, (e) logout, (s) suspend, \
-      (h) hibernate, (r) reboot, (Ctrl+s) shutdown
+      System \
+      (l) lock, (e) logout, (s) suspend, (h) hibernate, (r) reboot, (Ctrl+s) shutdown
 
 mode "$mode_system" {
   bindsym l exec --no-startup-id $i3lockwall, mode "default"
@@ -328,7 +328,7 @@ for_window [class="URxvt*"] border pixel 1
 for_window [instance="urxvt_scratchpad"] move to scratchpad, border none
 bindsym $mod+Shift+t [instance="urxvt_scratchpad"] scratchpad show
 #exec urxvtc -name urxvt_scratchpad -e vim '/tmp/vim-tmp.md'
-exec urxvtc -name urxvt_scratchpad -e tmuxp load term-scratchpad
+exec urxvtc -name urxvt_scratchpad -e tmuxp load term-scratchpad -s term-sp
 
 # htop scratchpad
 for_window [instance="htop_scratchpad"] move to scratchpad, border none
@@ -373,7 +373,7 @@ bindsym $mod+Shift+n [instance="whatsapp-app"] scratchpad show ; [instance="what
 
 set $mode_display \
       Config monitor resolution -\
-      Default config (d), Home laptop ()
+      Default config (d), Home laptop (l)
 mode "$mode_display" {
     bindsym d exec --no-startup-id sh "$HOME/.config/X11/monitor.sh", mode "default"
     bindsym l exec --no-startup-id sh "$HOME/.config/X11/monitor-home-laptop.sh", mode "default"

@@ -10,4 +10,8 @@ windows:
     layout: tiled
     panes:
       - sudo dmesg -w
+  - window_name: network
+    layout: tiled
+    panes:
+      - nmcli device
 
