@@ -1,6 +1,6 @@
 [user]
 	name = Michael Weitner
-	email = michael@weitnerembeddedsystem.com
+	email = michael.weitner@liebherr.com
 [core]
 #pager = diff-so-fancy | less --tabs=4 -RFX
 	editor = /usr/bin/nvim

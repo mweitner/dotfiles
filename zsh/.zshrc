@@ -74,6 +74,18 @@ source "$DOTFILES/zsh/external/bd.zsh"
 source "$DOTFILES/zsh/scripts.sh"
 
 #
+# Set java home
+#
+# The java home env is also used for path environment
+#  to point to right jdk.
+# Note: installing jdk at /bin/ makes command like java, ...
+# already available 
+#
+if [[ -e /usr/lib/jvm/java-8-openjdk-amd64 ]]; then
+  export JAVA_HOME="/usr/lib/jvm/java-8-openjdk-amd64"
+fi
+
+#
 # Adapt PATH
 # append:
 # path+=('/home/michael/my/bin')
@@ -97,7 +109,7 @@ export PATH
 
 #start i3
 if [ "$(tty)" = "/dev/tty1" ]; then
-  pgrep i3 || exec startx "$XDG_CONFIG_HOME/X11/.xinitrc"
+ pgrep i3 || exec startx "$XDG_CONFIG_HOME/X11/.xinitrc"
 fi
 
 if [ ! "$(tty)" = "/dev/tty1" ]; then
