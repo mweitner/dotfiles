@@ -109,6 +109,13 @@ bindsym $mod+Shift+space floating toggle
 # change focus between tiling / floating windows
 bindsym $mod+space focus mode_toggle
 
+# inspired by freebsd forum about sticky floating window
+# when switching workspace (container)
+# typically use $mod+Shift+s is already reserved for
+# my 1password floating window to remember s like security
+# instead using g for glue ;-)
+bindsym $mod+Shift+g sticky toggle
+
 # focus the parent container
 bindsym $mod+a focus parent
 
@@ -122,11 +129,11 @@ set $ws2web "web"
 set $ws3dev "dev"
 set $ws4vm "vm"
 set $ws5rdp "rdp"
-set $ws6 "6"
-set $ws7 "7"
-set $ws8 "8"
-set $ws9 "9"
-set $ws10 "10"
+set $ws6web2 "web2"
+set $ws7dev2 "dev2"
+set $ws8dev3 "dev3"
+set $ws9dev4 "dev4"
+set $ws10dev5 "dev5"
 
 # switch to workspace
 bindsym $mod+1 workspace number 1 $ws1term
@@ -134,11 +141,11 @@ bindsym $mod+2 workspace number 2 $ws2web
 bindsym $mod+3 workspace number 3 $ws3dev
 bindsym $mod+4 workspace number 4 $ws4vm
 bindsym $mod+5 workspace number 5 $ws5rdp
-bindsym $mod+6 workspace number $ws6
-bindsym $mod+7 workspace number $ws7
-bindsym $mod+8 workspace number $ws8
-bindsym $mod+9 workspace number $ws9
-bindsym $mod+0 workspace number $ws10
+bindsym $mod+6 workspace number 6 $ws6web2
+bindsym $mod+7 workspace number 7 $ws7dev2
+bindsym $mod+8 workspace number 8 $ws8dev3
+bindsym $mod+9 workspace number 9 $ws9dev4
+bindsym $mod+0 workspace number 10 $ws10dev5
 
 # move focused container to workspace
 bindsym $mod+Shift+1 move container to workspace number 1 $ws1term
@@ -146,11 +153,11 @@ bindsym $mod+Shift+2 move container to workspace number 2 $ws2web
 bindsym $mod+Shift+3 move container to workspace number 3 $ws3dev
 bindsym $mod+Shift+4 move container to workspace number 4 $ws4vm
 bindsym $mod+Shift+5 move container to workspace number 5 $ws5rdp
-bindsym $mod+Shift+6 move container to workspace number $ws6
-bindsym $mod+Shift+7 move container to workspace number $ws7
-bindsym $mod+Shift+8 move container to workspace number $ws8
-bindsym $mod+Shift+9 move container to workspace number $ws9
-bindsym $mod+Shift+0 move container to workspace number $ws10
+bindsym $mod+Shift+6 move container to workspace number 6 $ws6web2
+bindsym $mod+Shift+7 move container to workspace number 7 $ws7dev2
+bindsym $mod+Shift+8 move container to workspace number 8 $ws8dev3
+bindsym $mod+Shift+9 move container to workspace number 9 $ws9dev4
+bindsym $mod+Shift+0 move container to workspace number 10 $ws10dev5
 
 # move focused window to workspace and switch to target workspace
 bindsym $mod+Control+1 move container to workspace number 1 $ws1term; workspace number 1 $ws1term
@@ -158,6 +165,11 @@ bindsym $mod+Control+2 move container to workspace number 2 $ws2web; workspace n
 bindsym $mod+Control+3 move container to workspace number 3 $ws3dev; workspace number 3 ws3dev
 bindsym $mod+Control+4 move container to workspace number 4 $ws4vm; workspace number 4 $ws4vm
 bindsym $mod+Control+5 move container to workspace number 5 $ws5rdp; workspace number 5 $ws5rdp
+bindsym $mod+Control+6 move container to workspace number 6 $ws6web2; workspace number 6 $ws6web2
+bindsym $mod+Control+7 move container to workspace number 7 $ws7dev2; workspace number 7 $ws7dev2
+bindsym $mod+Control+8 move container to workspace number 8 $ws8dev3; workspace number 8 $ws8dev3
+bindsym $mod+Control+9 move container to workspace number 9 $ws9dev4; workspace number 9 $ws9dev4
+bindsym $mod+Control+10 move container to workspace number 10 $ws10dev5; workspace number 10 $ws10dev5
 
 # move workspace between monitors
 bindsym $mod+Control+m move workspace to output primary
@@ -389,6 +401,27 @@ for_window [instance="1password"] move scratchpad
 #for_window [instance="1password"] border none
 #exec --no-startup-id 1password --target window
 bindsym $mod+Shift+s [instance="1password"] scratchpad show ; [instance="1password"] move position center
+
+# move floating windows with keys
+# inspired by faq.i3wm.org 4615 how-can-i-move-a-floating-with-keys
+bindsym $mod+m mode "move" focus floating
+mode "move" {
+  bindsym $mod+Tab focus right
+
+  bindsym Left move left
+  bindsym Down move down
+  bindsym Up move up
+  bindsym Right move right
+
+  bindsym h move left
+  bindsym j move down
+  bindsym k move up
+  bindsym l move right
+
+  #back to normal: Enter or Escape
+  bindsym Return mode "default"
+  bindsym Escape mode "default"
+}
 
 set $mode_display \
       Config monitor resolution -\
