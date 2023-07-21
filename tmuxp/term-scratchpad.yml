@@ -3,19 +3,19 @@ start_directory: /tmp/
 
 windows:
   - window_name: vim doc
-    layout: tiled
     panes:
       - vim '/tmp/vim-tmp.md'
   - window_name: kernel logs
-    layout: tiled
     panes:
       - sudo dmesg -w
   - window_name: cal
-    layout: tiled
     panes:
       - bc
   - window_name: network
-    layout: tiled
     panes:
       - nmcli device
+  - window_name: screenshot
+    panes:
+      - echo 'use scrot -s to take a screenshot'
+
 

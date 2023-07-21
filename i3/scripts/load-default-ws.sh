@@ -14,14 +14,11 @@ if [[ ! $(pgrep -u $UID -f "$tmuxterm_prefix load term-ws1") ]]; then
   # most likely a timing issue which is solved if i3 api is used!!!
   #. $HOME/.config/i3/scripts/start-urxvt.sh urxvt-term
 fi
-#if [[ ! $(pgrep -u $UID -x firefox) ]]; then
 if [[ ! $(pgrep -u $UID -x firefox) ]]; then
+  #firefox only web workspace
   i3-msg "workspace number 2 web; append_layout $HOME/.config/i3/workspace2-web.json"
   #  firefox &
   i3-msg "exec --no-startup-id firefox"
-  #i3-msg "exec --no-startup-id $HOME/.config/i3/scripts/start-urxvt.sh urxvt-web"
-  i3-msg "exec --no-startup-id $HOME/.config/i3/scripts/start-tmuxp.sh term-web"
-  #. $HOME/.config/i3/scripts/start-urxvt.sh urxvt-web
 fi
 #if [[ ! $(pgrep -u $UID -f "urxvt -name urxvt-dev") ]]; then
 if [[ ! $(pgrep -u $UID -f "$tmuxterm_prefix load term-dev") ]]; then
@@ -31,3 +28,4 @@ if [[ ! $(pgrep -u $UID -f "$tmuxterm_prefix load term-dev") ]]; then
   #. $HOME/.config/i3/scripts/start-urxvt.sh urxvt-dev
 fi
 
+i3-msg "workspace number 6 web; append_layout $HOME/.config/i3/workspace6-web.json"

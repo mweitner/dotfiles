@@ -1,14 +1,14 @@
 session_name: term-dev
 windows:
-- focus: 'true'
-  layout: b234,273x60,0,0[273x47,0,0,6,273x12,0,48,7]
-  options:
-    automatic-rename: 'off'
+- window_name: dotfiles
   panes:
   - shell_command:
-    - cd /home/michael/dotfiles
+    - cd ${HOME}/dotfiles
     - nvim
   - focus: 'true'
-    shell_command:
-    - cd /home/michael
-  window_name: w1
+- window_name: dev1
+  panes:
+    - shell_command:
+      - nvim
+    - focus: 'true'
+

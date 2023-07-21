@@ -367,13 +367,13 @@ for_window [instance="pavucontrol"] border none
 bindsym $mod+Shift+a [instance="pavucontrol"] scratchpad show ; [instance="pavucontrol"] move position center
 
 # spotify scratchpad
-for_window [instance="spotify"] floating enable
-for_window [instance="spotify"] resize 825 800
+#for_window [instance="spotify"] floating enable
+#for_window [instance="spotify"] resize 825 800
 # move spotify window to scratchpad which hides it automatically
-for_window [instance="spotify"] move scratchpad
-for_window [instance="spotify"] border none
+#for_window [instance="spotify"] move scratchpad
+#for_window [instance="spotify"] border none
 #exec --no-startup-id spotify --target window
-bindsym $mod+Shift+m [instance="spotify"] scratchpad show ; [instance="spotify"] move position center
+#bindsym $mod+Shift+m [instance="spotify"] scratchpad show ; [instance="spotify"] move position center
 
 # whatsapp-app scratchpad
 for_window [instance="whatsapp-app"] floating enable

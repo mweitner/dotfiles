@@ -10,19 +10,12 @@
             "border": "normal",
             "current_border_width": 2,
             "floating": "auto_off",
-            "geometry": {
-               "height": 1031,
-               "width": 958,
-               "x": 0,
-               "y": 0
-            },
             "marks": [],
-            "name": "- Mozilla Firefox",
-            "percent": 0.5,
+            "name": "- Google Chrome",
             "swallows": [
                {
-                "class": "^firefox$",
-                "instance": "^Navigator$",
+                "class": "^Google-chrome$",
+                "instance": "^google-chrome$",
                 "window_role": "^browser$"
                }
             ],

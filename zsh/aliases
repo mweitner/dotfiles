@@ -13,3 +13,5 @@ alias gl='git log --decorate --oneline --graph --all'
 
 alias mc='EDITOR=nvim . /usr/lib/mc/mc-wrapper.sh'
 
+alias python='python3'
+

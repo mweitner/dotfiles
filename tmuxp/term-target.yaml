@@ -1,0 +1,7 @@
+session_name: term-target
+windows:
+- window_name: serial
+  focus: 'true'
+- window_name: netboot
+  shell_command: cd /opt/netboot
+
