@@ -394,13 +394,16 @@ for_window [instance="gpclient"] move scratchpad
 bindsym $mod+Shift+v [instance="gpclient"] scratchpad show ; [instance="gpclient"] move position center
 
 # 1Password scratchpad
-for_window [instance="1password"] floating enable
+# todo mweitner reactivate next line floating enable
+#for_window [instance="1password"] floating enable
 #for_window [instance="1password"] resize 825 800
 # move 1password window to scratchpad which hides it automatically
-for_window [instance="1password"] move scratchpad
+# todo mweitner reactivate next line move scratchpad
+#for_window [instance="1password"] move scratchpad
 #for_window [instance="1password"] border none
 #exec --no-startup-id 1password --target window
-bindsym $mod+Shift+s [instance="1password"] scratchpad show ; [instance="1password"] move position center
+# todo mweitner reactivate next line bindsym
+#bindsym $mod+Shift+s [instance="1password"] scratchpad show ; [instance="1password"] move position center
 
 # move floating windows with keys
 # inspired by faq.i3wm.org 4615 how-can-i-move-a-floating-with-keys

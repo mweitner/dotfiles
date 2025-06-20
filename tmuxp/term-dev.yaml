@@ -11,4 +11,3 @@ windows:
     - shell_command:
       - nvim
     - focus: 'true'
-

@@ -6,3 +6,5 @@
 	editor = /usr/bin/nvim
 [init]
 	defaultBranch = main
+[color]
+	ui = auto

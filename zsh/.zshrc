@@ -1,3 +1,15 @@
+# Source user's profile for environment setup (including systemd --user)
+# This block should be near the top of your .zshrc, or preferably in .zprofile
+# if you use that for login-specific configurations.
+if [[ -f ~/.profile ]] && [[ -z "$ZSH_PROFILE_SOURCED" ]]; then
+  source ~/.profile
+  export ZSH_PROFILE_SOURCED="true" # Prevent re-sourcing if .zshrc is sourced multiple times
+fi
+
+# as of zsh issue with insecure directories
+# https://github.com/zsh-users/zsh-completions/issues/680
+# set disable compfix
+#ZSH_DISABLE_COMPFIX="true"
 source "$XDG_CONFIG_HOME/zsh/aliases"
 
 setopt AUTO_PARAM_SLASH
@@ -109,7 +121,8 @@ export PATH
 
 #start i3
 if [ "$(tty)" = "/dev/tty1" ]; then
- pgrep i3 || exec startx "$XDG_CONFIG_HOME/X11/.xinitrc"
+ # pgrep i3 || exec startx "$XDG_CONFIG_HOME/X11/.xinitrc"
+ echo "Dummy Starting i3 on $(tty)"
 fi
 
 if [ ! "$(tty)" = "/dev/tty1" ]; then
