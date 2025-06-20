@@ -119,10 +119,11 @@ typeset -U path
 export PATH
 
 
-#start i3
+##start i3
+## disabled as use lightdm display manager
 if [ "$(tty)" = "/dev/tty1" ]; then
- # pgrep i3 || exec startx "$XDG_CONFIG_HOME/X11/.xinitrc"
- echo "Dummy Starting i3 on $(tty)"
+# echo "Starting i3 on $(tty) by startx"
+# pgrep i3 || exec startx "$XDG_CONFIG_HOME/X11/.xinitrc"
 fi
 
 if [ ! "$(tty)" = "/dev/tty1" ]; then
