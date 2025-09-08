@@ -1,0 +1,2 @@
+! Minimal font configuration
+URxvt*font: xft:Fira Code Nerd Font Mono:style=Regular:size=16

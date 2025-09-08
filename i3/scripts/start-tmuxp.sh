@@ -8,6 +8,5 @@
 name=$1
 
 if [[ ! $(tmux list-sessions -F \#S |grep $name) ]]; then
-  urxvtc -name $name -e tmuxp load $name &
+  alacritty --title $name -e tmuxp load $name &
 fi
- 

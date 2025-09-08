@@ -44,12 +44,28 @@ bindsym XF86AudioLowerVolume exec --no-startup-id pactl set-sink-volume @DEFAULT
 bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle && $refresh_i3status
 bindsym XF86AudioMicMute exec --no-startup-id pactl set-source-mute @DEFAULT_SOURCE@ toggle && $refresh_i3status
 
+# --------------------------------------------------------------------------
+# Autostart applications and services
+# These commands run when i3 starts after logging in.
+# Use 'exec_always' if you want them to run every time i3 is reloaded.
+# --------------------------------------------------------------------------
+
+# Load Xresources (Not needed for Alacritty)
+# exec --no-startup-id xrdb -merge ~/.config/X11/.Xresources
+
+# Start a default terminal emulator.
+# Alacritty does not need to run as a daemon.
+exec --no-startup-id alacritty
+
+# Start udiskie (your automounter)
+exec --no-startup-id udiskie -A
+
 # Use Mouse+$mod to drag floating windows to their wanted position
 floating_modifier $mod
 
 # start a terminal
 #bindsym $mod+Return exec i3-sensible-terminal
-bindsym $mod+Return exec urxvtc
+bindsym $mod+Return exec alacritty
 
 # kill focused window
 bindsym $mod+Shift+q kill
@@ -247,11 +263,11 @@ bar {
         separator $white2
 
         # border background text
-        focused_workspace 	$background $background $red1
-        active_workspace 	$black2 $black1 $white2
-        inactive_workspace 	$black1 $black2 $foreground
-        urgent_workspace 	$red1 $red1 $white2
-        binding_mode 		$background $red2 $white2
+        focused_workspace   $background $background $red1
+        active_workspace  $black2 $black1 $white2
+        inactive_workspace  $black1 $black2 $foreground
+        urgent_workspace  $red1 $red1 $white2
+        binding_mode    $background $red2 $white2
     }
 }
 
@@ -265,7 +281,7 @@ focus_follows_mouse no
 set $i3lockwall sh "$HOME/.config/i3/scripts/lock.sh"
 bindsym $mod+Control+Shift+l exec --no-startup-id $i3lockwall
 #wallpaper
-exec --no-startup-id feh --no-fehbg --bg-fill \
+exec_always --no-startup-id feh --no-fehbg --bg-fill \
   "$HOME/.config/i3/feh/nature-g2658ad761_1920.jpg"
 #floating windows
 for_window [window_role="pop-up"] floating enable
@@ -329,24 +345,25 @@ set_from_resource $white2 color15 #ffffff
 hide_edge_borders both
 
 # class border backgr. text indicator child_border 
-client.focused 		#333333 $black2 $white2 #285577
+client.focused    #333333 $black2 $white2 #285577
 client.focused_inactive #333333 $background $foreground #484e50
-client.unfocused 	#333333 #222222 #888888 #292d2e #222222
-client.urgent 		$red1 $red1 $white2 $red1 $red1
-client.placeholder 	#000000 #0c0c0c $white2 #000000 #0c0c0c
+client.unfocused  #333333 #222222 #888888 #292d2e #222222
+client.urgent     $red1 $red1 $white2 $red1 $red1
+client.placeholder  #000000 #0c0c0c $white2 #000000 #0c0c0c
 
-for_window [class="URxvt*"] border pixel 1
+# Use the explicit class for Alacritty windows.
+# removes the Alacritty window header (border)
+for_window [class="Alacritty"] border pixel 1
 
 # Terminal scratchpad
-for_window [instance="urxvt_scratchpad"] move to scratchpad, border none
-bindsym $mod+Shift+t [instance="urxvt_scratchpad"] scratchpad show
-#exec urxvtc -name urxvt_scratchpad -e vim '/tmp/vim-tmp.md'
-exec urxvtc -name urxvt_scratchpad -e tmuxp load term-scratchpad -s term-sp
+# Use both class and title for a robust rule.
+for_window [class="Alacritty" title="terminal_scratchpad"] move to scratchpad, border none
+bindsym $mod+Shift+t [class="Alacritty" title="terminal_scratchpad"] scratchpad show
+exec alacritty --title terminal_scratchpad -e tmuxp load term-scratchpad -s term-sp
 
-# htop scratchpad
-for_window [instance="htop_scratchpad"] move to scratchpad, border none
-bindsym $mod+Shift+p [instance="htop_scratchpad"] scratchpad show
-exec urxvtc -name htop_scratchpad -e htop
+# htop floating window
+for_window [class="Alacritty" title="htop"] floating enable
+bindsym $mod+Shift+p exec alacritty --title htop -e htop
 
 # qutebrowser scratchpad
 for_window [instance="qutebrowser"] floating enable
@@ -446,7 +463,7 @@ set $mode_workspace \
       Default layout (d), Development (f), Kill all (k)
 mode "$mode_workspace" {
   bindsym d exec --no-startup-id sh "$HOME/.config/i3/scripts/load-default-ws.sh", mode default
-# bindsym f exec --no-startup-id sh "$HOME/.config/i3/scripts/load-dev-ws.sh", mode default
+# bindsym f exec --no-startup_id sh "$HOME/.config/i3/scripts/load-dev-ws.sh", mode default
   bindsym f exec --no-startup-id "$HOME/.config/i3/scripts/load-audiocontrol.sh", mode default
   bindsym k exec --no-startup-id sh "$HOME/.config/i3/scripts/kill-ws.sh", mode default
 
@@ -457,4 +474,3 @@ mode "$mode_workspace" {
 bindsym $mod+c mode "$mode_workspace"
 
 exec --no-startup-id dunst
-

@@ -37,17 +37,27 @@
 ! inspiration from
 ! https://smarttech101.com/urxvt-installation-color-scheme-fonts-resize-etc/#urxvt-fonts
 !
-URxvt*font: \
-            xft:DroidSansMono Nerd Font Mono:antialias=true:size=16, \
-            xft:Comic Mono:style=Normal:antialias=true:size=12:minspace=False, \
-            xft:DroidSansMono Droid Sans Mono:antialias=true:size=16, \
-            xft:UbuntuMono Nerd Font Mono:style=Regular:antialias=true:size=16:minspace=False, \
-            xft:SauceCodePro Nerd Font:style=Regular:antialias=true:size=16:minspace=False, \
-            xft:DejaVuSansMono Nerd Font:antialias=true:size=16:minspace=False, \
-            xft:FuraMono NF:size=16:antialias=true:minspace=False, \
-            xft:RobotoMono Nerd Font:antialias=true:size=16:minspace=False, \
-            xft:Noto Sans Mono:antialias=true:size=16:minspace=False, \
-            xft:Monospace:style=Medium:antialias=true:minspace=False
+!URxvt*font: \
+!            xft:DroidSansMono Nerd Font Mono:antialias=true:size=16, \
+!            xft:Comic Mono:style=Normal:antialias=true:size=12:minspace=False, \
+!            xft:DroidSansMono Droid Sans Mono:antialias=true:size=16, \
+!            xft:UbuntuMono Nerd Font Mono:style=Regular:antialias=true:size=16:minspace=False, \
+!            xft:SauceCodePro Nerd Font:style=Regular:antialias=true:size=16:minspace=False, \
+!            xft:DejaVuSansMono Nerd Font:antialias=true:size=16:minspace=False, \
+!            xft:FuraMono NF:size=16:antialias=true:minspace=False, \
+!            xft:RobotoMono Nerd Font:antialias=true:size=16:minspace=False, \
+!            xft:Noto Sans Mono:antialias=true:size=16:minspace=False, \
+!            xft:Monospace:style=Medium:antialias=true:minspace=False
+! Simplified variant of font definition
+! gemini support: changed font to FiraCode Nerd Font Mono
+! - uncommented following line
+URxvt*font: xft:Monospace:size=14:antialias=true
+! gemini support: changed font to FiraCode Nerd Font Mono
+! - This single line tells URxvt to use the FiraCode Nerd Font Mono at a size of 16, with antialiasing enabled.
+! - The term FiraCode Nerd Font Mono is the correct, full name for the font you installed 
+! URxvt*font: xft:FiraCode Nerd Font Mono:antialias=true:size=16
+! URxvt*font: xft:FiraCode Nerd Font:size=16:antialias=true,xft:Noto Sans Mono:size=16:antialias=true
+! URxvt*font: xft:FiraCode Nerd Font Mono:size=12:antialias=true,xft:Noto Sans Mono:size=12:antialias=true
 URxvt*boldFont: \
             xft:DroidSansMono Nerd Font Mono:antialias=true:size=16, \
             xft:Comic Mono:style=Bold:antialias=true:size=18:minspace=False, \
