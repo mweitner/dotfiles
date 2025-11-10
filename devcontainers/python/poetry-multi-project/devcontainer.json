@@ -1,0 +1,40 @@
+{
+    "name": "Gemini Stable: Multi-Poetry Workspace",
+    
+    // Use a custom Dockerfile to handle the complex Poetry installation
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    
+    // Set the workspace root for the whole project
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+
+    // Run this script after the container is created to set up all projects
+    "postCreateCommand": "sudo /bin/bash .devcontainer/setup_poetry.sh",
+
+    // Essential VS Code Extensions to install inside the container
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "Google.geminicodeassist", 
+                "GoogleCloudTools.cloudcode", 
+                "ms-python.python" // Python extension is critical for detecting Poetry envs
+            ]
+        }
+    },
+
+    // Set Poetry configurations inside the container
+    "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        // Tell Poetry to install environments into the workspace for cache survival
+        "python.poetry.enabled": true,
+        "poetry.virtualenvs.in-project": true 
+    },
+
+    // Forward the port where the Gemini Agent might run (if necessary)
+    "forwardPorts": [45207],
+
+    // Default terminal to use (optional)
+    "remoteUser": "vscode"
+}

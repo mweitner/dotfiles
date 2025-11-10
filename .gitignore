@@ -1,3 +1,6 @@
 *.log
 tags
 
+# ai/ki
+ai/gemini/tmp/*
+ai/gemini/cache/*

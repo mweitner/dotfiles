@@ -1,0 +1,27 @@
+{
+    "name": "Doc engine sphinx Gemini Code Assist Stable Environment (Ubuntu 24.04)",
+    
+    // Use a modern base image that guarantees GLIBC 2.38+
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+    
+    // Run post-create commands to install necessary OS tools
+    // NEW (Correct): Use 'sudo' to gain root permissions for apt-get
+    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y git wget curl",
+
+    // Essential VS Code Extensions to install inside the container
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "Google.geminicodeassist", // The target extension
+                "GoogleCloudTools.cloudcode", 
+                "ms-python.python"
+            ]
+        }
+    },
+    
+    // Forward the port where the Gemini Agent might run (if necessary)
+    "forwardPorts": [45207],
+
+    // Default terminal to use (optional)
+    "remoteUser": "vscode"
+}

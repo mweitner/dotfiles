@@ -1,0 +1,48 @@
+{
+    "security": {
+        "auth": {
+            "selectedType": "oauth-personal"
+        }
+    },
+    // --- GENERAL SETTINGS ---
+    "general": {
+        // Automatically accept safe, read-only commands (like reading a file). 
+        // Set to false if you want confirmation for EVERYTHING.
+        "autoAccept": true,
+        // Default theme you selected during setup (adjust as needed)
+        "theme": "GitHub"
+    },
+    // --- TOOL CONFIGURATION (CORE) ---
+    // The coreTools section is the best way to restrict Agent Mode for safety.
+    // By providing this list, you effectively CREATE AN ALLOWLIST: 
+    // any tool NOT listed here will be blocked.
+    "tools": {
+        "core": [
+            // Standard File System Tools (Safe for Context and Reading)
+            "ReadFileTool",
+            "GlobTool",
+            "SearchText",
+            "WriteFileTool", // Essential for making code changes
+            // Standard Search/Web Tools
+            "GoogleSearch",
+            "WebFetchTool",
+            // Shell Tool (HIGH RISK - Use sparingly and restrict commands)
+            "ShellTool"
+        ],
+        // --- SHELL TOOL RESTRICTIONS (HIGHLY RECOMMENDED) ---
+        // This is a more explicit way to ensure dangerous commands are blocked.
+        // It's a second layer of defense against dangerous shell calls.
+        "excludeTools": [
+            // Block tools that can wipe data or change core system files.
+            "ShellTool(rm -rf)",
+            "ShellTool(sudo)",
+            "ShellTool(chmod -R)",
+            "ShellTool(curl | bash)",
+            "ShellTool(npm install -g)" // Use a controlled method for global installs
+        ]
+    }
+    // --- MCP SERVERS ---
+    // "mcpServers": {
+    //     // Add any custom external tools here later if you use them.
+    // }
+}
