@@ -117,6 +117,48 @@ cp ~/.config/i3/config ~/.config/sway/config
 2. **Waybar:** Replace bar block with `bar { swaybar_command waybar }`
 3. **Launcher:** `bindsym $mod+d exec wofi --show run`
 
+### Waybar Config
+
+Save this to ~/.config/waybar/config.jsonc:
+
+- sway/waybar/config.jsonc
+
+```json
+{
+    "layer": "top",
+    "position": "bottom",
+    "height": 30,
+    "modules-left": ["sway/workspaces", "sway/mode"],
+    "modules-center": ["sway/window"],
+    "modules-right": ["pulseaudio", "network", "cpu", "memory", "backlight", "battery", "clock", "tray"],
+
+    "sway/workspaces": {
+        "disable-scroll": true,
+        "all-outputs": true,
+        "format": "{name}"
+    },
+    "backlight": {
+        "format": "{percent}% {icon}",
+        "format-icons": ["", ""]
+    },
+    "pulseaudio": {
+        "format": "{volume}% {icon}",
+        "format-bluetooth": "{volume}% {icon}",
+        "format-muted": "",
+        "format-icons": {
+            "headphone": "",
+            "hands-free": "",
+            "headset": "",
+            "phone": "",
+            "portable": "",
+            "car": "",
+            "default": ["", ""]
+        }
+    }
+}
+
+```
+
 ## Phase 6: Browser & Communication
 
 For documentation and Yocto community interaction:
