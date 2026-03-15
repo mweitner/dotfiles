@@ -12,8 +12,8 @@
 set $mod Mod4
 
 
-# Font for window titles
-font pango:DroidSansMonoForPowerline Nerd Font, FontAwesome, 9
+# Font for window titles and bar
+font pango:Noto Sans, Noto Serif, Noto Emoji, FontAwesome, monospace 11
 
 # Sway-specific: scaling for HiDPI
 output eDP-1 scale 1.25
@@ -224,6 +224,7 @@ bindsym $mod+r mode "resize"
 # Use Waybar for Sway
 bar {
   swaybar_command waybar
+  font pango:Noto Sans, Noto Serif, Noto Emoji, FontAwesome, monospace 11
 }
 
 workspace_auto_back_and_forth yes
