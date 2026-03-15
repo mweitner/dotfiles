@@ -15,3 +15,29 @@ alias mc='EDITOR=nvim . /usr/lib/mc/mc-wrapper.sh'
 
 alias python='python3'
 
+function poetry-dev() {
+    #first cleanup
+    poetry-clean
+    #than create venv and install
+	poetry env use python3.10
+    poetry install
+    source $(poetry env info --path)/bin/activate
+    # Load .env variables
+    # makes sure .env is loaded even module is run with python instead of poetry run
+    set -a
+    [ -f .env ] && source .env
+    set +a
+}
+
+function poetry-clean() {
+    poetry env remove $(poetry env info --executable)
+    deactivate
+}
+
+function repo-status() {
+    repo forall -c '\
+        echo "===";\
+        basename `git rev-parse --show-toplevel`;\
+        git describe --tags --dirty --always --long\
+    '
+}

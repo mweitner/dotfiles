@@ -6,6 +6,10 @@ if [[ -f ~/.profile ]] && [[ -z "$ZSH_PROFILE_SOURCED" ]]; then
   export ZSH_PROFILE_SOURCED="true" # Prevent re-sourcing if .zshrc is sourced multiple times
 fi
 
+# Set xterm-256color as terminal that target (device) ssh terminals work nicley
+# e.g. DC5 display showed a 80 column terminal if not set to xterm...
+export TERM=xterm-256color
+
 # as of zsh issue with insecure directories
 # https://github.com/zsh-users/zsh-completions/issues/680
 # set disable compfix
