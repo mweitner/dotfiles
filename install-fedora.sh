@@ -66,6 +66,9 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
     meld \
     neovim
 
+  # Audio mixer (PipeWire-compatible via pipewire-pulseaudio)
+  sudo dnf install -y pavucontrol
+
   # Shell & multiplexer
   sudo dnf install -y zsh fish tmux
 
@@ -77,7 +80,8 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
     google-noto-sans-fonts \
     google-noto-serif-fonts \
     google-noto-emoji-fonts \
-    fontawesome-fonts
+    fontawesome-6-free-fonts \
+    fontawesome-6-brands-fonts
 
   # Power / thermal (HP ZBook)
   sudo dnf install -y tlp tlp-rdw thermald

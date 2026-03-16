@@ -223,12 +223,8 @@ mode "resize" {
 
 bindsym $mod+r mode "resize"
 
-# our customiyed i3bar
-# Use Waybar for Sway
-bar {
-  swaybar_command waybar
-  font pango:Noto Sans, Noto Serif, Noto Emoji, FontAwesome, monospace 11
-}
+# Waybar — kill any running instance before (re)launching to prevent duplicates
+exec_always pkill -x waybar; waybar &
 
 workspace_auto_back_and_forth yes
 assign [class="firefox" instance="Navigator"] 2 $ws2web
@@ -333,14 +329,13 @@ for_window [instance="qutebrowser"] move scratchpad
 for_window [instance="qutebrowser"] border none
 bindsym $mod+Shift+i exec --no-startup-id $HOME/.config/sway/scripts/toggle-scratchpad-qutebrowser.sh
 
-# pavucontrol scratchpad
-for_window [instance="pavucontrol"] floating enable
-for_window [instance="pavucontrol"] resize 825 800
-# move pavucontrol window to scratchpad which hides it automatically
-for_window [instance="pavucontrol"] move scratchpad
-for_window [instance="pavucontrol"] border none
-exec --no-startup-id pavucontrol --target window
-bindsym $mod+Shift+a [instance="pavucontrol"] scratchpad show ; [instance="pavucontrol"] move position center
+# pavucontrol scratchpad (PipeWire-native via pipewire-pulseaudio compat)
+for_window [app_id="pavucontrol"] floating enable
+for_window [app_id="pavucontrol"] resize set 825 800
+for_window [app_id="pavucontrol"] mark scratchpad-pavucontrol
+for_window [app_id="pavucontrol"] move scratchpad
+for_window [app_id="pavucontrol"] border none
+bindsym $mod+Shift+a exec --no-startup-id $HOME/.config/sway/scripts/toggle-scratchpad-pavucontrol.sh
 
 # spotify scratchpad
 #for_window [instance="spotify"] floating enable
