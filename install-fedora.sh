@@ -177,14 +177,37 @@ if [[ "$SKIP_SERVICES" == false ]]; then
   echo ""
   echo "── Phase 3: Configuring greetd ──────────────────────────────────────────"
   if command -v tuigreet &>/dev/null; then
-    sudo tee /etc/greetd/config.toml > /dev/null <<'EOF'
+    GREETD_DOTFILE="$DOTFILES/greetd/config.toml"
+    sudo mkdir -p /etc/greetd
+
+    if [[ -f "$GREETD_DOTFILE" ]]; then
+      sudo ln -sfn "$GREETD_DOTFILE" /etc/greetd/config.toml
+    else
+      echo "WARN: $GREETD_DOTFILE not found, writing fallback /etc/greetd/config.toml"
+      sudo tee /etc/greetd/config.toml > /dev/null <<'EOF'
+[terminal]
+vt = 1
+
 [default_session]
-command = "/usr/bin/tuigreet --time --remember --cmd sway"
+command = "/usr/bin/tuigreet --time --remember --asterisks --cmd sway"
 user = "greetd"
 EOF
+    fi
     sudo chown greetd:greetd /var/lib/greetd
-    sudo systemctl enable --now greetd
-    echo "==> greetd configured and enabled."
+
+    # Fedora may report "preset: disabled" for greetd; explicitly enable it.
+    sudo systemctl set-default graphical.target
+    sudo systemctl unmask greetd.service
+    sudo systemctl enable greetd.service
+    # Note: don't start greetd immediately, as it may interfere with the current session.
+    #sudo systemctl start greetd.service
+
+    if sudo systemctl is-enabled greetd.service >/dev/null && \
+       sudo systemctl is-active greetd.service >/dev/null; then
+      echo "==> greetd configured, enabled, and active."
+    else
+      echo "WARN: greetd is not fully active. Check with: systemctl status greetd"
+    fi
   else
     echo "WARN: tuigreet not found — skipping greetd config (did package install run?)"
   fi

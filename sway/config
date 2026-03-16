@@ -179,12 +179,12 @@ set $mode_system \
       (l) lock, (e) logout, (s) suspend, (h) hibernate, (r) reboot, (Ctrl+s) shutdown
 
 mode "$mode_system" {
-  bindsym l exec --no-startup-id $i3lockwall, mode "default"
-  bindsym e exec --no-startup-id i3-msg exit, mode "default"
+  bindsym l exec --no-startup-id sh "$HOME/.config/i3/scripts/lock.sh", mode "default"
+  bindsym e exec --no-startup-id swaymsg exit, mode "default"
   bindsym r exec --no-startup-id sudo systemctl reboot, mode "default"
-  bindsym s exec --no-startup-id $i3lockwall && (sleep 0.5 && sudo systemctl suspend), \
+  bindsym s exec --no-startup-id sh "$HOME/.config/i3/scripts/lock.sh" && (sleep 0.5 && sudo systemctl suspend), \
     mode "default"
-  bindsym h exec --no-startup-id $i3lockwall && sudo systemctl hibernate, \
+  bindsym h exec --no-startup-id sh "$HOME/.config/i3/scripts/lock.sh" && sudo systemctl hibernate, \
     mode "default"
   bindsym Control+s exec --no-startup-id sudo systemctl poweroff -i, \
     mode "default"
@@ -223,8 +223,8 @@ mode "resize" {
 
 bindsym $mod+r mode "resize"
 
-# Waybar — kill any running instance before (re)launching to prevent duplicates
-exec_always pkill -x waybar; waybar &
+# Waybar: wait until sway IPC is responsive, then (re)launch once.
+exec_always --no-startup-id sh -c 'pkill -x waybar; while ! swaymsg -t get_outputs >/dev/null 2>&1; do sleep 0.2; done; waybar'
 
 workspace_auto_back_and_forth yes
 assign [class="firefox" instance="Navigator"] 2 $ws2web

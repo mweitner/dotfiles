@@ -46,13 +46,27 @@ After the first reboot, log in to the TTY and update.
 
 ### 2. Configure greetd
 
-Edit `/etc/greetd/config.toml`:
+Store the config in dotfiles and symlink it into `/etc`:
 
-`[default_session] command = "/usr/bin/tuigreet --time --remember --cmd sway" user = "greetd" `
+`mkdir -p ~/dotfiles/greetd `
 
-Apply permissions and enable service:
+Save this in `~/dotfiles/greetd/config.toml`:
 
-`sudo chown greetd:greetd /var/lib/greetd sudo systemctl enable --now greetd `
+`[terminal] vt = 1 [default_session] command = "/usr/bin/tuigreet --time --remember --cmd sway" user = "greetd" `
+
+Link it:
+
+`sudo mkdir -p /etc/greetd sudo ln -sfn ~/dotfiles/greetd/config.toml /etc/greetd/config.toml `
+
+Apply permissions and enable/start service explicitly:
+
+`sudo chown greetd:greetd /var/lib/greetd sudo systemctl set-default graphical.target sudo systemctl unmask greetd.service sudo systemctl enable greetd.service sudo systemctl start greetd.service `
+
+Check service state:
+
+`systemctl is-enabled greetd.service systemctl is-active greetd.service `
+
+Note: `Loaded: ... preset: disabled` is normal on Fedora for some units and does not mean the service cannot be enabled manually.
 
 ## Phase 3: Developer Tooling & Yocto
 
