@@ -1,11 +1,9 @@
-# ldc-hp-dev-pc - Fedora Minimal + Wayland/Sway
-
 # Dev Laptop Setup: Fedora Minimal + Wayland/Sway
 
-**Hardware:** HP ZBook Power G11 (16") **Processor:** Intel(R) Core(TM) Ultra 9 285H **Target Workflow:** Embedded Linux (Yocto), Tiling WM, Mouseless
+**Hardware:** HP ZBook Power G11 (16") **Processor:** Intel(R) Core(TM) Ultra 9 285H **Target Workflow:** Embedded
+Linux (Yocto), Tiling WM, Mouseless.
 
 ## Phase 0: Backup & Windows Preparation
-
 
 1. **Extract Windows License Key** Open **PowerShell** as Administrator and run:
 

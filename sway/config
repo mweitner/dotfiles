@@ -30,7 +30,6 @@ bindsym XF86AudioMicMute exec pactl set-source-mute @DEFAULT_SOURCE@ toggle
 # Use 'exec_always' if you want them to run every time i3 is reloaded.
 # --------------------------------------------------------------------------
 
-
 exec foot
 
 # Start udiskie (your automounter)
@@ -48,6 +47,10 @@ bindsym $mod+Shift+q kill
 # start dmenu (a program launcher)
 # Use wofi as launcher (Wayland-native)
 bindsym $mod+d exec wofi --show run
+
+# Screenshots
+bindsym Print exec ~/.config/sway/scripts/grimshot.sh full
+bindsym $mod+Print exec ~/.config/sway/scripts/grimshot.sh region
 
 # change focus
 bindsym $mod+h focus left
@@ -416,4 +419,4 @@ mode "$mode_workspace" {
 }
 bindsym $mod+c mode "$mode_workspace"
 
-exec --no-startup-id dunst
+exec mako

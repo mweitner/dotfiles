@@ -1,0 +1,11 @@
+# Minimal mako config for Sway
+font=monospace 11
+background-color=#222222E6
+text-color=#FFFFFF
+border-color=#666666
+border-size=2
+padding=8
+margin=10
+anchor=top-right
+max-visible=5
+default-timeout=5000
