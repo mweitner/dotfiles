@@ -74,7 +74,7 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   sudo dnf install -y zsh fish tmux
 
   # Modern CLI tools
-  sudo dnf install -y ripgrep fd-find fzf htop btop
+  sudo dnf install -y ripgrep fd-find fzf zoxide htop btop
 
   # Fonts
   sudo dnf install -y \
@@ -138,6 +138,12 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
     rm -rf "$XDG_CONFIG_HOME/fish/conf.d"
     ln -sf "$DOTFILES/fish/conf.d" "$XDG_CONFIG_HOME/fish/conf.d"
   fi
+  if [[ -d "$DOTFILES/fish/functions" ]]; then
+    rm -rf "$XDG_CONFIG_HOME/fish/functions"
+    ln -sf "$DOTFILES/fish/functions" "$XDG_CONFIG_HOME/fish/functions"
+  fi
+  [[ -f "$DOTFILES/fish/fish_plugins" ]] && \
+    ln -sf "$DOTFILES/fish/fish_plugins" "$XDG_CONFIG_HOME/fish/fish_plugins"
 
   # X11 monitor scripts (referenced by sway mode_display)
   rm -rf "$XDG_CONFIG_HOME/X11"
@@ -232,6 +238,17 @@ EOF
       fi
     fi
     echo "==> fish default shell check done."
+
+    # Bootstrap fish plugin manager + plugins declared in fish_plugins.
+    if [[ -f "$XDG_CONFIG_HOME/fish/fish_plugins" ]]; then
+      if fish -c 'functions -q fisher' >/dev/null 2>&1; then
+        fish -c 'fisher update' || echo "WARN: fisher update failed."
+      else
+        fish -c 'curl -fsSL https://git.io/fisher | source; and fisher install jorgebucaran/fisher; and fisher update' || \
+          echo "WARN: fisher bootstrap failed (network or plugin source issue)."
+      fi
+      echo "==> fish plugins checked (fisher)."
+    fi
   else
     echo "WARN: fish not found."
   fi
