@@ -58,7 +58,8 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
 
   # Screenshot tooling
   # requires sway stack packages wl-clipboard libnotify
-  sudo dnf install -y grim slurp
+  # ImageMagick provides both magick and convert used by lock.sh blur step
+  sudo dnf install -y grim slurp ImageMagick
 
   # Diff tooling
   sudo dnf install -y \
