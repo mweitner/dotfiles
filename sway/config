@@ -35,6 +35,11 @@ exec foot
 # Start udiskie (your automounter)
 exec udiskie -A
 
+# Dev workspace auto-startup.
+# Uncomment the line below to launch all dev workspaces automatically on login.
+# Trigger manually anytime via: $mod+c → f  (workspace layout → Development)
+#exec_always --no-startup-id sh -c 'sleep 2 && $HOME/.config/i3/scripts/load-dev-ws.sh'
+
 # Use Mouse+$mod to drag floating windows to their wanted position
 floating_modifier $mod
 
@@ -240,10 +245,6 @@ exec_always swaybg -i "$HOME/.config/i3/feh/nature-g2658ad761_1920.jpg" -m fill
 #floating windows
 for_window [window_role="pop-up"] floating enable
 for_window [window_role="task_dialog"] floating enable
-for_window [class="Arandr"] floating enable
-#todo try to fix that pavucontrol is not started in scratchpad
-#for_window [class="Pavucontrol"] floating enable
-for_window [class="Spotify"] floating enable
 for_window [class="vlc"] floating enable
 
 # virtual box mmnager, 
@@ -258,7 +259,6 @@ assign [class="VirtualBox Manager" instance="VirtualBox Manager"] 4 $ws4vm
 # important use second param as class which starts with big letter V
 #for_window [class="Virt-manager"] floating enabled
 assign [class="Virt-manager"] 4 $ws4vm
-
 
 # Colors: Sway does not support set_from_resource, so define colors directly if needed
 set $foreground #C6C6C6
@@ -296,10 +296,8 @@ client.unfocused  #333333 #222222 #888888 #292d2e #222222
 client.urgent     $red1 $red1 $white2 $red1 $red1
 client.placeholder  #000000 #0c0c0c $white2 #000000 #0c0c0c
 
-## Removed Alacritty-specific window rules
-
 # Terminal scratchpad
-# Sway-native terminal scratchpad using foot + title match.
+# Sway-native terminal emulator foot scratchpad using foot + title match.
 for_window [app_id="foot" title="scratchpad-term"] floating enable
 for_window [app_id="foot" title="scratchpad-term"] resize set 1200 800
 for_window [app_id="foot" title="scratchpad-term"] mark scratchpad-term
@@ -312,21 +310,11 @@ for_window [app_id="foot" title="htop-float"] floating enable
 bindsym $mod+Shift+p exec foot --title htop-float -e htop
 
 # qutebrowser scratchpad
-for_window [app_id="qutebrowser"] floating enable
-for_window [app_id="qutebrowser"] resize set 825 800
-for_window [app_id="qutebrowser"] mark scratchpad-qutebrowser
-for_window [app_id="qutebrowser"] move scratchpad
-for_window [app_id="qutebrowser"] border none
-for_window [class="qutebrowser"] floating enable
-for_window [class="qutebrowser"] resize set 825 800
-for_window [class="qutebrowser"] mark scratchpad-qutebrowser
-for_window [class="qutebrowser"] move scratchpad
-for_window [class="qutebrowser"] border none
-for_window [instance="qutebrowser"] floating enable
-for_window [instance="qutebrowser"] resize set 825 800
-for_window [instance="qutebrowser"] mark scratchpad-qutebrowser
-for_window [instance="qutebrowser"] move scratchpad
-for_window [instance="qutebrowser"] border none
+for_window [app_id="org.qutebrowser.qutebrowser"] floating enable
+for_window [app_id="org.qutebrowser.qutebrowser"] resize set 825 800
+for_window [app_id="org.qutebrowser.qutebrowser"] mark scratchpad-qutebrowser
+for_window [app_id="org.qutebrowser.qutebrowser"] move scratchpad
+for_window [app_id="org.qutebrowser.qutebrowser"] border none
 bindsym $mod+Shift+i exec --no-startup-id $HOME/.config/sway/scripts/toggle-scratchpad-qutebrowser.sh
 
 # pavucontrol scratchpad (PipeWire-native via pipewire-pulseaudio compat)
@@ -338,37 +326,20 @@ for_window [app_id="pavucontrol"] border none
 bindsym $mod+Shift+a exec --no-startup-id $HOME/.config/sway/scripts/toggle-scratchpad-pavucontrol.sh
 
 # spotify scratchpad
-#for_window [instance="spotify"] floating enable
-#for_window [instance="spotify"] resize 825 800
-# move spotify window to scratchpad which hides it automatically
-#for_window [instance="spotify"] move scratchpad
-#for_window [instance="spotify"] border none
-#exec --no-startup-id spotify --target window
-#bindsym $mod+Shift+m [instance="spotify"] scratchpad show ; [instance="spotify"] move position center
+# not supported anymore as using browser based apps like apple.music, amazon.music, spotify.com, ...
 
 # whatsapp-app scratchpad
-for_window [instance="whatsapp-app"] floating enable
-for_window [instance="whatsapp-app"] resize 825 800
-# move whatsapp-app window to scratchpad which hides it automatically
-for_window [instance="whatsapp-app"] move scratchpad
-for_window [instance="whatsapp-app"] border none
-#exec --no-startup-id whatsapp-app --target window
-bindsym $mod+Shift+n [instance="whatsapp-app"] scratchpad show ; [instance="whatsapp-app"] move position center
+# not supported anymore as using browser based app
 
 # vpn scratchpad
-for_window [instance="gpclient"] floating enable
-#for_window [instance="gpclient"] resize 825 800
-# move gpclient window to scratchpad which hides it automatically
-for_window [instance="gpclient"] move scratchpad
-#for_window [instance="gpclient"] border none
-#exec --no-startup-id gpclient --target window
-bindsym $mod+Shift+v [instance="gpclient"] scratchpad show ; [instance="gpclient"] move position center
+# not supported anymore as the UI client not supported anymore
 
 # 1Password scratchpad
-for_window [instance="1password"] move scratchpad
-for_window [instance="1password"] border none
-exec --no-startup-id 1password --target window
-bindsym $mod+Shift+s [instance="1password"] scratchpad show ; [instance="1password"] move position center
+for_window [app_id="(?i).*1password.*"] floating enable
+for_window [app_id="(?i).*1password.*"] mark scratchpad-1password
+for_window [app_id="(?i).*1password.*"] move scratchpad
+for_window [app_id="(?i).*1password.*"] border none
+bindsym $mod+Shift+s exec --no-startup-id $HOME/.config/sway/scripts/toggle-scratchpad-1password.sh
 
 # move floating windows with keys
 # inspired by faq.i3wm.org 4615 how-can-i-move-a-floating-with-keys
@@ -411,8 +382,7 @@ set $mode_workspace \
       Default layout (d), Development (f), Kill all (k)
 mode "$mode_workspace" {
   bindsym d exec --no-startup-id sh "$HOME/.config/i3/scripts/load-default-ws.sh", mode default
-# bindsym f exec --no-startup_id sh "$HOME/.config/i3/scripts/load-dev-ws.sh", mode default
-  bindsym f exec --no-startup-id "$HOME/.config/i3/scripts/load-audiocontrol.sh", mode default
+  bindsym f exec --no-startup-id sh "$HOME/.config/i3/scripts/load-dev-ws.sh", mode default
   bindsym k exec --no-startup-id sh "$HOME/.config/i3/scripts/kill-ws.sh", mode default
 
   # back to normal: Enter or Escape

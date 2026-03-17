@@ -1,0 +1,15 @@
+session_name: 3-dev
+start_directory: $HOME
+
+windows:
+  - window_name: editor
+    panes:
+      - nvim
+    focus: 'true'
+  - window_name: shell
+    panes:
+      - shell_command: []
+  - window_name: git
+    panes:
+      - shell_command:
+        - git status 2>/dev/null || cd $HOME

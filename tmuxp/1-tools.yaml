@@ -1,0 +1,14 @@
+session_name: 1-tools
+start_directory: $HOME
+
+windows:
+  - window_name: shell
+    panes:
+      - shell_command: []
+  - window_name: monitor
+    panes:
+      - btop
+  - window_name: notes
+    panes:
+      - shell_command:
+        - cd $HOME/notes 2>/dev/null || cd $HOME

@@ -1,0 +1,13 @@
+session_name: 5-tools
+start_directory: $HOME
+
+windows:
+  - window_name: shell
+    panes:
+      - shell_command: []
+  - window_name: logs
+    panes:
+      - journalctl -f
+  - window_name: scratchpad
+    panes:
+      - shell_command: []

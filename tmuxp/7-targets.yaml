@@ -1,0 +1,18 @@
+session_name: 7-targets
+start_directory: $HOME
+
+windows:
+  - window_name: serial
+    panes:
+      - echo 'use: tio /dev/ttyUSB0  (or ttyACM0)'
+    focus: 'true'
+  - window_name: ssh
+    panes:
+      - shell_command: []
+  - window_name: netboot
+    start_directory: /opt/netboot
+    panes:
+      - shell_command: []
+  - window_name: monitor
+    panes:
+      - shell_command: []

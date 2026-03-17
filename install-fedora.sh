@@ -71,7 +71,10 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   sudo dnf install -y pavucontrol
 
   # Shell & multiplexer
-  sudo dnf install -y zsh fish tmux
+  sudo dnf install -y zsh fish tmux tmuxp
+
+  # Serial port terminal (tio)
+  sudo dnf install -y tio
 
   # Modern CLI tools
   sudo dnf install -y ripgrep fd-find fzf zoxide htop btop
