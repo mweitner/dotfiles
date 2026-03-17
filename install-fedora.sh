@@ -85,7 +85,14 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   echo ""
   echo "── Phase 1: Installing packages ─────────────────────────────────────────"
   sudo dnf install -y \
-    bash-completion curl wget git pciutils usbutils xdg-utils
+    bash-completion curl wget git pciutils usbutils xdg-utils \
+    NetworkManager NetworkManager-tui iwd
+
+  # NM GUI tools naming differs by Fedora release. Prefer legacy meta package,
+  # then fallback to split packages used on newer Fedora versions.
+  if ! sudo dnf install -y NetworkManager-gnome; then
+    sudo dnf install -y network-manager-applet nm-connection-editor
+  fi
 
   # Wayland / Sway stack
   sudo dnf install -y \
@@ -189,6 +196,10 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/fish/fish_plugins" ]] && \
     ln -sf "$DOTFILES/fish/fish_plugins" "$XDG_CONFIG_HOME/fish/fish_plugins"
 
+  # local user scripts (used by launchers like wofi run)
+  mkdir -p "$HOME/.local/bin"
+  [[ -f "$DOTFILES/shell/nmtui" ]] && ln -sf "$DOTFILES/shell/nmtui" "$HOME/.local/bin/nmtui"
+
   # X11 monitor scripts (referenced by sway mode_display)
   rm -rf "$XDG_CONFIG_HOME/X11"
   ln -sf "$DOTFILES/X11" "$XDG_CONFIG_HOME"
@@ -226,7 +237,23 @@ fi
 # ── Phase 3: greetd (display manager) ─────────────────────────────────────────
 if [[ "$SKIP_SERVICES" == false ]]; then
   echo ""
-  echo "── Phase 3: Configuring greetd ──────────────────────────────────────────"
+  echo "── Phase 3a: NetworkManager + iwd ───────────────────────────────────────"
+  sudo mkdir -p /etc/NetworkManager/conf.d
+  sudo tee /etc/NetworkManager/conf.d/10-wifi-backend.conf >/dev/null <<'EOF'
+[device]
+wifi.backend=iwd
+EOF
+
+  sudo systemctl enable --now iwd 2>/dev/null || true
+  sudo systemctl stop wpa_supplicant.service 2>/dev/null || true
+  sudo systemctl disable wpa_supplicant.service 2>/dev/null || true
+  sudo systemctl enable --now NetworkManager
+  sudo systemctl restart NetworkManager
+  echo "==> NetworkManager configured with iwd backend."
+  echo "==> NetworkManager GUI tools available: nm-applet, nm-connection-editor."
+
+  echo ""
+  echo "── Phase 3b: Configuring greetd ──────────────────────────────────────────"
   if command -v tuigreet &>/dev/null; then
     GREETD_DOTFILE="$DOTFILES/greetd/config.toml"
     sudo mkdir -p /etc/greetd
@@ -264,13 +291,13 @@ EOF
   fi
 
   echo ""
-  echo "── Phase 3b: Power & thermal services ───────────────────────────────────"
+  echo "── Phase 3c: Power & thermal services ───────────────────────────────────"
   sudo systemctl enable --now tlp      2>/dev/null || true
   sudo systemctl enable --now thermald 2>/dev/null || true
   echo "==> tlp + thermald enabled."
 
   echo ""
-  echo "── Phase 3c: Default shell (fish) ───────────────────────────────────────"
+  echo "── Phase 3d: Default shell (fish) ───────────────────────────────────────"
   if command -v fish &>/dev/null; then
     FISH_PATH="$(command -v fish)"
     if [[ "${SHELL:-}" != "$FISH_PATH" ]]; then
@@ -298,7 +325,7 @@ EOF
   fi
 
   echo ""
-  echo "── Phase 3d: Default browser ────────────────────────────────────────────"
+  echo "── Phase 3e: Default browser ────────────────────────────────────────────"
   set_default_browser
 fi
 

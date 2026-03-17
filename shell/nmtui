@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+TOGGLE_SCRIPT="${HOME}/.config/sway/scripts/toggle-scratchpad-nmtui.sh"
+
+if [ -n "${SWAYSOCK:-}" ] && [ -S "${SWAYSOCK}" ] && command -v swaymsg >/dev/null 2>&1; then
+  if swaymsg -t get_version >/dev/null 2>&1 && [ -x "$TOGGLE_SCRIPT" ]; then
+    exec "$TOGGLE_SCRIPT"
+  fi
+fi
+
+exec /usr/bin/nmtui "$@"

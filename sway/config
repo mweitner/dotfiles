@@ -35,6 +35,9 @@ exec foot
 # Start udiskie (your automounter)
 exec udiskie -A
 
+# NetworkManager tray applet (provides quick GUI controls)
+exec_always --no-startup-id sh -c 'pkill -x nm-applet; command -v nm-applet >/dev/null && nm-applet --indicator'
+
 # Dev workspace auto-startup.
 # Uncomment the line below to launch all dev workspaces automatically on login.
 # Trigger manually anytime via: $mod+c → f  (workspace layout → Development)
@@ -324,6 +327,24 @@ for_window [app_id="pavucontrol"] mark scratchpad-pavucontrol
 for_window [app_id="pavucontrol"] move scratchpad
 for_window [app_id="pavucontrol"] border none
 bindsym $mod+Shift+a exec --no-startup-id $HOME/.config/sway/scripts/toggle-scratchpad-pavucontrol.sh
+
+# NetworkManager connection editor as floating utility window
+for_window [app_id="(?i).*nm-connection-editor.*"] floating enable
+for_window [app_id="(?i).*nm-connection-editor.*"] resize set 980 760
+for_window [app_id="(?i).*nm-connection-editor.*"] move position center
+for_window [app_id="(?i).*nm-connection-editor.*"] border none
+for_window [class="(?i).*nm-connection-editor.*"] floating enable
+for_window [class="(?i).*nm-connection-editor.*"] resize set 980 760
+for_window [class="(?i).*nm-connection-editor.*"] move position center
+for_window [class="(?i).*nm-connection-editor.*"] border none
+
+# nmtui scratchpad utility window
+for_window [app_id="nmtui-float"] floating enable
+for_window [app_id="nmtui-float"] resize set 1400 1000
+for_window [app_id="nmtui-float"] mark scratchpad-nmtui
+for_window [app_id="nmtui-float"] move scratchpad
+for_window [app_id="nmtui-float"] border none
+bindsym $mod+Shift+n exec --no-startup-id $HOME/.config/sway/scripts/toggle-scratchpad-nmtui.sh
 
 # spotify scratchpad
 # not supported anymore as using browser based apps like apple.music, amazon.music, spotify.com, ...

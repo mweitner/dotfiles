@@ -1,10 +1,10 @@
 session_name: term-scratchpad
-start_directory: /tmp/
+start_directory: ~/
 
 windows:
-  - window_name: vim doc
+  - window_name: nvim-home
     panes:
-      - vim '/tmp/vim-tmp.md'
+      - nvim
   - window_name: kernel logs
     panes:
       - sudo dmesg -w
@@ -13,9 +13,17 @@ windows:
       - bc
   - window_name: network
     panes:
-      - nmcli device
+      - ip a
   - window_name: screenshot
     panes:
-      - echo 'use scrot -s to take a screenshot'
+      - >
+        echo 'Manual screenshot commands (Sway):';
+        echo '  grimshot save area ~/Pictures/screenshot-$(date +%F-%H%M%S).png';
+        echo '  grimshot copy area';
+        echo '  grimshot save output ~/Pictures/screenshot-$(date +%F-%H%M%S).png';
+        exec fish
+  - window_name: shell
+    panes:
+      - fish
 
 

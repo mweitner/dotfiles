@@ -58,7 +58,9 @@
         "format-ethernet": "\uf796  {ipaddr}/{cidr}",
         "format-linked": "\uf796  {ifname} (no IP)",
         "format-disconnected": "\uf127  Disconnected",
-        "tooltip-format": "{ifname}: {ipaddr}\nGateway: {gwaddr}\nUp: {bandwidthUpBits}  Down: {bandwidthDownBits}"
+        "tooltip-format": "{ifname}: {ipaddr}\nGateway: {gwaddr}\nUp: {bandwidthUpBits}  Down: {bandwidthDownBits}",
+        "on-click": "sh -c 'if command -v nm-connection-editor >/dev/null 2>&1; then nm-connection-editor; else ~/.config/sway/scripts/toggle-scratchpad-nmtui.sh; fi'",
+        "on-click-right": "~/.config/sway/scripts/toggle-scratchpad-nmtui.sh"
     },
     "cpu": {
         "interval": 3,
