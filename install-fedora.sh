@@ -29,12 +29,53 @@ done
 DOTFILES="${DOTFILES:-$HOME/dotfiles}"
 XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+DEFAULT_BROWSER="${DEFAULT_BROWSER:-google-chrome.desktop}"
 
 if [[ ! -d "$DOTFILES" ]]; then
   echo "ERROR: dotfiles directory not found at $DOTFILES"
   echo "Set DOTFILES or clone repo to $HOME/dotfiles"
   exit 1
 fi
+
+# Pick an installed browser desktop file and register it as default.
+set_default_browser() {
+  local app
+  local candidates=()
+  local fallback=(
+    google-chrome.desktop
+    firefox.desktop
+    qutebrowser.desktop
+    org.chromium.Chromium.desktop
+    chromium-browser.desktop
+  )
+
+  if ! command -v xdg-settings >/dev/null 2>&1 || ! command -v xdg-mime >/dev/null 2>&1; then
+    echo "WARN: xdg-settings/xdg-mime not available; skipping default browser setup."
+    return 0
+  fi
+
+  # User-selected default first, then fallback list.
+  candidates+=("$DEFAULT_BROWSER")
+  for app in "${fallback[@]}"; do
+    if [[ "$app" != "$DEFAULT_BROWSER" ]]; then
+      candidates+=("$app")
+    fi
+  done
+
+  for app in "${candidates[@]}"; do
+    if [[ -f "/usr/share/applications/$app" || -f "$HOME/.local/share/applications/$app" ]]; then
+      xdg-settings set default-web-browser "$app" || true
+      xdg-mime default "$app" x-scheme-handler/http || true
+      xdg-mime default "$app" x-scheme-handler/https || true
+      xdg-mime default "$app" text/html || true
+      xdg-mime default "$app" application/xhtml+xml || true
+      echo "==> Default browser set to $app"
+      return 0
+    fi
+  done
+
+  echo "WARN: no known browser desktop file found; leaving default browser unchanged."
+}
 
 echo "==> Dotfiles: $DOTFILES"
 echo "==> XDG_CONFIG_HOME: $XDG_CONFIG_HOME"
@@ -44,7 +85,7 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   echo ""
   echo "── Phase 1: Installing packages ─────────────────────────────────────────"
   sudo dnf install -y \
-    bash-completion curl wget git pciutils usbutils
+    bash-completion curl wget git pciutils usbutils xdg-utils
 
   # Wayland / Sway stack
   sudo dnf install -y \
@@ -255,6 +296,10 @@ EOF
   else
     echo "WARN: fish not found."
   fi
+
+  echo ""
+  echo "── Phase 3d: Default browser ────────────────────────────────────────────"
+  set_default_browser
 fi
 
 # ── Phase 4: Yocto shared directory ───────────────────────────────────────────

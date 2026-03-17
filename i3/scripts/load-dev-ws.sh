@@ -30,6 +30,18 @@ ws_exec() {
   sleep 0.3
 }
 
+# Remove stale Chromium singleton locks left after crashes/power loss.
+cleanup_browser_singleton_lock() {
+  local profile_dir="$1"
+  local lock
+
+  [ -d "$profile_dir" ] || return 0
+
+  for lock in SingletonLock SingletonSocket SingletonCookie; do
+    [ -e "$profile_dir/$lock" ] && rm -f "$profile_dir/$lock"
+  done
+}
+
 # ws1 term — 1-tools tmux session
 ws_exec 1 term "foot -e tmux attach-session -t 1-tools"
 
@@ -48,11 +60,18 @@ ws_exec 4 vm "foot -e tmux attach-session -t 4-dev"
 ws_exec 5 rdp "foot -e tmux attach-session -t 5-tools"
 
 # ws6 web2 — Google Chrome (falls back to Chromium)
-if ! pgrep -u "$UID" -x "google-chrome-stable\|chromium\|chromium-browser" >/dev/null 2>&1; then
+if ! pgrep -u "$UID" -f '(^|/)(google-chrome(-stable)?|chromium(-browser)?)( |$)' >/dev/null 2>&1; then
+  cleanup_browser_singleton_lock "${XDG_CONFIG_HOME:-$HOME/.config}/google-chrome"
+  cleanup_browser_singleton_lock "${XDG_CONFIG_HOME:-$HOME/.config}/chromium"
+
   if command -v google-chrome-stable >/dev/null 2>&1; then
     ws_exec 6 web2 google-chrome-stable
+  elif command -v google-chrome >/dev/null 2>&1; then
+    ws_exec 6 web2 google-chrome
   elif command -v chromium >/dev/null 2>&1; then
     ws_exec 6 web2 chromium
+  elif command -v chromium-browser >/dev/null 2>&1; then
+    ws_exec 6 web2 chromium-browser
   fi
 fi
 
