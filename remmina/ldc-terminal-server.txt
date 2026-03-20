@@ -11,3 +11,4 @@ Share folder=/home/ldcwem0/Downloads
 
 Resolution=Use inital window size
 Color depth=High colour (16bpp)
+

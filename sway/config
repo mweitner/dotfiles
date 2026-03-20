@@ -399,13 +399,13 @@ mode "move" {
 }
 
 set $mode_display \
-      Config monitor resolution -\
-      Default config (d), Home laptop (l), Office LDC (o), Home Dell (h)
+      Display Profiles — Wayland-native (kanshi + swaymsg) \
+      (k) kanshi auto, (l) laptop-only, (h) home-office, (u) ulm-office
 mode "$mode_display" {
-    bindsym d exec --no-startup-id sh "$HOME/.config/X11/monitor.sh", mode "default"
-    bindsym l exec --no-startup-id sh "$HOME/.config/X11/monitor-home-laptop.sh", mode "default"
-    bindsym o exec --no-startup-id sh "$HOME/.config/X11/monitor-ldc-ulm.sh", mode "default"
-    bindsym h exec --no-startup-id sh "$HOME/.config/X11/monitor-ldc-homeoffice.sh", mode "default"
+    bindsym k exec --no-startup-id kanshctl switch-profile home-office, mode "default"
+    bindsym l exec --no-startup-id $HOME/.local/bin/monitor-laptop-only, mode "default"
+    bindsym h exec --no-startup-id $HOME/.local/bin/monitor-home-office, mode "default"
+    bindsym u exec --no-startup-id $HOME/.local/bin/monitor-ulm-office, mode "default"
 
     # back to normal: Enter or Escape
     bindsym Return mode "default"

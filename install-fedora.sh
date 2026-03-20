@@ -152,7 +152,8 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
     foot wl-clipboard \
     libnotify mako \
     brightnessctl \
-    udiskie
+    udiskie \
+    kanshi
 
   # Screenshot tooling
   # requires sway stack packages wl-clipboard libnotify
@@ -176,6 +177,9 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
 
   # Modern CLI tools
   sudo dnf install -y ripgrep fd-find fzf zoxide htop btop
+
+  # NAS/SMB client tools
+  sudo dnf install -y cifs-utils
 
   # Fonts
   sudo dnf install -y \
@@ -219,6 +223,10 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   # Link entire scripts directory so grimshot.sh and future scripts are available
   rm -rf "$XDG_CONFIG_HOME/sway/scripts"
   ln -sf "$DOTFILES/sway/scripts"  "$XDG_CONFIG_HOME/sway/scripts"
+
+  # Display management (kanshi for multi-monitor hotplug + profile switching)
+  mkdir -p "$XDG_CONFIG_HOME/kanshi"
+  [[ -f "$DOTFILES/.config/kanshi/config" ]] && ln -sf "$DOTFILES/.config/kanshi/config" "$XDG_CONFIG_HOME/kanshi/config"
 
   # i3 scripts reused by sway config (lock, load-default-ws, etc.)
   rm -rf "$XDG_CONFIG_HOME/i3"
@@ -268,6 +276,8 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/nmtui" ]] && ln -sf "$DOTFILES/shell/nmtui" "$HOME/.local/bin/nmtui"
   [[ -f "$DOTFILES/shell/vpn-on" ]] && ln -sf "$DOTFILES/shell/vpn-on" "$HOME/.local/bin/vpn-on"
   [[ -f "$DOTFILES/shell/rdp-hop" ]] && ln -sf "$DOTFILES/shell/rdp-hop" "$HOME/.local/bin/rdp-hop"
+  [[ -f "$DOTFILES/shell/setup-ugreen-nas-mount" ]] && ln -sf "$DOTFILES/shell/setup-ugreen-nas-mount" "$HOME/.local/bin/setup-ugreen-nas-mount"
+  [[ -f "$DOTFILES/shell/nas-status" ]] && ln -sf "$DOTFILES/shell/nas-status" "$HOME/.local/bin/nas-status"
 
   # X11 monitor scripts (referenced by sway mode_display)
   rm -rf "$XDG_CONFIG_HOME/X11"

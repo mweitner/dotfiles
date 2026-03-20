@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wayland-native monitor configuration for home office docking
+# Uses swaymsg to configure display outputs
+# Layout: DP-1-1 (left) | DP-1-2 (center) | eDP-1 (right, scaled 1.25)
+
+swaymsg output DP-1-1 mode 1920x1200@60Hz position 0 0
+swaymsg output DP-1-2 mode 1920x1200@60Hz position 1920 0
+swaymsg output eDP-1 mode 1920x1080@60Hz position 3840 120 scale 1.25
+swaymsg output DP-1-3 disable
+swaymsg output HDMI-1 disable
+swaymsg output DP-1 disable
+
+echo "✓ Home office docking display profile applied"

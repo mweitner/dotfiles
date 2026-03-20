@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODE="fstab"
+if [[ "${1:-}" == "--mode" ]]; then
+  MODE="${2:-}"
+fi
+
+if [[ "$MODE" != "fstab" && "$MODE" != "systemd-units" ]]; then
+  echo "Usage: $0 [--mode fstab|systemd-units]" >&2
+  exit 2
+fi
+
+NAS_ALIAS="${UGREEN_NAS_ALIAS:-ugreen-nas}"
+NAS_IP_HOME="${UGREEN_NAS_IP_HOME:-192.168.1.110}"
+NAS_IP_WORK="${UGREEN_NAS_IP_WORK:-192.168.3.91}"
+NAS_SHARE="${UGREEN_NAS_SHARE:-data}"
+MOUNT_POINT="${UGREEN_NAS_MOUNT_POINT:-/mnt/data}"
+CRED_FILE="${UGREEN_SMB_CREDENTIALS:-$HOME/dotfiles/.secrets/.smbcredentials_ugreen}"
+
+UID_NUM="$(id -u)"
+GID_NUM="$(id -g)"
+
+if [[ ! -f "$CRED_FILE" ]]; then
+  echo "ERROR: Credentials file missing: $CRED_FILE" >&2
+  echo "Create it with:" >&2
+  echo "  username=ldcwem0" >&2
+  echo "  password=<see 1Password>" >&2
+  exit 1
+fi
+
+chmod 600 "$CRED_FILE"
+
+if ! command -v mount.cifs >/dev/null 2>&1; then
+  echo "==> Installing cifs-utils..."
+  sudo dnf install -y cifs-utils
+fi
+
+sudo mkdir -p "$MOUNT_POINT"
+
+# Keep a deterministic alias for the NAS with both site IPs.
+# The resolver can try another address when one site address is unreachable.
+HOSTS_BEGIN="# BEGIN dotfiles-ugreen-nas"
+HOSTS_END="# END dotfiles-ugreen-nas"
+TMP_HOSTS="$(mktemp)"
+awk -v b="$HOSTS_BEGIN" -v e="$HOSTS_END" '
+  $0 == b {skip=1; next}
+  $0 == e {skip=0; next}
+  !skip {print}
+' /etc/hosts > "$TMP_HOSTS"
+{
+  echo "$HOSTS_BEGIN"
+  echo "$NAS_IP_HOME $NAS_ALIAS"
+  echo "$NAS_IP_WORK $NAS_ALIAS"
+  echo "$HOSTS_END"
+} >> "$TMP_HOSTS"
+sudo cp "$TMP_HOSTS" /etc/hosts
+rm -f "$TMP_HOSTS"
+
+OPTIONS="credentials=$CRED_FILE,uid=$UID_NUM,gid=$GID_NUM,iocharset=utf8,vers=3.1.1,file_mode=0664,dir_mode=0775,_netdev,nofail,x-systemd.mount-timeout=15s"
+
+if [[ "$MODE" == "fstab" ]]; then
+  FSTAB_BEGIN="# BEGIN dotfiles-ugreen-fstab"
+  FSTAB_END="# END dotfiles-ugreen-fstab"
+  TMP_FSTAB="$(mktemp)"
+
+  awk -v b="$FSTAB_BEGIN" -v e="$FSTAB_END" '
+    $0 == b {skip=1; next}
+    $0 == e {skip=0; next}
+    !skip {print}
+  ' /etc/fstab > "$TMP_FSTAB"
+
+  {
+    echo "$FSTAB_BEGIN"
+    echo "//$NAS_ALIAS/$NAS_SHARE $MOUNT_POINT cifs $OPTIONS,x-systemd.automount,x-systemd.idle-timeout=5min 0 0"
+    echo "$FSTAB_END"
+  } >> "$TMP_FSTAB"
+
+  sudo cp "$TMP_FSTAB" /etc/fstab
+  rm -f "$TMP_FSTAB"
+
+  sudo systemctl daemon-reload
+  sudo systemctl restart mnt-data.automount
+  sudo systemctl enable mnt-data.automount
+
+  echo "==> fstab automount configured for $MOUNT_POINT"
+  echo "    Access it once (e.g. ls $MOUNT_POINT) to trigger mount."
+else
+  sudo tee /etc/systemd/system/mnt-data.mount >/dev/null <<EOF
+[Unit]
+Description=UGREEN NAS SMB Mount (/mnt/data)
+After=network-online.target
+Wants=network-online.target
+
+[Mount]
+What=//$NAS_ALIAS/$NAS_SHARE
+Where=$MOUNT_POINT
+Type=cifs
+Options=$OPTIONS
+TimeoutSec=15
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  sudo tee /etc/systemd/system/mnt-data.automount >/dev/null <<EOF
+[Unit]
+Description=Automount UGREEN NAS at /mnt/data
+After=network-online.target
+Wants=network-online.target
+
+[Automount]
+Where=$MOUNT_POINT
+TimeoutIdleSec=5min
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now mnt-data.automount
+
+  echo "==> systemd mount+automount units configured for $MOUNT_POINT"
+  echo "    Access it once (e.g. ls $MOUNT_POINT) to trigger mount."
+fi

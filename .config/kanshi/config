@@ -1,0 +1,33 @@
+# kanshi display profiles for multi-monitor docking station setup
+# HP ZBook Power G11 with docking station + two external LDC displays
+
+# Laptop only (single display, no docking)
+profile laptop-only {
+  output eDP-1 enable mode 1920x1080@60Hz position 0 0 scale 1.25
+  output DP-1-1 disable
+  output DP-1-2 disable
+  output DP-1-3 disable
+  output HDMI-1 disable
+  output DP-1 disable
+}
+
+# Home office docking station: three displays
+# Layout: DP-1-1 (left, 1920x1200) | DP-1-2 (center, 1920x1200) | eDP-1 (right, 1920x1080 scaled 1.25)
+profile home-office {
+  output DP-1-1 enable mode 1920x1200@60Hz position 0 0
+  output DP-1-2 enable mode 1920x1200@60Hz position 1920 0
+  output eDP-1 enable mode 1920x1080@60Hz position 3840 120 scale 1.25
+  output DP-1-3 disable
+  output HDMI-1 disable
+  output DP-1 disable
+}
+
+# Ulm office docking station: three displays (same layout as home office)
+profile ulm-office {
+  output DP-1-1 enable mode 1920x1200@60Hz position 0 0
+  output DP-1-2 enable mode 1920x1200@60Hz position 1920 0
+  output eDP-1 enable mode 1920x1080@60Hz position 3840 120 scale 1.25
+  output DP-1-3 disable
+  output HDMI-1 disable
+  output DP-1 disable
+}
