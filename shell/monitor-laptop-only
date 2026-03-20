@@ -4,11 +4,8 @@ set -euo pipefail
 # Wayland-native monitor configuration for laptop-only setup
 # Uses swaymsg to configure display outputs
 
-swaymsg output eDP-1 mode 1920x1080@60Hz position 0 0 scale 1.25
-swaymsg output DP-1-1 disable
-swaymsg output DP-1-2 disable
-swaymsg output DP-1-3 disable
-swaymsg output HDMI-1 disable
-swaymsg output DP-1 disable
+swaymsg output eDP-1 mode 2560x1600@120Hz position 0 0 scale 1.25
+swaymsg output DP-6 disable
+swaymsg output DP-7 disable
 
 echo "✓ Laptop-only display profile applied"

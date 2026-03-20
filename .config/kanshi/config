@@ -1,33 +1,26 @@
 # kanshi display profiles for multi-monitor docking station setup
-# HP ZBook Power G11 with docking station + two external LDC displays
+# HP ZBook Power G11 + Dell WD19TB Thunderbolt Dock + 2× Samsung U28E850 (4K 28")
+#
+# Thunderbolt dock output names: DP-6 (left), DP-7 (center)
+# Logical layout:  [DP-6 1920px] [DP-7 1920px] [eDP-1 2048px]
+# Physical:        3840x2160@scale2 + 3840x2160@scale2 + 2560x1600@scale1.25
 
-# Laptop only (single display, no docking)
+# Laptop only (no dock)
 profile laptop-only {
-  output eDP-1 enable mode 1920x1080@60Hz position 0 0 scale 1.25
-  output DP-1-1 disable
-  output DP-1-2 disable
-  output DP-1-3 disable
-  output HDMI-1 disable
-  output DP-1 disable
+  output eDP-1 enable mode 2560x1600@120Hz position 0,0 scale 1.25
 }
 
-# Home office docking station: three displays
-# Layout: DP-1-1 (left, 1920x1200) | DP-1-2 (center, 1920x1200) | eDP-1 (right, 1920x1080 scaled 1.25)
+# Home office: Dell WD19TB via Thunderbolt — two Samsung 4K + laptop
+# Layout: DP-6 (left) | DP-7 (center) | eDP-1 (right)
 profile home-office {
-  output DP-1-1 enable mode 1920x1200@60Hz position 0 0
-  output DP-1-2 enable mode 1920x1200@60Hz position 1920 0
-  output eDP-1 enable mode 1920x1080@60Hz position 3840 120 scale 1.25
-  output DP-1-3 disable
-  output HDMI-1 disable
-  output DP-1 disable
+  output DP-7  enable mode 3840x2160@30Hz position 0,0    scale 2
+  output DP-6  enable mode 3840x2160@60Hz position 1920,0 scale 2
+  output eDP-1 enable mode 2560x1600@120Hz position 3840,0 scale 1.25
 }
 
-# Ulm office docking station: three displays (same layout as home office)
+# Ulm office: same dock + same monitors as home office
 profile ulm-office {
-  output DP-1-1 enable mode 1920x1200@60Hz position 0 0
-  output DP-1-2 enable mode 1920x1200@60Hz position 1920 0
-  output eDP-1 enable mode 1920x1080@60Hz position 3840 120 scale 1.25
-  output DP-1-3 disable
-  output HDMI-1 disable
-  output DP-1 disable
+  output DP-7  enable mode 3840x2160@30Hz position 0,0    scale 2
+  output DP-6  enable mode 3840x2160@60Hz position 1920,0 scale 2
+  output eDP-1 enable mode 2560x1600@120Hz position 3840,0 scale 1.25
 }

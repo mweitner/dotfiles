@@ -209,6 +209,9 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   # Power / thermal (HP ZBook)
   sudo dnf install -y tlp tlp-rdw thermald
 
+  # Thunderbolt device manager — auto-authorizes docks (Dell WD19TB needs this for USB)
+  sudo dnf install -y bolt
+
   echo "==> Packages installed."
 fi
 
@@ -374,6 +377,31 @@ EOF
   sudo systemctl enable --now tlp      2>/dev/null || true
   sudo systemctl enable --now thermald 2>/dev/null || true
   echo "==> tlp + thermald enabled."
+
+  echo ""
+  echo "── Phase 3c2: Thunderbolt authorization (bolt) ──────────────────────────"
+  # bolt is socket/dbus-activated on Fedora (static unit), so start is enough.
+  sudo systemctl start bolt 2>/dev/null || true
+  # Enroll the Dell WD19TB dock if it is currently connected and not yet enrolled.
+  # bolt enrolls by UUID; skip silently if not connected or already enrolled.
+  if command -v boltctl &>/dev/null; then
+    DOCK_UUID="$(boltctl list 2>/dev/null | awk '/Dell WD19TB/{found=1} found && /uuid/{print $2; exit}')"
+    if [[ -n "$DOCK_UUID" ]]; then
+      # "stored:" appears in boltctl list output only when the device is enrolled
+      if boltctl list 2>/dev/null | awk "/uuid.*$DOCK_UUID/{found=1} found && /stored:/{print; exit}" | grep -q "stored:"; then
+        echo "==> Dell WD19TB dock already enrolled (UUID: $DOCK_UUID)."
+      else
+        sudo boltctl enroll --policy auto "$DOCK_UUID" 2>/dev/null && \
+          echo "==> Dell WD19TB dock enrolled (UUID: $DOCK_UUID)." || \
+          echo "WARN: boltctl enroll failed — enroll manually with: sudo boltctl enroll --policy auto <uuid>"
+      fi
+    else
+      echo "INFO: Dell WD19TB dock not connected — skipping enroll."
+      echo "      When connected, run: sudo boltctl enroll --policy auto <uuid>"
+      echo "      Or re-run this script with the dock plugged in."
+    fi
+  fi
+  echo "==> bolt (Thunderbolt manager) enabled."
 
   echo ""
   echo "── Phase 3d: Default shell (fish) ───────────────────────────────────────"
