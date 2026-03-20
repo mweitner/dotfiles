@@ -1,0 +1,13 @@
+Name=ldc-terminal-server
+Protocol=RDP - Remote Desktop Protocol
+
+[Basic]
+Server=lhgsvrds16.hau.liebherr.i
+Username=ldcwem0
+Password=<my password>
+Domain=hau.liebherr.i
+
+Share folder=/home/ldcwem0/Downloads
+
+Resolution=Use inital window size
+Color depth=High colour (16bpp)

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HOST="${RDP_HOST:-lhgsvrds16.hau.liebherr.i}"
+HOST_IP_FALLBACK="${RDP_HOST_IP:-10.4.8.165}"
+PROFILE_DEFAULT="$HOME/.local/share/remmina/group_rdp_ldc-terminal-server_lhgsvrds16-hau-liebherr-i.remmina"
+PROFILE_IP_DEFAULT="$HOME/.local/share/remmina/group_rdp_ldc-terminal-server-ip_10-4-8-165.remmina"
+PROFILE="${1:-${RDP_PROFILE:-$PROFILE_DEFAULT}}"
+
+if ! command -v remmina >/dev/null 2>&1; then
+  echo "ERROR: remmina not installed." >&2
+  echo "Install with: sudo dnf install -y remmina remmina-plugins-rdp" >&2
+  exit 1
+fi
+
+if [[ ! -f "$PROFILE" ]]; then
+  echo "ERROR: Remmina profile not found: $PROFILE" >&2
+  echo "Hint: pass a profile path as first argument or set RDP_PROFILE." >&2
+  exit 1
+fi
+
+# Bound resolver wait time so we fail fast instead of hanging in Remmina.
+TARGET_HOST="$HOST"
+if ! timeout 5 getent hosts "$HOST" >/dev/null 2>&1; then
+  if [[ -n "$HOST_IP_FALLBACK" ]]; then
+    echo "WARN: Host '$HOST' not resolvable. Falling back to IP '$HOST_IP_FALLBACK'." >&2
+    TARGET_HOST="$HOST_IP_FALLBACK"
+    # Prefer dedicated IP profile when available.
+    if [[ "$PROFILE" == "$PROFILE_DEFAULT" && -f "$PROFILE_IP_DEFAULT" ]]; then
+      PROFILE="$PROFILE_IP_DEFAULT"
+    fi
+  else
+    echo "ERROR: Host '$HOST' is not resolvable in current network." >&2
+    echo "Hint: connect VPN first (e.g. $HOME/.local/bin/vpn-on lis01.vpn.liebherr.com)." >&2
+    exit 1
+  fi
+fi
+
+# Prefer nc when available, otherwise skip the port check.
+if command -v nc >/dev/null 2>&1; then
+  if ! nc -z -w 3 "$TARGET_HOST" 3389 >/dev/null 2>&1; then
+    echo "ERROR: '$TARGET_HOST:3389' is not reachable right now." >&2
+    echo "Hint: verify VPN tunnel and route to company network." >&2
+    exit 1
+  fi
+fi
+
+exec remmina -c "$PROFILE"

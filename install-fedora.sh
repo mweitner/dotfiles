@@ -77,6 +77,56 @@ set_default_browser() {
   echo "WARN: no known browser desktop file found; leaving default browser unchanged."
 }
 
+# Install optional company CA certs from a private secrets directory.
+# Expected filenames:
+# - LiebherrEnterpriseCA02.crt
+# - LiebherrRootCA2.crt
+install_company_ca_certs() {
+  local cert anchors_dir secrets_dir
+  local -a certs=(
+    LiebherrEnterpriseCA02.crt
+    LiebherrRootCA2.crt
+  )
+  local -a candidate_dirs=(
+    "$DOTFILES/.secrets"
+    "$DOTFILES/.secret"
+  )
+
+  anchors_dir="/etc/pki/ca-trust/source/anchors"
+  secrets_dir=""
+
+  for cert in "${candidate_dirs[@]}"; do
+    if [[ -d "$cert" ]]; then
+      secrets_dir="$cert"
+      break
+    fi
+  done
+
+  if [[ -z "$secrets_dir" ]]; then
+    echo "WARN: no secrets dir found at $DOTFILES/.secrets (or .secret); skipping company CA install."
+    return 0
+  fi
+
+  sudo mkdir -p "$anchors_dir"
+
+  local copied_any=false
+  for cert in "${certs[@]}"; do
+    if [[ -f "$secrets_dir/$cert" ]]; then
+      sudo install -m 0644 "$secrets_dir/$cert" "$anchors_dir/$cert"
+      copied_any=true
+    else
+      echo "WARN: missing cert $secrets_dir/$cert"
+    fi
+  done
+
+  if [[ "$copied_any" == true ]]; then
+    sudo update-ca-trust extract
+    echo "==> Company CA certificates installed into Fedora trust store."
+  else
+    echo "WARN: no company CA certificates copied; trust store unchanged."
+  fi
+}
+
 echo "==> Dotfiles: $DOTFILES"
 echo "==> XDG_CONFIG_HOME: $XDG_CONFIG_HOME"
 
@@ -134,6 +184,23 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
     google-noto-emoji-fonts \
     fontawesome-6-free-fonts \
     fontawesome-6-brands-fonts
+
+  # VPN client — preferred: gpclient (yuezk COPR) for GlobalProtect SAML
+  # Fallback: raw openconnect when COPR is unavailable
+  if sudo dnf copr enable -y yuezk/globalprotect-openconnect 2>/dev/null; then
+    sudo dnf install -y globalprotect-openconnect
+    echo "==> gpclient installed from yuezk COPR (preferred GlobalProtect backend)."
+  else
+    echo "WARN: yuezk COPR not reachable; falling back to openconnect only."
+  fi
+  # openconnect kept as fallback runtime dependency used by vpn-on
+  sudo dnf install -y openconnect vpnc-script
+
+  # Remote desktop client — Remmina + RDP plugin (for Windows/hop-PC access over VPN)
+  sudo dnf install -y remmina remmina-plugins-rdp remmina-plugins-secret
+
+  # Secret service backend for Remmina credential storage in Sway sessions
+  sudo dnf install -y gnome-keyring libsecret
 
   # Power / thermal (HP ZBook)
   sudo dnf install -y tlp tlp-rdw thermald
@@ -199,6 +266,8 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   # local user scripts (used by launchers like wofi run)
   mkdir -p "$HOME/.local/bin"
   [[ -f "$DOTFILES/shell/nmtui" ]] && ln -sf "$DOTFILES/shell/nmtui" "$HOME/.local/bin/nmtui"
+  [[ -f "$DOTFILES/shell/vpn-on" ]] && ln -sf "$DOTFILES/shell/vpn-on" "$HOME/.local/bin/vpn-on"
+  [[ -f "$DOTFILES/shell/rdp-hop" ]] && ln -sf "$DOTFILES/shell/rdp-hop" "$HOME/.local/bin/rdp-hop"
 
   # X11 monitor scripts (referenced by sway mode_display)
   rm -rf "$XDG_CONFIG_HOME/X11"
@@ -327,6 +396,10 @@ EOF
   echo ""
   echo "── Phase 3e: Default browser ────────────────────────────────────────────"
   set_default_browser
+
+  echo ""
+  echo "── Phase 3f: Company CA certificates ────────────────────────────────────"
+  install_company_ca_certs
 fi
 
 # ── Phase 4: Yocto shared directory ───────────────────────────────────────────

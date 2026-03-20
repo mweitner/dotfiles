@@ -35,6 +35,9 @@ exec foot
 # Start udiskie (your automounter)
 exec udiskie -A
 
+# Secret service for Remmina/libsecret (avoids libsecret critical warnings)
+exec --no-startup-id sh -c 'if command -v gnome-keyring-daemon >/dev/null; then mkdir -p "$XDG_RUNTIME_DIR/keyring"; gnome-keyring-daemon --daemonize --components=secrets --control-directory "$XDG_RUNTIME_DIR/keyring" >/dev/null; fi'
+
 # NetworkManager tray applet (provides quick GUI controls)
 exec_always --no-startup-id sh -c 'pkill -x nm-applet; command -v nm-applet >/dev/null && nm-applet --indicator'
 
@@ -345,6 +348,18 @@ for_window [app_id="nmtui-float"] mark scratchpad-nmtui
 for_window [app_id="nmtui-float"] move scratchpad
 for_window [app_id="nmtui-float"] border none
 bindsym $mod+Shift+n exec --no-startup-id $HOME/.config/sway/scripts/toggle-scratchpad-nmtui.sh
+
+# VPN scratchpad — GlobalProtect via gpclient/openconnect ($mod+v to toggle)
+# Single persistent scratchpad instance: re-press $mod+v to hide/show.
+for_window [app_id="vpn-float"] floating enable
+for_window [app_id="vpn-float"] resize set 1000 650
+for_window [app_id="vpn-float"] mark scratchpad-vpn
+for_window [app_id="vpn-float"] move scratchpad
+for_window [app_id="vpn-float"] border none
+bindsym $mod+v exec $HOME/.config/sway/scripts/toggle-scratchpad-vpn.sh
+
+# Hop PC RDP launcher (checks VPN/DNS before starting Remmina profile)
+bindsym $mod+Shift+v exec --no-startup-id $HOME/.local/bin/rdp-hop
 
 # spotify scratchpad
 # not supported anymore as using browser based apps like apple.music, amazon.music, spotify.com, ...

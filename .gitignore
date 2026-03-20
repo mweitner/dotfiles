@@ -6,3 +6,4 @@ ai/gemini/tmp/*
 ai/gemini/cache/*
 # no secrets in git
 ai/gemini/oauth_creds.json
+.secrets
