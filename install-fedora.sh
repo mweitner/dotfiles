@@ -8,7 +8,7 @@ set -euo pipefail
 # Hardware target:    HP ZBook Power G11 (HiDPI, Wayland/Sway)
 #
 # Usage:
-#   bash install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services]
+#   bash install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--with-ssh-secrets]
 #
 # Idempotent: safe to re-run.  All symlinks use -sf (force/overwrite).
 #
@@ -16,12 +16,14 @@ set -euo pipefail
 SKIP_PACKAGES=false
 SKIP_SYMLINKS=false
 SKIP_SERVICES=false
+WITH_SSH_SECRETS=false
 
 for arg in "$@"; do
   case $arg in
     --skip-packages) SKIP_PACKAGES=true ;;
     --skip-symlinks) SKIP_SYMLINKS=true ;;
     --skip-services) SKIP_SERVICES=true ;;
+    --with-ssh-secrets) WITH_SSH_SECRETS=true ;;
   esac
 done
 
@@ -125,6 +127,37 @@ install_company_ca_certs() {
   else
     echo "WARN: no company CA certificates copied; trust store unchanged."
   fi
+}
+
+# Install SSH profile for this machine from secrets.
+# Source: $DOTFILES/.secrets/ssh/dev-pc/.ssh
+# Strategy: copy files (not symlink) so ~/.ssh remains independent and can be
+# permission-hardened for OpenSSH strict checks.
+install_ssh_secrets_dev_pc() {
+  local src dst
+  src="$DOTFILES/.secrets/ssh/dev-pc/.ssh"
+  dst="$HOME/.ssh"
+
+  if [[ ! -d "$src" ]]; then
+    echo "WARN: SSH secrets source not found at $src; skipping SSH setup."
+    return 0
+  fi
+
+  mkdir -p "$dst"
+  cp -a "$src"/. "$dst"/
+
+  # OpenSSH requires strict permissions for private keys and config.
+  chmod 700 "$dst"
+  find "$dst" -type d -exec chmod 700 {} +
+  find "$dst" -type f -exec chmod 600 {} +
+  find "$dst" -type f -name "*.pub" -exec chmod 644 {} +
+  [[ -f "$dst/known_hosts" ]] && chmod 644 "$dst/known_hosts"
+  [[ -f "$dst/known_hosts.old" ]] && chmod 644 "$dst/known_hosts.old"
+
+  # Keep ownership correct even if files were previously created by root.
+  chown -R "$USER:$USER" "$dst" 2>/dev/null || sudo chown -R "$USER:$USER" "$dst" 2>/dev/null || true
+
+  echo "==> SSH profile installed from $src to $dst with hardened permissions."
 }
 
 echo "==> Dotfiles: $DOTFILES"
@@ -453,6 +486,15 @@ EOF
   echo ""
   echo "── Phase 3f: Company CA certificates ────────────────────────────────────"
   install_company_ca_certs
+
+  echo ""
+  echo "── Phase 3g: SSH profile (dev-pc secrets) ───────────────────────────────"
+  if [[ "$WITH_SSH_SECRETS" == true ]]; then
+    install_ssh_secrets_dev_pc
+  else
+    echo "INFO: SSH profile install skipped (opt-in)."
+    echo "      Re-run with --with-ssh-secrets to install from .secrets/ssh/dev-pc/.ssh"
+  fi
 fi
 
 # ── Phase 4: Yocto shared directory ───────────────────────────────────────────
