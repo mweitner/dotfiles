@@ -281,6 +281,7 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/rdp-hop" ]] && ln -sf "$DOTFILES/shell/rdp-hop" "$HOME/.local/bin/rdp-hop"
   [[ -f "$DOTFILES/shell/setup-ugreen-nas-mount" ]] && ln -sf "$DOTFILES/shell/setup-ugreen-nas-mount" "$HOME/.local/bin/setup-ugreen-nas-mount"
   [[ -f "$DOTFILES/shell/nas-status" ]] && ln -sf "$DOTFILES/shell/nas-status" "$HOME/.local/bin/nas-status"
+  [[ -f "$DOTFILES/shell/setup-machine-network-profiles.sh" ]] && ln -sf "$DOTFILES/shell/setup-machine-network-profiles.sh" "$HOME/.local/bin/setup-machine-network-profiles"
 
   # X11 monitor scripts (referenced by sway mode_display)
   rm -rf "$XDG_CONFIG_HOME/X11"
