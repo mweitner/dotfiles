@@ -380,6 +380,20 @@ EOF
   echo "==> tlp + thermald enabled."
 
   echo ""
+  echo "── Phase 3c1: Serial console permissions (tio) ──────────────────────────"
+  # USB serial adapters are commonly owned by group dialout on Fedora.
+  # Grant access so tools like tio can open /dev/ttyUSB* without sudo.
+  if getent group dialout >/dev/null; then
+    sudo usermod -aG dialout "$USER" 2>/dev/null || true
+  fi
+  # Some setups/tools also rely on lock group for serial lock files.
+  if getent group lock >/dev/null; then
+    sudo usermod -aG lock "$USER" 2>/dev/null || true
+  fi
+  echo "==> Added $USER to serial access groups (dialout/lock when available)."
+  echo "   Re-login required for group membership changes to take effect."
+
+  echo ""
   echo "── Phase 3c2: Thunderbolt authorization (bolt) ──────────────────────────"
   # bolt is socket/dbus-activated on Fedora (static unit), so start is enough.
   sudo systemctl start bolt 2>/dev/null || true
