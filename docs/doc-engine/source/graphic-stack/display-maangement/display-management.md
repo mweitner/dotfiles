@@ -2,6 +2,12 @@
 
 This setup uses Wayland-native tools (`kanshi` and `swaymsg`) instead of X11 `xrandr`.
 
+## Quick Start Links
+
+- Dell WD19TB Thunderbolt setup: `../docking-station/dell-thunderbolt.md`
+- Apply current home-office layout now: `~/.local/bin/monitor-home-office`
+- Switch profile with kanshi: `kanshctl switch-profile home-office`
+
 ## Current Working Layout (Dell WD19TB)
 
 Hardware:
@@ -17,7 +23,7 @@ Output mapping in Sway:
 Active profile values:
 - `DP-7`: `3840x2160@30Hz`, `scale 2`, `position 0,0`
 - `DP-6`: `3840x2160@60Hz`, `scale 2`, `position 1920,0`
-- `eDP-1`: `2560x1600@120Hz`, `scale 1.25`, `position 3840,0`
+- `eDP-1`: `2560x1600@120Hz`, `scale 1.5`, `position 3840,14`
 
 Logical geometry:
 - 4K at scale 2 gives `1920x1080` logical size for each external display

@@ -1,9 +1,9 @@
 # kanshi display profiles for multi-monitor docking station setup
 # HP ZBook Power G11 + Dell WD19TB Thunderbolt Dock + 2× Samsung U28E850 (4K 28")
 #
-# Thunderbolt dock output names: DP-6 (left), DP-7 (center)
-# Logical layout:  [DP-6 1920px] [DP-7 1920px] [eDP-1 2048px]
-# Physical:        3840x2160@scale2 + 3840x2160@scale2 + 2560x1600@scale1.25
+# Thunderbolt dock output names: DP-7 (left), DP-6 (center)
+# Logical layout:  [DP-7 1920px] [DP-6 1920px] [eDP-1 1707px]
+# Physical:        3840x2160@scale2 + 3840x2160@scale2 + 2560x1600@scale1.5
 
 # Laptop only (no dock)
 profile laptop-only {
@@ -15,12 +15,12 @@ profile laptop-only {
 profile home-office {
   output DP-7  enable mode 3840x2160@30Hz position 0,0    scale 2
   output DP-6  enable mode 3840x2160@60Hz position 1920,0 scale 2
-  output eDP-1 enable mode 2560x1600@120Hz position 3840,0 scale 1.25
+  output eDP-1 enable mode 2560x1600@120Hz position 3840,14 scale 1.5
 }
 
 # Ulm office: same dock + same monitors as home office
 profile ulm-office {
   output DP-7  enable mode 3840x2160@30Hz position 0,0    scale 2
   output DP-6  enable mode 3840x2160@60Hz position 1920,0 scale 2
-  output eDP-1 enable mode 2560x1600@120Hz position 3840,0 scale 1.25
+  output eDP-1 enable mode 2560x1600@120Hz position 3840,14 scale 1.5
 }

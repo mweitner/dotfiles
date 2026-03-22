@@ -18,6 +18,21 @@ font pango:Noto Sans, Noto Serif, Noto Emoji, FontAwesome, monospace 11
 # Sway-specific: scaling for HiDPI
 output eDP-1 scale 1.25
 
+# Bind workspaces to specific outputs (exclusive per output)
+# Left monitor (DP-7): workspaces 1-3
+workspace 1 output DP-7
+workspace 2 output DP-7
+workspace 3 output DP-7
+# Center monitor (DP-6): workspaces 4-6
+workspace 4 output DP-6
+workspace 5 output DP-6
+workspace 6 output DP-6
+# Right monitor (eDP-1): workspaces 7-10
+workspace 7 output eDP-1
+workspace 8 output eDP-1
+workspace 9 output eDP-1
+workspace 10 output eDP-1
+
 # Use pactl to adjust volume in PipeWire/PulseAudio
 bindsym XF86AudioRaiseVolume exec pactl set-sink-volume @DEFAULT_SINK@ +10%
 bindsym XF86AudioLowerVolume exec pactl set-sink-volume @DEFAULT_SINK@ -10%
@@ -63,29 +78,27 @@ bindsym $mod+d exec wofi --show run
 bindsym Print exec ~/.config/sway/scripts/grimshot.sh full
 bindsym $mod+Print exec ~/.config/sway/scripts/grimshot.sh region
 
-# change focus
-bindsym $mod+h focus left
-bindsym $mod+j focus down
-bindsym $mod+k focus up
-bindsym $mod+l focus right
-
-# alternatively, you can use the cursor keys:
+# change focus within workspace (using arrow keys)
 bindsym $mod+Left focus left
 bindsym $mod+Down focus down
 bindsym $mod+Up focus up
 bindsym $mod+Right focus right
 
-# move focused window
-bindsym $mod+Shift+h move left
-bindsym $mod+Shift+j move down
-bindsym $mod+Shift+k move up
-bindsym $mod+Shift+l move right
-
-# alternatively, you can use the cursor keys:
+# move focused window within workspace (using arrow keys)
 bindsym $mod+Shift+Left move left
 bindsym $mod+Shift+Down move down
 bindsym $mod+Shift+Up move up
 bindsym $mod+Shift+Right move right
+
+# move workspace to adjacent output (left/right)
+bindsym $mod+h move workspace to output left; focus output left
+bindsym $mod+l move workspace to output right; focus output right
+bindsym $mod+Control+h move workspace to output left; focus output left
+bindsym $mod+Control+l move workspace to output right; focus output right
+
+# move focused window within workspace (left/right)
+bindsym $mod+Shift+h move left
+bindsym $mod+Shift+l move right
 
 # split in horizontal orientation
 #mweitner for me is horizontal split left/right
@@ -93,7 +106,6 @@ bindsym $mod+Control+v split h
 
 # split in vertical orientation
 #mweitner for me is vertical split down/up
-# changed from h (horizontal) to n because Control+h already used
 bindsym $mod+Control+n split v
 
 # enter fullscreen mode for the focused container
@@ -163,7 +175,7 @@ bindsym $mod+Shift+0 move container to workspace number 10 $ws10dev5
 # move focused window to workspace and switch to target workspace
 bindsym $mod+Control+1 move container to workspace number 1 $ws1term; workspace number 1 $ws1term
 bindsym $mod+Control+2 move container to workspace number 2 $ws2web; workspace number 2 $ws2web
-bindsym $mod+Control+3 move container to workspace number 3 $ws3dev; workspace number 3 ws3dev
+bindsym $mod+Control+3 move container to workspace number 3 $ws3dev; workspace number 3 $ws3dev
 bindsym $mod+Control+4 move container to workspace number 4 $ws4vm; workspace number 4 $ws4vm
 bindsym $mod+Control+5 move container to workspace number 5 $ws5rdp; workspace number 5 $ws5rdp
 bindsym $mod+Control+6 move container to workspace number 6 $ws6web2; workspace number 6 $ws6web2
@@ -172,15 +184,13 @@ bindsym $mod+Control+8 move container to workspace number 8 $ws8dev3; workspace 
 bindsym $mod+Control+9 move container to workspace number 9 $ws9dev4; workspace number 9 $ws9dev4
 bindsym $mod+Control+0 move container to workspace number 10 $ws10dev5; workspace number 10 $ws10dev5
 
-# move workspace between monitors
-bindsym $mod+Control+m move workspace to output primary
-bindsym $mod+Control+s move workspace to output HDMI-1
-bindsym $mod+Control+l move workspace to output right
-bindsym $mod+Control+h move workspace to output left
+# Additional multi-output navigation (Control+arrow variants)
+bindsym $mod+Control+Left  move workspace to output left; focus output left
+bindsym $mod+Control+Right move workspace to output right; focus output right
 
 # reload the configuration file
 bindsym $mod+Shift+c reload
-# restart i3 inplace (preserves your layout/session, can be used to upgrade i3)
+# restart i3 inplace (preserves your layoKut/session, can be used to upgrade i3)
 bindsym $mod+Shift+r restart
 # exit i3 (logs you out of your X session)
 #bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'You pressed the exit shortcut. Do you really want to exit i3? This will end your X session.' -B 'Yes, exit i3' 'i3-msg exit'"

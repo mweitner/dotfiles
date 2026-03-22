@@ -3,11 +3,11 @@ set -euo pipefail
 
 # Wayland-native monitor configuration for home office docking
 # Dell WD19TB Thunderbolt Dock + 2× Samsung U28E850 4K 28"
-# Layout: DP-6 (left) | DP-7 (center) | eDP-1 (right)
+# Layout: DP-7 (left) | DP-6 (center) | eDP-1 (right)
 # Logical positions: 0 | 1920 | 3840  (scale 2 on 4K = 1920 logical px wide each)
 
 swaymsg output DP-7  mode 3840x2160@30Hz  position 0    0 scale 2
 swaymsg output DP-6  mode 3840x2160@60Hz  position 1920 0 scale 2
-swaymsg output eDP-1 mode 2560x1600@120Hz position 3840 0 scale 1.25
+swaymsg output eDP-1 mode 2560x1600@120Hz position 3840 14 scale 1.5
 
 echo "✓ Home office docking display profile applied"

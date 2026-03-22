@@ -1,5 +1,11 @@
 # Dell WD19TB Thunderbolt Dock
 
+## Quick Start Links
+
+- Display arrangement on Sway/kanshi: `../graphic-stack/display-maangement/display-management.md`
+- Apply current dock layout now: `~/.local/bin/monitor-home-office`
+- Verify Thunderbolt enrollment: `boltctl list`
+
 ## Hardware
 
 | Item | Detail |
@@ -111,7 +117,7 @@ With the WD19TB on the Thunderbolt port, Sway sees:
 Final working layout:
 - Left: `DP-7` (`3840x2160@30Hz`, `scale 2`, `position 0,0`)
 - Center: `DP-6` (`3840x2160@60Hz`, `scale 2`, `position 1920,0`)
-- Right: `eDP-1` (`2560x1600@120Hz`, `scale 1.25`, `position 3840,0`)
+- Right: `eDP-1` (`2560x1600@120Hz`, `scale 1.5`, `position 3840,14`)
 
 Display profiles are managed by kanshi and helper scripts.
 For visual rearrangement on Wayland, use `wdisplays` and then copy final coordinates into kanshi/scripts.
