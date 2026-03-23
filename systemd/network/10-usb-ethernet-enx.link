@@ -1,0 +1,11 @@
+# Prefer MAC-based predictable names for USB Realtek Ethernet adapters.
+# Result: enx<mac> (e.g. enx00e04c6805c8)
+
+[Match]
+Type=ether
+Driver=r8152
+
+[Link]
+NamePolicy=mac
+AlternativeNamesPolicy=path
+MACAddressPolicy=persistent

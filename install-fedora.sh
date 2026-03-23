@@ -264,6 +264,13 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   mkdir -p "$XDG_CONFIG_HOME/kanshi"
   [[ -f "$DOTFILES/.config/kanshi/config" ]] && ln -sf "$DOTFILES/.config/kanshi/config" "$XDG_CONFIG_HOME/kanshi/config"
 
+  # Network interface naming policy (prefer enx<mac> for USB Realtek NICs)
+  # Managed via systemd .link file in /etc/systemd/network.
+  if [[ -f "$DOTFILES/systemd/network/10-usb-ethernet-enx.link" ]]; then
+    sudo mkdir -p /etc/systemd/network
+    sudo ln -sfn "$DOTFILES/systemd/network/10-usb-ethernet-enx.link" /etc/systemd/network/10-usb-ethernet-enx.link
+  fi
+
   # i3 scripts reused by sway config (lock, load-default-ws, etc.)
   rm -rf "$XDG_CONFIG_HOME/i3"
   ln -sf "$DOTFILES/i3" "$XDG_CONFIG_HOME"
@@ -315,6 +322,7 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/setup-ugreen-nas-mount" ]] && ln -sf "$DOTFILES/shell/setup-ugreen-nas-mount" "$HOME/.local/bin/setup-ugreen-nas-mount"
   [[ -f "$DOTFILES/shell/nas-status" ]] && ln -sf "$DOTFILES/shell/nas-status" "$HOME/.local/bin/nas-status"
   [[ -f "$DOTFILES/shell/setup-machine-network-profiles.sh" ]] && ln -sf "$DOTFILES/shell/setup-machine-network-profiles.sh" "$HOME/.local/bin/setup-machine-network-profiles"
+  [[ -f "$DOTFILES/shell/setup-adapters.sh" ]] && ln -sf "$DOTFILES/shell/setup-adapters.sh" "$HOME/.local/bin/setup-adapters"
 
   # X11 monitor scripts (referenced by sway mode_display)
   rm -rf "$XDG_CONFIG_HOME/X11"
