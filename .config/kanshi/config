@@ -18,9 +18,9 @@ profile home-office {
   output eDP-1 enable mode 2560x1600@120Hz position 3840,14 scale 1.5
 }
 
-# Ulm office: same dock + same monitors as home office
+# Ulm office: Dell WD19TB + 2x Dell U2415 (1920x1200)
 profile ulm-office {
-  output DP-7  enable mode 3840x2160@30Hz position 0,0    scale 2
-  output DP-6  enable mode 3840x2160@60Hz position 1920,0 scale 2
-  output eDP-1 enable mode 2560x1600@120Hz position 3840,14 scale 1.5
+  output DP-5  enable mode 1920x1200@59.950Hz position 0,0    scale 1
+  output DP-6  enable mode 1920x1200@59.950Hz position 1920,0 scale 1
+  output eDP-1 enable mode 2560x1600@120Hz   position 3840,0 scale 1.5
 }

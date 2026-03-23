@@ -415,7 +415,7 @@ mode "$mode_display" {
     bindsym k exec --no-startup-id kanshctl switch-profile home-office, mode "default"
     bindsym l exec --no-startup-id $HOME/.local/bin/monitor-laptop-only, mode "default"
     bindsym h exec --no-startup-id $HOME/.local/bin/monitor-home-office, mode "default"
-    bindsym u exec --no-startup-id $HOME/.local/bin/monitor-ulm-office, mode "default"
+  bindsym u exec --no-startup-id sh -c 'command -v kanshctl >/dev/null && kanshctl switch-profile ulm-office || "$HOME/.local/bin/monitor-ulm-office"', mode "default"
 
     # back to normal: Enter or Escape
     bindsym Return mode "default"

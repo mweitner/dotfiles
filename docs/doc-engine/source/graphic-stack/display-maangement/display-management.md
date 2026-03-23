@@ -6,6 +6,7 @@ This setup uses Wayland-native tools (`kanshi` and `swaymsg`) instead of X11 `xr
 
 - Dell WD19TB Thunderbolt setup: `../docking-station/dell-thunderbolt.md`
 - Apply current home-office layout now: `~/.local/bin/monitor-home-office`
+- Apply current ULM-office layout now: `~/.local/bin/monitor-ulm-office`
 - Switch profile with kanshi: `kanshctl switch-profile home-office`
 
 ## Current Working Layout (Dell WD19TB)
@@ -28,6 +29,27 @@ Active profile values:
 Logical geometry:
 - 4K at scale 2 gives `1920x1080` logical size for each external display
 - Desktop order: `[DP-7 left] [DP-6 center] [eDP-1 right]`
+
+## Current Working Layout (ULM LDC Office)
+
+Hardware:
+- Laptop: HP ZBook Power G11
+- Dock: Dell WD19TB (Thunderbolt)
+- External monitors: 2x Dell U2415 (1920x1200)
+
+Output mapping in Sway:
+- `DP-5` = left external monitor
+- `DP-6` = center external monitor
+- `eDP-1` = laptop panel on the right
+
+Active profile values:
+- `DP-5`: `1920x1200@59.95Hz`, `scale 1`, `position 0,0`
+- `DP-6`: `1920x1200@59.95Hz`, `scale 1`, `position 1920,0`
+- `eDP-1`: `2560x1600@120Hz`, `scale 1.5`, `position 3840,0`
+
+Logical geometry:
+- Desktop order: `[DP-5 left] [DP-6 center] [eDP-1 right]`
+- External monitors run at native 1:1 scale for sharp text and predictable workspace widths
 
 ## Why Not xrandr
 
@@ -90,8 +112,8 @@ If cursor crossing does not match physical order, swap `DP-6` and `DP-7` positio
 - `~/.local/bin/monitor-ulm-office`
 
 Current correct order is:
-- `DP-7` at `position 0,0`
-- `DP-6` at `position 1920,0`
+- Home office (4K): `DP-7` at `position 0,0`, `DP-6` at `position 1920,0`
+- ULM office (U2415): `DP-5` at `position 0,0`, `DP-6` at `position 1920,0`
 
 ### One 4K monitor only runs at 30Hz
 
