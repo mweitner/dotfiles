@@ -69,6 +69,37 @@ setup-adapters \
   --group lpo=c
 ```
 
+### Dual-adapter example: mining/NAS + LPO in parallel
+
+Concrete office setup:
+
+- `adapter-a` for `mining` (NAS/dev switch path, `192.168.3.0/24`)
+- `adapter-c` for `lpo` (`192.168.2.0/24`)
+
+Apply mapping and bring up both gateway profiles:
+
+```bash
+setup-adapters --group mining=a --group lpo=c
+nmcli connection up Machine-mining-excavator-GW
+nmcli connection up Machine-lpo-CSM-GW
+```
+
+If NAS is needed on mining in the same session:
+
+```bash
+setup-dnsmasq-profile --profile ulm-nas
+setup-ugreen-nas-mount --mode systemd-units --site auto
+ls /mnt/data
+```
+
+Quick checks:
+
+```bash
+nmcli connection show Machine-mining-excavator-GW | grep mac-address
+nmcli connection show Machine-lpo-CSM-GW | grep mac-address
+nas-status
+```
+
 ### Mixed: most on adapter-a, one specific on adapter-b
 ```bash
 setup-adapters \

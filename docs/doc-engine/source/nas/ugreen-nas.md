@@ -110,6 +110,53 @@ What it does:
 - applies NAS automount via `systemd` units
 - triggers mount and prints `nas-status`
 
+## Dual-Adapter Workflow: Mining + LPO At The Same Time
+
+This setup keeps NAS/mining on one USB2Ethernet adapter and LPO on a second
+USB2Ethernet adapter in parallel.
+
+Concrete example with current adapter registry:
+
+- `adapter-a` (`00:E0:4C:B8:28:B5` / `enx00e04cb828b5`) for `mining`
+- `adapter-c` (`3C:49:37:05:47:46` / `enx3c4937054746`) for `lpo`
+
+Apply the mapping:
+
+```bash
+setup-adapters --group mining=a --group lpo=c
+```
+
+Bring up both gateway profiles:
+
+```bash
+nmcli connection up Machine-mining-excavator-GW
+nmcli connection up Machine-lpo-CSM-GW
+```
+
+Switch dnsmasq to mining/NAS profile and ensure NAS mount is ready:
+
+```bash
+setup-dnsmasq-profile --profile ulm-nas
+setup-ugreen-nas-mount --mode systemd-units --site auto
+ls /mnt/data
+```
+
+Verification:
+
+```bash
+nmcli connection show Machine-mining-excavator-GW | grep mac-address
+nmcli connection show Machine-lpo-CSM-GW | grep mac-address
+ip -4 addr show enx00e04cb828b5
+ip -4 addr show enx3c4937054746
+nas-status
+```
+
+Expected result:
+
+- mining gateway profile bound to adapter-a (`192.168.3.1/24`)
+- lpo gateway profile bound to adapter-c (`192.168.2.1/24`)
+- NAS reachable/mounted from the mining network while LPO network remains active
+
 Optional overrides:
 
 ```bash
