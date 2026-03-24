@@ -215,6 +215,9 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   # NAS/SMB client tools
   sudo dnf install -y cifs-utils
 
+  # Lightweight DNS/DHCP server for machine-network profiles
+  sudo dnf install -y dnsmasq
+
   # Fonts
   sudo dnf install -y \
     google-noto-sans-fonts \
@@ -324,6 +327,7 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/nas-status" ]] && ln -sf "$DOTFILES/shell/nas-status" "$HOME/.local/bin/nas-status"
   [[ -f "$DOTFILES/shell/setup-machine-network-profiles.sh" ]] && ln -sf "$DOTFILES/shell/setup-machine-network-profiles.sh" "$HOME/.local/bin/setup-machine-network-profiles"
   [[ -f "$DOTFILES/shell/setup-adapters.sh" ]] && ln -sf "$DOTFILES/shell/setup-adapters.sh" "$HOME/.local/bin/setup-adapters"
+  [[ -f "$DOTFILES/shell/setup-dnsmasq-profile" ]] && ln -sf "$DOTFILES/shell/setup-dnsmasq-profile" "$HOME/.local/bin/setup-dnsmasq-profile"
 
   # X11 monitor scripts (referenced by sway mode_display)
   rm -rf "$XDG_CONFIG_HOME/X11"
@@ -376,6 +380,20 @@ EOF
   sudo systemctl restart NetworkManager
   echo "==> NetworkManager configured with iwd backend."
   echo "==> NetworkManager GUI tools available: nm-applet, nm-connection-editor."
+
+  echo ""
+  echo "── Phase 3a1: Configuring dnsmasq profile ───────────────────────────────"
+  DNSMASQ_DEFAULT_PROFILE="${DNSMASQ_DEFAULT_PROFILE:-ulm-nas}"
+  if [[ -x "$DOTFILES/shell/setup-dnsmasq-profile" ]]; then
+    if "$DOTFILES/shell/setup-dnsmasq-profile" --list | grep -qx "$DNSMASQ_DEFAULT_PROFILE"; then
+      "$DOTFILES/shell/setup-dnsmasq-profile" --profile "$DNSMASQ_DEFAULT_PROFILE" || \
+        echo "WARN: dnsmasq profile apply failed. Check with: setup-dnsmasq-profile --show"
+    else
+      echo "WARN: dnsmasq profile '$DNSMASQ_DEFAULT_PROFILE' not found under $DOTFILES/dnsmasq/config"
+    fi
+  else
+    echo "WARN: setup-dnsmasq-profile script not found or not executable."
+  fi
 
   echo ""
   echo "── Phase 3b: Configuring greetd ──────────────────────────────────────────"

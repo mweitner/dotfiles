@@ -1,0 +1,176 @@
+# disables DNS functionality
+#port=0
+port=53
+enable-tftp
+# concept tftp-root subfolders:
+#  /root/: provides rootfs to mount by nfs
+#  /images/: read only access to image to be flashed by dd
+#  /boot/: boot artifacts like linux kernal fitImage, zImage, dtbs...
+#  <project>/root/: project specific rootfs to mount by nfs
+#  <project>/images/: project specific access to image to be flashed by dd
+#  <project>/boot/: project specific boot artifacts like linux kernal fitImage,
+#    zImage, dtbs...
+tftp-root=/opt/netboot
+
+# the network device on which dnsmasq operates
+# First we used interface=enx0050b65ea4a2 only, but if that interface is not
+# connected the dnsmasq service fails to start!
+# Best solution is to use interface and bind-dynamic option
+#interface=enx0050b65ea4a2 <- broken adapter when used in Lindau (LED) 12.01.2024
+#interface=enx0050b65ea50f
+interface=enx00e04cb828b5
+listen-address=192.168.2.1
+#listen-address=192.168.3.200
+interface=enx54b80aefbffa
+# new USB2Ethernet adapter (private adapter owned by mweitner)
+interface=enx00e04c680221
+# dc5 evo
+interface=enx3c4937054746
+# dell host pc ethernet
+#interface=enxf4ee08caae80
+bind-dynamic
+
+# activate dhcp function
+#dhcp-range=interface:enx0050b65ea4a2,192.168.3.10,192.168.3.100,255.255.255.0,12h
+#dhcp-range=interface:enx54b80aefbffa,192.168.3.10,192.168.3.100,255.255.255.0,12h
+#dhcp-range=interface:enx00e04c680221,192.168.3.110,192.168.3.120,255.255.255.0,12h
+#dhcp-range=interface:enx0050b65ea50f,169.254.1.10,169.254.1.100,255.255.255.0,12h
+#dhcp-range=interface:enx0050b65ea50f,192.168.3.10,192.168.3.100,255.255.255.0,12h
+# new adapter: enx00e04cb828b5, setup for DC5 linux-lpo
+dhcp-range=interface:enx00e04cb828b5,192.168.3.210,192.168.3.220,255.255.255.0,12h
+dhcp-range=interface:enx3c4937054746,192.168.2.10,192.168.2.100,255.255.255.0,12h
+#dhcp-range=interface:enx00e04cb828b5,192.168.2.10,192.168.2.100,255.255.255.0,12h
+
+# set static ips of devices
+# QNAP TSi410 NAS server, machine network mining-excavator, used for initial setup...
+#dhcp-host=24:5E:BE:7F:5D:85,iptime,192.168.3.90,infinite
+# this pc device enx0050b65ea4a2: 00:50:b6:5e:a4:a2
+# this adapter is defect I think
+#dhcp-host=00:50:b6:5e:a4:a2,iptime,192.168.3.1,infinite
+# this pc device enx0050b65ea50f: 00:50:b6:5e:a5:0f
+#  if setup with slate router on 192.168.3.1, we use for dev PC 192.168.3.2
+#dhcp-host=00:50:b6:5e:a5:0f,iptime,169.254.1.1,infinite
+#dhcp-host=00:50:b6:5e:a5:0f,iptime,192.168.3.2,infinite
+#  if setup with dc5 display we use 192.168.2.1 for dev PC
+#dhcp-host=00:50:b6:5e:a5:0f,iptime,192.168.2.1,infinite
+#dhcp-host=00:e0:4c:b8:28:b5,iptime,192.168.2.1,infinite
+dhcp-host=00:e0:4c:b8:28:b5,iptime,192.168.3.200,infinite
+# DC5 test rack display -> assign static ip 192.168.2.130
+#dhcp-host=00:11:b8:20:bb:d5,iptime,192.168.2.130,infinite
+dhcp-host=00:11:b8:21:98:3d,iptime,192.168.2.130,infinite
+# this dev pc with interface:enx00e04c680221, dedicated to MCG linux-dps
+#dhcp-host=00:e0:4c:68:02:21,iptime,192.168.3.1,infinite
+# todo add mac address of second interface
+#dhcp-host=00:50:b6:5e:a4:a2,iptime,169.254.1.1,infinite
+# mac of target device UCM todo
+#dhcp-host=?,iptime,169.254.1.34,infinite
+# mac of target device MCG
+#dhcp-host=00:11:b8:06:16:e2,iptime,192.168.3.34,infinite
+# mac of target device raspberrypi4(sheep2)
+#  dc:a6:32:45:c3:14
+# mac of target device LEG4IT
+#  B01-Sample (dev1): ca:a6:d3:60:52:dc
+#  B01-Sample (dev2): 5e:f9:8f:a3:51:86
+#  B01-Sample (dev3, bricked): ...
+#  B01-Sample (dev4): 5a:b1:8f:d5:22:a1
+#  B01+-Sample (dev5, mweitner): ae:fc:cf:cf:a7:69
+#  B01+-Sample (dev6, andreas knappic): 46:79:3c:19:13:71
+#  B02-Sample (dev7, andreas knappic hw-testing): 42:37:2a:a8:1d:94
+#  B02-Sample (dev8, mweitner dev): c6:0c:4f:d8:a9:5e
+#  A-Sample: aa:37:b2:a8:4f:cb
+#  16.10.2023 (somehow changed mac): f2:73:f1:fa:18:5d
+# mac of target device MCG (LMT Thomas Blaser)
+#  0a:e9:a8:12:a5:61
+# mac of Christians MCG
+#  f2:73:f1:fa:18:5d
+# mac of target device dc5 (ip: 192.168.2.34):
+#  dev02: 00:11:b8:20:46:c8
+# always give following n devices the same ip (they are not online at same time)
+#dhcp-host=00:11:b8:03:26:06,00:11:b8:06:16:e2,00:11:b8:07:17:20,00:11:b8:07:17:3c,dc:a6:32:45:c3:14,aa:37:b2:a8:4f:cb,0a:e9:a8:12:a5:61,f2:73:f1:fa:18:5d,00:11:b8:06:16:e6,ca:a6:d3:60:52:dc,fe:39:a3:83:12:d1,5e:f9:8f:a3:51:86,5a:b1:8f:d5:22:a1,ae:fc:cf:cf:a7:69,46:79:3c:19:13:71,42:37:2a:a8:1d:94,c6:0c:4f:d8:a9:5e,192.168.3.34
+# dev MCG mweitner (imx6sleg-mcg, ublox modem, serial number: ?)
+#dhcp-host=00:11:b8:06:16:e2,192.168.3.34
+# dev mcgdev3 mweitner (imx6qleg-mcg, ublox modem, serial number: ?)
+#dhcp-host=00:11:b8:1e:93:51,192.168.3.34
+# dev mcgdev8: mweitner (imx6qleg-mcg, mining-excavator, slave)
+#dhcp-host=00:11:b8:1e:93:59,192.168.3.34
+# dev mcgdev9: mweitner (imx6qleg-mcg, mining-excavator, slave)
+#dhcp-host=00:11:b8:1e:93:54,192.168.3.34
+# dev mcgdev6: mweitner (imx6qleg-mcg, mining-excavator, slave)
+dhcp-host=00:11:b8:1e:93:57,192.168.3.34
+# dev W&T FTP Data Station 3 (LPO)
+# 00:c0:3d:0a:71:d2
+#dhcp-host=00:c0:3d:0a:71:d2,192.168.3.180
+# dev dc5 display
+#dhcp-host=00:11:b8:20:46:c8,192.168.2.34
+#dhcp-host=00:11:b8:03:26:06,00:11:b8:06:16:e2,00:11:b8:07:17:20,00:11:b8:07:17:3c,dc:a6:32:45:c3:14,aa:37:b2:a8:4f:cb,0a:e9:a8:12:a5:61,f2:73:f1:fa:18:5d,00:11:b8:06:16:e6,ca:a6:d3:60:52:dc,fe:39:a3:83:12:d1,5e:f9:8f:a3:51:86,5a:b1:8f:d5:22:a1,ae:fc:cf:cf:a7:69,46:79:3c:19:13:71,42:37:2a:a8:1d:94,c6:0c:4f:d8:a9:5e,169.254.1.34
+# 01, netmask
+dhcp-option=interface:enx0050b65ea4a2,option:netmask,255.255.255.0
+#dhcp-option=interface:enx0050b65ea50f,option:netmask,255.255.255.0
+dhcp-option=interface:enx00e04cb828b5,option:netmask,255.255.255.0
+dhcp-option=interface:enx00e04c680221,option:netmask,255.255.255.0
+# 03, gatewayip
+#dhcp-option=interface:enx0050b65ea4a2,option:router,192.168.3.1
+#dhcp-option=interface:enx0050b65ea50f,option:router,192.168.3.2
+#dhcp-option=interface:enx00e04cb828b5,option:router,192.168.2.1
+dhcp-option=interface:enx00e04cb828b5,option:router,192.168.3.200
+
+#dc5evo
+dhcp-option=interface:enx3c4937054746,option:router,192.168.2.1
+dhcp-option=interface:enx3c4937054746,option:root-path,/opt/netboot/root/imx6q-display5-evo
+dhcp-boot=interface:enx3c4937054746,boot/imx8-display5-evo/fitImage,imx8-display5-evo,192.168.2.1
+
+#dhcp-option=interface:enx00e04c680221,option:router,192.168.3.1
+# 06, dnsip
+#dhcp-option=interface:enx0050b65ea4a2,option:dns-server,192.168.3.1
+#dhcp-option=interface:enx00e04c680221,option:dns-server,192.168.3.1
+#dhcp-option=interface:enx0050b65ea50f,option:dns-server,192.168.3.2
+#dhcp-option=interface:enx0050b65ea50f,option:dns-server,192.168.2.1
+# LIS firewall DNS
+#dhcp-option=interface:enx0050b65ea50f,option:dns-server,10.146.72.1
+# IoT core DNS hack
+# Required changes: port set to 53
+# the address attribute works only within dev net!!!
+#dhcp-option=interface:enx00e04cb828b5,option:dns-server,192.168.2.1
+# Attention: for iot core only!!!
+address=/lpo-dc5-v1.fota.iotdevices.liebherr.com/10.242.162.5
+# 17, uboot-env: rootpath
+# Important: The rootpath must point to the rootfs netboot folder.
+# For example:
+# - dc5 display default is /srv/tftp/DISP5/rootfs
+# - dc5 local development default is /opt/netboot/root/imx6q-display5
+dhcp-option=interface:enx0050b65ea4a2,option:root-path,/opt/netboot
+#dhcp-option=interface:enx00e04cb828b5,option:root-path,/opt/netboot/root/imx6q-display5
+dhcp-option=interface:enx00e04cb828b5,option:root-path,/opt/netboot/root/imx6qleg-mcg
+#dhcp-option=interface:enx00e04c680221,option:root-path,/opt/netboot/root/imx6sleg-mcg
+dhcp-option=interface:enx00e04c680221,option:root-path,/opt/netboot/root/imx6qleg-mcg
+# 67, bootfile
+#,legsv,192.168.1.10
+#dhcp-boot=,legsv,192.168.3.1
+#dhcp-boot=mytest-bootfile-name,192.168.3.1
+#dhcp-boot=interface:enx0050b65ea4a2,boot/imx8qxp-leg4it/fitImage,192.168.3.1
+#dhcp-boot=interface:enx00e04c680221,boot/imx6sleg-mcg/fitImage,192.168.3.1
+#dhcp-boot=interface:enx00e04c680221,boot/imx6qleg-mcg/fitImage,192.168.3.1
+#dhcp-boot=interface:enx00e04cb828b5,boot/imx6qleg-mcg/fitImage,192.168.3.200
+#dhcp-boot=interface:enx0050b65ea50f,boot/imx8qxp-leg4it/Image,192.168.3.2
+#dhcp-boot=interface:enx0050b65ea50f,boot/imx6q-display5/fitImage,192.168.2.1
+#dhcp-boot=boot/imx6q-display5/fitImage,,192.168.2.1
+#without interface was working fine
+#dhcp-boot=boot/imx6q-display5/fitImage,imx6q-display5,192.168.2.1
+#todo double check if this dhcp-boot with interface option works and can replace above entry
+#dhcp-boot=interface:enx00e04cb828b5,boot/imx6q-display5/fitImage,imx6q-display5,192.168.2.1
+#dhcp-boot=boot/imx6q-display5/fitImage,imx6q-display5,192.168.2.1
+#dhcp-boot=boot/imx6qleg-mcg/fitImage,imx6qleg-mcg,192.168.3.200
+
+#
+# Support NTP server
+#
+#dhcp-option=interface:enx00e04cb828b5,option:ntp-server,192.168.2.1
+dhcp-option=interface:enx00e04cb828b5,option:ntp-server,192.168.3.200
+#dhcp-option=interface:enx00e04c680221,option:ntp-server,192.168.3.1
+
+# Logging
+log-facility=/var/log/dnsmasq.log
+log-async
+log-queries
+log-dhcp
+

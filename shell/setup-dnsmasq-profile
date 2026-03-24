@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DOTFILES="${DOTFILES:-$HOME/dotfiles}"
+PROFILE_DIR="$DOTFILES/dnsmasq/config"
+ACTIVE_FILE="/etc/dnsmasq.d/10-dotfiles-active.conf"
+STATE_FILE="/var/lib/dnsmasq-dotfiles/active-profile"
+
+PROFILE=""
+SHOW_ONLY=false
+LIST_ONLY=false
+
+usage() {
+  cat <<'EOF'
+Usage:
+  setup-dnsmasq-profile --profile <name>
+  setup-dnsmasq-profile --show
+  setup-dnsmasq-profile --list
+
+Options:
+  --profile <name>   Activate dnsmasq profile from $DOTFILES/dnsmasq/config
+  --show             Show active profile and dnsmasq service state
+  --list             List available profiles
+  -h, --help         Show this help
+
+Examples:
+  setup-dnsmasq-profile --list
+  setup-dnsmasq-profile --profile ulm-nas
+  setup-dnsmasq-profile --show
+EOF
+}
+
+list_profiles() {
+  if [[ ! -d "$PROFILE_DIR" ]]; then
+    return 0
+  fi
+
+  find "$PROFILE_DIR" -maxdepth 1 -type f -name '*.conf' -printf '%f\n' \
+    | sed 's/\.conf$//' \
+    | sort
+}
+
+show_status() {
+  local active=""
+
+  if [[ -f "$STATE_FILE" ]]; then
+    active="$(sudo cat "$STATE_FILE" 2>/dev/null || true)"
+  fi
+
+  if [[ -z "$active" && -f "$ACTIVE_FILE" ]]; then
+    active="$(basename "$ACTIVE_FILE")"
+  fi
+
+  echo "Active dnsmasq profile: ${active:-unknown}"
+  echo "Active config file: $ACTIVE_FILE"
+  systemctl --no-pager --full status dnsmasq | sed -n '1,15p' || true
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --profile)
+      PROFILE="${2:-}"
+      shift 2
+      ;;
+    --show)
+      SHOW_ONLY=true
+      shift
+      ;;
+    --list)
+      LIST_ONLY=true
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [[ "$LIST_ONLY" == true ]]; then
+  list_profiles
+  exit 0
+fi
+
+if [[ "$SHOW_ONLY" == true ]]; then
+  show_status
+  exit 0
+fi
+
+if [[ -z "$PROFILE" ]]; then
+  echo "Error: missing --profile <name>" >&2
+  usage
+  exit 1
+fi
+
+if [[ ! -d "$PROFILE_DIR" ]]; then
+  echo "Error: profile directory not found: $PROFILE_DIR" >&2
+  exit 1
+fi
+
+SRC_FILE="$PROFILE_DIR/$PROFILE.conf"
+if [[ ! -f "$SRC_FILE" ]]; then
+  echo "Error: profile not found: $SRC_FILE" >&2
+  echo "Available profiles:" >&2
+  list_profiles >&2 || true
+  exit 1
+fi
+
+if ! command -v dnsmasq >/dev/null 2>&1; then
+  echo "==> Installing dnsmasq..."
+  sudo dnf install -y dnsmasq
+fi
+
+sudo mkdir -p /etc/dnsmasq.d
+sudo mkdir -p /var/lib/dnsmasq-dotfiles
+sudo install -m 0644 "$SRC_FILE" "$ACTIVE_FILE"
+
+echo "$PROFILE" | sudo tee "$STATE_FILE" >/dev/null
+
+if ! sudo dnsmasq --test --conf-file=/etc/dnsmasq.conf >/dev/null; then
+  echo "ERROR: dnsmasq config test failed. Service not restarted." >&2
+  exit 1
+fi
+
+sudo systemctl enable dnsmasq >/dev/null
+sudo systemctl restart dnsmasq
+
+echo "==> Activated dnsmasq profile: $PROFILE"
+show_status
