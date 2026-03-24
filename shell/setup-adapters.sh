@@ -40,7 +40,7 @@ Options:
   --dry-run                  Print nmcli commands without executing them
   -h, --help                 Show this help
 
-Groups: crane, concrete, mining, lpo
+Groups: crane, concrete, mining, lpo, ho
 
 Examples:
   # Use adapter-b for all profiles
@@ -52,8 +52,8 @@ Examples:
   # Use adapter-c only for Machine-lpo-dc5, rest on adapter-a
   setup-adapters.sh --adapter a --profile Machine-lpo-dc5=c --group lpo
 
-  # Use adapter-a for crane, adapter-b for concrete, adapter-c for mining
-  setup-adapters.sh --group crane=a --group concrete=b --group mining=c
+  # Use adapter-a for crane, adapter-b for concrete, adapter-c for mining and home-office simulation
+  setup-adapters.sh --group crane=a --group concrete=b --group mining=c --group ho=c
 EOF
 }
 

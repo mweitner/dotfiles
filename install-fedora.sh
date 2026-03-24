@@ -181,6 +181,7 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   sudo dnf install -y \
     sway greetd greetd-selinux tuigreet \
     swaylock swayidle swaybg \
+    xdg-desktop-portal xdg-desktop-portal-gtk xdg-desktop-portal-wlr \
     waybar wofi \
     foot wl-clipboard \
     libnotify mako \

@@ -43,12 +43,13 @@ Current adapters (auto-detected MAC → preferred name):
 
 ## Network Profile Groups
 
-Profiles are organized into four groups:
+Profiles are organized into five groups:
 
 - **crane**: Machine-crane-rope-testrig-GW, Machine-crane-rope-testrig-TU
 - **concrete**: Machine-concrete-mixing-plant-GW, Machine-concrete-mixing-plant-TU
 - **mining**: Machine-mining-excavator-GW, Machine-mining-excavator-TU
 - **lpo**: Machine-lpo-CSM, Machine-lpo-CSM-GW, Machine-lpo-dc5
+- **ho**: Machine-ho-dev-pc-GW (home-office simulation, dev-pc as gateway at `192.168.1.1/24`)
 
 Each profile specifies fixed IP(s), gateway, and never-default routing policy.
 

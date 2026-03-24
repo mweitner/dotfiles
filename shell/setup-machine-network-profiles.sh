@@ -32,7 +32,7 @@ Notes:
   - Existing profiles with the same name are replaced.
   - All profiles are set to autoconnect=no and ipv4.method=manual.
   - Precedence for MAC selection is: profile override > group override > --usb-mac.
-  - Known groups: crane, concrete, mining, lpo.
+  - Known groups: crane, concrete, mining, lpo, ho.
 EOF
 }
 
@@ -42,6 +42,7 @@ crane
 concrete
 mining
 lpo
+ho
 EOF
 }
 
@@ -242,6 +243,9 @@ apply_profile "mining" "Machine-mining-excavator-TU" "192.168.3.101/24,169.254.1
 apply_profile "lpo" "Machine-lpo-CSM" "192.168.2.200/24" ""
 apply_profile "lpo" "Machine-lpo-CSM-GW" "192.168.2.1/24" ""
 apply_profile "lpo" "Machine-lpo-dc5" "192.168.2.130/24" ""
+
+# Home-office simulation network (dev-pc acts as gateway)
+apply_profile "ho" "Machine-ho-dev-pc-GW" "192.168.1.1/24" ""
 
 if [ "$DRY_RUN" -eq 0 ]; then
   if [ -n "$USB_MAC" ]; then
