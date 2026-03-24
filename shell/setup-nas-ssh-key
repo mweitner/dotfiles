@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+
+# Setup SSH key-based authentication for UGREEN NAS
+# Generates ed25519 key and adds it to NAS authorized_keys
+# Usage: setup-nas-ssh-key [--host ugreen-nas|ugreen-nas-home] [--password PASSWORD]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES="${DOTFILES:-$(dirname "$SCRIPT_DIR")}"
+
+NAS_HOST="${NAS_HOST:-ugreen-nas}"
+NAS_USER="michael"
+KEY_PATH="${HOME}/.ssh/id_ed25519_ugreen_nas"
+KEY_NAME="id_ed25519_ugreen_nas"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --host)
+      NAS_HOST="$2"
+      shift 2
+      ;;
+    --password)
+      NAS_PASSWORD="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      echo "Usage: setup-nas-ssh-key [--host ugreen-nas|ugreen-nas-home] [--password PASSWORD]"
+      exit 1
+      ;;
+  esac
+done
+
+# Resolve hostname to IP
+case "$NAS_HOST" in
+  ugreen-nas)
+    NAS_IP="192.168.3.91"
+    ;;
+  ugreen-nas-home)
+    NAS_IP="192.168.1.110"
+    ;;
+  *)
+    NAS_IP="$NAS_HOST"
+    ;;
+esac
+
+echo "=== UGREEN NAS SSH Key Setup ==="
+echo "Target: $NAS_HOST ($NAS_IP)"
+echo ""
+
+# Step 1: Generate SSH key if needed
+if [[ ! -f "$KEY_PATH" ]]; then
+  echo "📝 Generating ed25519 SSH key at $KEY_PATH..."
+  ssh-keygen -t ed25519 -f "$KEY_PATH" -N "" -C "ugreen-nas-git" >/dev/null 2>&1
+  chmod 600 "$KEY_PATH"
+  chmod 644 "$KEY_PATH.pub"
+  echo "✓ SSH key generated"
+else
+  echo "✓ SSH key already exists at $KEY_PATH"
+fi
+
+echo ""
+
+# Step 2: Add public key to NAS authorized_keys
+echo "📤 Adding public key to NAS authorized_keys..."
+
+PUBLIC_KEY=$(cat "$KEY_PATH.pub")
+
+# Check if we can connect via ssh-agent first
+if sshpass -V >/dev/null 2>&1 || ssh-keyscan -t ed25519 "$NAS_IP" >/dev/null 2>&1 2>&1; then
+  # Try to use sshpass if password is provided
+  if [[ -v NAS_PASSWORD ]]; then
+    echo "Adding key using password authentication..."
+    sshpass -p "$NAS_PASSWORD" ssh -o StrictHostKeyChecking=no "$NAS_USER@$NAS_IP" \
+      "mkdir -p ~/.ssh && echo '$PUBLIC_KEY' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys" \
+      2>/dev/null || {
+      echo "❌ Failed to add key via password" >&2
+      exit 1
+    }
+  else
+    # Fallback: prompt user to manually run command
+    echo ""
+    echo "⚠️  Interactive SSH connection required."
+    echo "You will be prompted for the NAS password."
+    echo ""
+    echo "When connected, run this command on the NAS:"
+    echo "  mkdir -p ~/.ssh && echo '$PUBLIC_KEY' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+    echo ""
+    echo "Connecting to $NAS_USER@$NAS_IP..."
+    ssh -o StrictHostKeyChecking=no "$NAS_USER@$NAS_IP" \
+      "mkdir -p ~/.ssh && echo '$PUBLIC_KEY' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys" \
+      || {
+      echo "❌ Failed to add key" >&2
+      exit 1
+    }
+  fi
+else
+  # No direct connection; show manual instructions
+  echo ""
+  echo "⚠️  Cannot auto-connect to NAS. Manual setup required:"
+  echo ""
+  echo "1. SSH into NAS: ssh michael@$NAS_IP"
+  echo "2. Run this command:"
+  echo "   mkdir -p ~/.ssh && echo '$PUBLIC_KEY' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+  echo ""
+  read -p "Done? (y/n) " -n 1 -r
+  echo
+  [[ $REPLY =~ ^[Yy]$ ]] || exit 1
+fi
+
+echo "✓ Public key added to NAS"
+echo ""
+
+# Step 3: Test SSH connection
+echo "🧪 Testing SSH connection to $NAS_HOST..."
+if ssh -i "$KEY_PATH" -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$NAS_USER@$NAS_IP" "echo 'SSH connection successful'" >/dev/null 2>&1; then
+  echo "✓ SSH connection verified"
+else
+  echo "❌ SSH connection failed" >&2
+  exit 1
+fi
+
+echo ""
+echo "=== Setup Complete ==="
+echo "You can now use:"
+echo "  ssh $NAS_HOST"
+echo "  ssh-copy-id -i $KEY_PATH $NAS_HOST"
+echo ""
+echo "For git operations, use:"
+echo "  git clone ssh://michael@$NAS_IP/volume1/data/repos/PROJECT.git"
+echo "  git push origin main"
+echo ""

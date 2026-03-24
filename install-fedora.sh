@@ -329,6 +329,8 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/setup-adapters.sh" ]] && ln -sf "$DOTFILES/shell/setup-adapters.sh" "$HOME/.local/bin/setup-adapters"
   [[ -f "$DOTFILES/shell/setup-dnsmasq-profile" ]] && ln -sf "$DOTFILES/shell/setup-dnsmasq-profile" "$HOME/.local/bin/setup-dnsmasq-profile"
   [[ -f "$DOTFILES/shell/setup-ulm-office-mode" ]] && ln -sf "$DOTFILES/shell/setup-ulm-office-mode" "$HOME/.local/bin/setup-ulm-office-mode"
+  [[ -f "$DOTFILES/shell/setup-nas-ssh-key" ]] && ln -sf "$DOTFILES/shell/setup-nas-ssh-key" "$HOME/.local/bin/setup-nas-ssh-key"
+  [[ -f "$DOTFILES/shell/setup-nas-git-repo" ]] && ln -sf "$DOTFILES/shell/setup-nas-git-repo" "$HOME/.local/bin/setup-nas-git-repo"
 
   # X11 monitor scripts (referenced by sway mode_display)
   rm -rf "$XDG_CONFIG_HOME/X11"
@@ -395,6 +397,14 @@ EOF
   else
     echo "WARN: setup-dnsmasq-profile script not found or not executable."
   fi
+
+  echo ""
+  echo "── Phase 3a2: Setting up NAS SSH key ──────────────────────────────────────"
+  echo "⚠️  NAS SSH key setup is required for git repository access."
+  echo "Run this command when ready:"
+  echo "  setup-nas-ssh-key"
+  echo "Or manually: setup-nas-ssh-key --host ugreen-nas-home  (for home NAS)"
+  echo ""
 
   echo ""
   echo "── Phase 3b: Configuring greetd ──────────────────────────────────────────"

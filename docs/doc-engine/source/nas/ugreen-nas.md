@@ -168,6 +168,113 @@ setup-ulm-office-mode --site work
 
 ---
 
+## Git Repository Management
+
+The NAS can host bare git repositories at `/volume1/data/repos/` for remote backup
+or collaborative development. SSH-based authentication is used (key-based, passwordless).
+
+### Initial SSH Setup (One-Time)
+
+Generate SSH key and add it to NAS authorized_keys:
+
+```bash
+setup-nas-ssh-key
+```
+
+For home NAS:
+
+```bash
+setup-nas-ssh-key --host ugreen-nas-home
+```
+
+What it does:
+
+- generates `~/.ssh/id_ed25519_ugreen_nas` if it doesn't exist
+- adds public key to `~/.ssh/authorized_keys` on the NAS
+- tests SSH connection
+- output: `ssh ugreen-nas` (or `ssh ugreen-nas-home`) now works without password
+
+### Create a Git Repository
+
+Create a new bare repository on the NAS:
+
+```bash
+setup-nas-git-repo my-project
+```
+
+Output will show the clone URL:
+
+```text
+Repository: my-project
+Host: ugreen-nas (192.168.3.91)
+Path: /volume1/data/repos/my-project.git
+
+Clone this repository:
+  git clone ssh://michael@192.168.3.91/volume1/data/repos/my-project.git my-project
+```
+
+Clone and initialize:
+
+```bash
+setup-nas-git-repo my-project --clone ~/src
+cd ~/src/my-project
+```
+
+This creates the repo, clones it locally, and pushes an initial commit.
+
+### Push Existing Repository
+
+If you have an existing git repository, add the NAS as a remote:
+
+```bash
+git remote add nas-storage ssh://michael@192.168.3.91/volume1/data/repos/project-name.git
+git branch -M main
+git push -u nas-storage main
+```
+
+### Manage Repositories
+
+List repositories on NAS:
+
+```bash
+ssh ugreen-nas ls -la /volume1/data/repos/
+```
+
+Delete a repository:
+
+```bash
+setup-nas-git-repo project-name --delete
+```
+
+### SSH Host Aliases
+
+- `ugreen-nas`: ULM office network (192.168.3.91)
+- `ugreen-nas-home`: Home network (192.168.1.110)
+
+Both use SSH key `~/.ssh/id_ed25519_ugreen_nas` and connect as user `michael`.
+
+### Clone URL Formats
+
+Direct SSH:
+
+```bash
+git clone ssh://michael@192.168.3.91/volume1/data/repos/project-name.git
+```
+
+Via SSH host alias:
+
+```bash
+git clone ssh://michael@ugreen-nas/volume1/data/repos/project-name.git
+```
+
+Shorthand (if set up as remote):
+
+```bash
+git clone ugreen-nas:repos/project-name.git
+```
+
+---
+
 ## Manual fstab Entry (Reference)
 
 If you want to manage it manually, use:

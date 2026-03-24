@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+
+# Setup and manage git repositories on UGREEN NAS
+# Creates bare git repos at /volume1/data/repos/ with SSH access
+# Usage: setup-nas-git-repo REPO_NAME [--host ugreen-nas|ugreen-nas-home] [--clone PATH] [--delete]
+
+set -euo pipefail
+
+REPO_NAME="${1:-}"
+NAS_HOST="${NAS_HOST:-ugreen-nas}"
+CLONE_PATH=""
+DELETE_REPO=false
+
+# Parse arguments
+while [[ $# -gt 1 ]]; do
+  shift
+  case "$1" in
+    --host)
+      NAS_HOST="$2"
+      shift
+      ;;
+    --clone)
+      CLONE_PATH="$2"
+      shift
+      ;;
+    --delete)
+      DELETE_REPO=true
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Validate repo name
+if [[ -z "$REPO_NAME" ]]; then
+  echo "Usage: setup-nas-git-repo REPO_NAME [--host ugreen-nas|ugreen-nas-home] [--clone PATH] [--delete]"
+  echo ""
+  echo "Examples:"
+  echo "  setup-nas-git-repo my-project"
+  echo "  setup-nas-git-repo mining-fw --clone ~/src/"
+  echo "  setup-nas-git-repo old-project --delete"
+  exit 1
+fi
+
+# Resolve hostname to IP  
+case "$NAS_HOST" in
+  ugreen-nas)
+    NAS_IP="192.168.3.91"
+    ;;
+  ugreen-nas-home)
+    NAS_IP="192.168.1.110"
+    ;;
+  *)
+    NAS_IP="$NAS_HOST"
+    ;;
+esac
+
+NAS_USER="michael"
+REPO_BASE="/volume1/data/repos"
+REPO_PATH="${REPO_BASE}/${REPO_NAME}.git"
+GIT_URL="ssh://${NAS_USER}@${NAS_IP}${REPO_PATH}"
+
+echo "=== UGREEN NAS Git Repository Setup ==="
+echo "Repository: $REPO_NAME"
+echo "Host: $NAS_HOST ($NAS_IP)"
+echo "Path: $REPO_PATH"
+echo ""
+
+# Step 1: Delete repo if requested
+if [[ "$DELETE_REPO" == "true" ]]; then
+  echo "⚠️  Deleting repo $REPO_NAME from NAS..."
+  if ssh -o ConnectTimeout=5 "$NAS_USER@$NAS_IP" "rm -rf '$REPO_PATH'" 2>/dev/null; then
+    echo "✓ Repository deleted"
+    exit 0
+  else
+    echo "❌ Failed to delete repository" >&2
+    exit 1
+  fi
+fi
+
+# Step 2: Create bare git repository on NAS
+echo "📝 Creating bare git repository..."
+
+SSH_CMD="
+  set -e
+  mkdir -p '$REPO_BASE'
+  if [[ -d '$REPO_PATH' ]]; then
+    echo 'Repository already exists'
+    exit 0
+  fi
+  git init --bare '$REPO_PATH'
+  chmod -R g+w '$REPO_PATH'
+  git -C '$REPO_PATH' config core.sharedRepository group
+  echo 'Repository created'
+"
+
+if ! ssh -o ConnectTimeout=10 "$NAS_USER@$NAS_IP" bash -c "$SSH_CMD" 2>/dev/null; then
+  echo "❌ Failed to create repository on NAS" >&2
+  exit 1
+fi
+
+echo "✓ Repository created at $REPO_PATH"
+echo ""
+
+# Step 3: Clone locally if requested
+if [[ -n "$CLONE_PATH" ]]; then
+  echo "📥 Cloning repository to $CLONE_PATH..."
+  
+  if [[ -d "$CLONE_PATH/$REPO_NAME" ]]; then
+    echo "⚠️  Clone directory already exists at $CLONE_PATH/$REPO_NAME"
+  else
+    mkdir -p "$CLONE_PATH"
+    if git clone "$GIT_URL" "$CLONE_PATH/$REPO_NAME" 2>/dev/null; then
+      echo "✓ Repository cloned to $CLONE_PATH/$REPO_NAME"
+      
+      # Add initial commit if empty
+      cd "$CLONE_PATH/$REPO_NAME"
+      if ! git rev-parse HEAD >/dev/null 2>&1; then
+        echo "initial commit" > README.md
+        git add README.md
+        git commit -m "Initial commit" >/dev/null
+        git push -u origin main 2>/dev/null || git push -u origin master 2>/dev/null || true
+        echo "✓ Initial commit pushed"
+      fi
+      cd - >/dev/null
+    else
+      echo "❌ Failed to clone repository" >&2
+      exit 1
+    fi
+  fi
+  echo ""
+fi
+
+# Step 4: Display usage information
+echo "=== Setup Complete ==="
+echo ""
+echo "📋 Clone URL:"
+echo "  $GIT_URL"
+echo ""
+echo "📥 Clone this repository:"
+if [[ -n "$CLONE_PATH" ]]; then
+  echo "  cd $CLONE_PATH/$REPO_NAME"
+else
+  echo "  git clone $GIT_URL $REPO_NAME"
+  echo "  cd $REPO_NAME"
+fi
+echo ""
+echo "📤 Push your code:"
+echo "  git remote add origin $GIT_URL"
+echo "  git branch -M main"
+echo "  git push -u origin main"
+echo ""
+echo "🔍 Managing the repository:"
+echo "  setup-nas-git-repo $REPO_NAME --delete   # Delete the repository"
+echo "  ssh $NAS_HOST ls -la $REPO_PATH          # View repository"
+echo ""
