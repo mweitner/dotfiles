@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DOTFILES="${DOTFILES:-$HOME/dotfiles}"
+DNS_PROFILE="${DNSMASQ_PROFILE:-ulm-nas}"
+NM_CONNECTION="${ULM_NM_CONNECTION:-Machine-mining-excavator-GW}"
+NM_INTERFACE="${ULM_NM_INTERFACE:-}"
+NAS_SITE="${UGREEN_NAS_SITE:-auto}"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  setup-ulm-office-mode [--interface <ifname>] [--connection <nm-connection>] [--dns-profile <profile>] [--site auto|home|work]
+
+What it does:
+  1) Rebind mining network profile to active adapter MAC and bring up gateway profile (192.168.3.1)
+  2) Activate dnsmasq profile (default: ulm-nas)
+  3) Configure NAS automount via systemd-units and site-aware host ordering
+  4) Trigger mount and print nas-status
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --interface)
+      NM_INTERFACE="${2:-}"
+      shift 2
+      ;;
+    --connection)
+      NM_CONNECTION="${2:-}"
+      shift 2
+      ;;
+    --dns-profile)
+      DNS_PROFILE="${2:-}"
+      shift 2
+      ;;
+    --site)
+      NAS_SITE="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [[ "$NAS_SITE" != "auto" && "$NAS_SITE" != "home" && "$NAS_SITE" != "work" ]]; then
+  echo "Error: --site must be one of: auto, home, work" >&2
+  exit 2
+fi
+
+if [[ -z "$NM_INTERFACE" ]]; then
+  NM_INTERFACE="$(awk -F= '/^interface=/{print $2; exit}' "$DOTFILES/dnsmasq/config/$DNS_PROFILE.conf" 2>/dev/null || true)"
+fi
+
+if [[ -z "$NM_INTERFACE" ]]; then
+  echo "Error: could not resolve network interface. Use --interface <ifname>." >&2
+  exit 1
+fi
+
+if [[ ! -d "/sys/class/net/$NM_INTERFACE" ]]; then
+  echo "Error: interface '$NM_INTERFACE' not found." >&2
+  exit 1
+fi
+
+if ! command -v nmcli >/dev/null 2>&1; then
+  echo "Error: nmcli not found (NetworkManager required)." >&2
+  exit 1
+fi
+
+for helper in setup-machine-network-profiles.sh setup-dnsmasq-profile setup-ugreen-nas-mount; do
+  if [[ ! -x "$DOTFILES/shell/$helper" ]]; then
+    echo "Error: required helper missing or not executable: $DOTFILES/shell/$helper" >&2
+    exit 1
+  fi
+done
+
+ADAPTER_MAC="$(cat "/sys/class/net/$NM_INTERFACE/address")"
+echo "==> Using interface: $NM_INTERFACE ($ADAPTER_MAC)"
+
+echo "==> Rebinding mining profiles to current adapter MAC..."
+"$DOTFILES/shell/setup-machine-network-profiles.sh" --group-mac "mining=$ADAPTER_MAC" --only-group mining
+
+echo "==> Bringing up network profile: $NM_CONNECTION"
+nmcli connection up "$NM_CONNECTION" ifname "$NM_INTERFACE"
+
+echo "==> Activating dnsmasq profile: $DNS_PROFILE"
+"$DOTFILES/shell/setup-dnsmasq-profile" --profile "$DNS_PROFILE"
+
+echo "==> Configuring NAS mount (systemd units, site=$NAS_SITE)..."
+"$DOTFILES/shell/setup-ugreen-nas-mount" --mode systemd-units --site "$NAS_SITE"
+
+echo "==> Triggering automount..."
+ls /mnt/data >/dev/null
+
+echo "==> NAS status"
+if [[ -x "$DOTFILES/shell/nas-status" ]]; then
+  "$DOTFILES/shell/nas-status"
+fi
+
+echo "==> ULM office mode ready."

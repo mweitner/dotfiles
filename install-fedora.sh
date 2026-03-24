@@ -328,6 +328,7 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/setup-machine-network-profiles.sh" ]] && ln -sf "$DOTFILES/shell/setup-machine-network-profiles.sh" "$HOME/.local/bin/setup-machine-network-profiles"
   [[ -f "$DOTFILES/shell/setup-adapters.sh" ]] && ln -sf "$DOTFILES/shell/setup-adapters.sh" "$HOME/.local/bin/setup-adapters"
   [[ -f "$DOTFILES/shell/setup-dnsmasq-profile" ]] && ln -sf "$DOTFILES/shell/setup-dnsmasq-profile" "$HOME/.local/bin/setup-dnsmasq-profile"
+  [[ -f "$DOTFILES/shell/setup-ulm-office-mode" ]] && ln -sf "$DOTFILES/shell/setup-ulm-office-mode" "$HOME/.local/bin/setup-ulm-office-mode"
 
   # X11 monitor scripts (referenced by sway mode_display)
   rm -rf "$XDG_CONFIG_HOME/X11"

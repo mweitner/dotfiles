@@ -28,19 +28,28 @@ chmod 600 ~/dotfiles/.secrets/.smbcredentials_ugreen
 
 ---
 
-## Recommended (Automated): fstab + systemd automount
+## Recommended (Automated): Native systemd `.mount` + `.automount`
 
 Use the helper script from this repo:
 
 ```bash
-setup-ugreen-nas-mount --mode fstab
+setup-ugreen-nas-mount --mode systemd-units --site auto
+```
+
+If you are at ULM office on the machine-network switch, first activate the
+lightweight dnsmasq profile that serves the office subnet and NAS alias:
+
+```bash
+setup-dnsmasq-profile --profile ulm-nas
 ```
 
 What it does:
 
 - installs `cifs-utils` if missing
 - configures `/etc/hosts` alias `ugreen-nas` with both IPs
-- writes a managed `/etc/fstab` entry with `x-systemd.automount`
+- orders IPs site-aware (`--site auto|home|work`) so reachable site is preferred first
+- writes `/etc/systemd/system/mnt-data.mount`
+- writes `/etc/systemd/system/mnt-data.automount`
 - enables/restarts `mnt-data.automount`
 
 Test:
@@ -52,20 +61,41 @@ mount | grep '/mnt/data'
 
 ---
 
-## Alternative: Native systemd `.mount` + `.automount`
+## Alternative: fstab + systemd automount
 
-If you prefer explicit units over `/etc/fstab`:
+If you prefer fstab-managed configuration:
 
 ```bash
-setup-ugreen-nas-mount --mode systemd-units
+setup-ugreen-nas-mount --mode fstab --site auto
 ```
 
-This writes:
+This writes a managed block in `/etc/fstab` and enables/restarts
+`mnt-data.automount`.
 
-- `/etc/systemd/system/mnt-data.mount`
-- `/etc/systemd/system/mnt-data.automount`
+## ULM Office One-Shot Workflow
 
-Then enables `mnt-data.automount`.
+Use this helper to prepare network profile + dnsmasq + NAS automount in one run:
+
+```bash
+setup-ulm-office-mode --site auto
+```
+
+What it does:
+
+- rebinds mining profile to the currently attached adapter MAC
+- activates `Machine-mining-excavator-GW` (expected `192.168.3.1/24`)
+- switches dnsmasq to `ulm-nas` profile
+- applies NAS automount via `systemd` units
+- triggers mount and prints `nas-status`
+
+Optional overrides:
+
+```bash
+setup-ulm-office-mode --interface enx00e04cb828b5
+setup-ulm-office-mode --connection "Machine-mining-excavator-GW"
+setup-ulm-office-mode --dns-profile ulm-nas
+setup-ulm-office-mode --site work
+```
 
 ---
 
