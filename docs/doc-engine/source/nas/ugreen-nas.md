@@ -26,6 +26,28 @@ Set strict permissions:
 chmod 600 ~/dotfiles/.secrets/.smbcredentials_ugreen
 ```
 
+## Quick Commands
+
+Home office (NAS on `192.168.1.110`):
+
+```bash
+setup-ugreen-nas-mount --mode systemd-units --site home
+ls /mnt/data
+```
+
+ULM office (dev switch + dnsmasq + NAS on `192.168.3.91`):
+
+```bash
+setup-ulm-office-mode --site auto
+ls /mnt/data
+```
+
+Check current status:
+
+```bash
+nas-status
+```
+
 ---
 
 ## Recommended (Automated): Native systemd `.mount` + `.automount`
