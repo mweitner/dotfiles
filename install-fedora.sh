@@ -182,6 +182,51 @@ install_netrc_secrets() {
   echo "==> Installed .netrc from $src to $dst (mode 600)."
 }
 
+# Link Yocto key folders from dotfiles secrets into /opt/yocto/keys.
+# This keeps llp_init_build.sh project_keys_path defaults reproducible.
+setup_yocto_key_links() {
+  local src_root dst_root src_dir name dst
+  local linked_any=false
+
+  src_root="$DOTFILES/.secrets/yocto/keys"
+  dst_root="/opt/yocto/keys"
+
+  if [[ ! -d "$src_root" ]]; then
+    echo "WARN: Yocto secrets dir not found at $src_root; skipping /opt/yocto/keys symlinks."
+    return 0
+  fi
+
+  sudo mkdir -p "$dst_root"
+
+  shopt -s nullglob
+  for src_dir in "$src_root"/*; do
+    [[ -d "$src_dir" ]] || continue
+    name="$(basename "$src_dir")"
+    dst="$dst_root/$name"
+
+    if [[ -e "$dst" && ! -L "$dst" ]]; then
+      echo "WARN: $dst exists and is not a symlink; leaving it unchanged."
+      continue
+    fi
+
+    sudo ln -sfn "$src_dir" "$dst"
+    echo "==> Yocto key link: $dst -> $src_dir"
+    linked_any=true
+  done
+  shopt -u nullglob
+
+  # Compatibility alias: some older secrets layouts use llp instead of lpo.
+  if [[ ! -e "$dst_root/lpo" && -d "$src_root/llp" ]]; then
+    sudo ln -sfn "$src_root/llp" "$dst_root/lpo"
+    echo "==> Yocto key compatibility link: $dst_root/lpo -> $src_root/llp"
+    linked_any=true
+  fi
+
+  if [[ "$linked_any" == false ]]; then
+    echo "WARN: no Yocto key subdirectories found under $src_root"
+  fi
+}
+
 echo "==> Dotfiles: $DOTFILES"
 echo "==> XDG_CONFIG_HOME: $XDG_CONFIG_HOME"
 
@@ -363,6 +408,12 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/yocto/llp_init_build.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_init_build.sh" "$HOME/.local/bin/llp_init_build.sh"
   [[ -f "$DOTFILES/shell/yocto/setup-yocto-project" ]] && ln -sf "$DOTFILES/shell/yocto/setup-yocto-project" "$HOME/.local/bin/setup-yocto-project"
   [[ -f "$DOTFILES/shell/yocto/llp_yocto_wrapper.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_yocto_wrapper.sh" "$HOME/.local/bin/llp-yocto-build"
+  [[ -f "$DOTFILES/shell/yocto/yocto-prefetch-source" ]] && ln -sf "$DOTFILES/shell/yocto/yocto-prefetch-source" "$HOME/.local/bin/yocto-prefetch-source"
+  [[ -f "$DOTFILES/shell/yocto/yocto-prefetch-recipe-source" ]] && ln -sf "$DOTFILES/shell/yocto/yocto-prefetch-recipe-source" "$HOME/.local/bin/yocto-prefetch-recipe-source"
+  [[ -f "$DOTFILES/shell/yocto/lpo-build" ]] && ln -sf "$DOTFILES/shell/yocto/lpo-build" "$HOME/.local/bin/lpo-build"
+
+  # Yocto key secrets exposed at /opt/yocto/keys/<project>
+  setup_yocto_key_links
 
   # X11 monitor scripts (referenced by sway mode_display)
   rm -rf "$XDG_CONFIG_HOME/X11"
@@ -585,9 +636,20 @@ EOF
   echo "INFO: llp_init_build.sh is linked to ~/.local/bin/llp_init_build.sh"
   echo "INFO: setup-yocto-project is linked to ~/.local/bin/setup-yocto-project"
   echo "INFO: llp-yocto-build is linked to ~/.local/bin/llp-yocto-build"
+  echo "INFO: lpo-build is linked to ~/.local/bin/lpo-build"
+  echo "INFO: yocto-prefetch-source is linked to ~/.local/bin/yocto-prefetch-source"
+  echo "INFO: yocto-prefetch-recipe-source is linked to ~/.local/bin/yocto-prefetch-recipe-source"
   echo "      Example bootstrap: setup-yocto-project --project linux-dps"
-  echo "      Fish/tmux-safe build example:"
+  echo "      Fish/tmux-safe build example (llp-yocto-build):"
   echo "      llp-yocto-build --workdir ~/lpo-dev/linux-lpo --distro-layer meta-liebherr-lpo-display lpo-display-image"
+  echo "      Quick LPO build from fish (lpo-build, tmux-compatible):"
+  echo "      cd ~/lpo-dev/linux-lpo && lpo-build bitbake -u knotty -v lpo-display-image"
+  echo "      Or drop to initialized bash shell:"
+  echo "      cd ~/lpo-dev/linux-lpo && lpo-build bash"
+  echo "      Prefetch retry helper example:"
+  echo "      yocto-prefetch-source --url https://downloads.yoctoproject.org/mirror/sources/libjpeg-turbo-3.0.1.tar.gz --sha256 22429507714ae147b3acacd299e82099fce5d9f456882fc28e252e4579ba2a75"
+  echo "      Recipe-aware prefetch helper example:"
+  echo "      yocto-prefetch-recipe-source --recipe ~/lpo-dev/linux-lpo/layers/poky/meta/recipes-graphics/jpeg/libjpeg-turbo_3.0.1.bb"
 fi
 
 # ── Phase 4: Yocto shared directory ───────────────────────────────────────────

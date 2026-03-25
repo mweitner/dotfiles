@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Download a Yocto source artifact into DL_DIR with resume + checksum verify.
+# Useful when upstream connections reset mid-transfer.
+
+DL_DIR_DEFAULT="/opt/yocto/shared/downloads"
+MAX_ATTEMPTS_DEFAULT=20
+CONNECT_TIMEOUT_DEFAULT=20
+SLEEP_SECONDS_DEFAULT=1
+
+usage() {
+  cat <<'EOF'
+Usage:
+  yocto-prefetch-source --url <url> --sha256 <hex> [options]
+
+Required:
+  --url <url>            Source URL to download
+  --sha256 <hex>         Expected SHA256 checksum
+
+Options:
+  --filename <name>      Target filename inside DL_DIR (default: basename of URL path)
+  --dl-dir <path>        Yocto download cache directory (default: /opt/yocto/shared/downloads)
+  --attempts <n>         Max retry attempts with resume (default: 20)
+  --connect-timeout <s>  curl connect timeout in seconds (default: 20)
+  --sleep <s>            Sleep between attempts in seconds (default: 1)
+  -h, --help             Show help
+
+Example:
+  yocto-prefetch-source \
+    --url https://downloads.yoctoproject.org/mirror/sources/libjpeg-turbo-3.0.1.tar.gz \
+    --sha256 22429507714ae147b3acacd299e82099fce5d9f456882fc28e252e4579ba2a75
+EOF
+}
+
+URL=""
+EXPECTED_SHA=""
+FILENAME=""
+DL_DIR="$DL_DIR_DEFAULT"
+MAX_ATTEMPTS="$MAX_ATTEMPTS_DEFAULT"
+CONNECT_TIMEOUT="$CONNECT_TIMEOUT_DEFAULT"
+SLEEP_SECONDS="$SLEEP_SECONDS_DEFAULT"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --url)
+      URL="${2:-}"
+      shift 2
+      ;;
+    --sha256)
+      EXPECTED_SHA="${2:-}"
+      shift 2
+      ;;
+    --filename)
+      FILENAME="${2:-}"
+      shift 2
+      ;;
+    --dl-dir)
+      DL_DIR="${2:-}"
+      shift 2
+      ;;
+    --attempts)
+      MAX_ATTEMPTS="${2:-}"
+      shift 2
+      ;;
+    --connect-timeout)
+      CONNECT_TIMEOUT="${2:-}"
+      shift 2
+      ;;
+    --sleep)
+      SLEEP_SECONDS="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Error: unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "$URL" || -z "$EXPECTED_SHA" ]]; then
+  echo "Error: --url and --sha256 are required" >&2
+  usage
+  exit 2
+fi
+
+if [[ -z "$FILENAME" ]]; then
+  FILENAME="$(basename "${URL%%\?*}")"
+fi
+
+if [[ -z "$FILENAME" ]]; then
+  echo "Error: could not derive filename from URL. Use --filename." >&2
+  exit 2
+fi
+
+if ! command -v curl >/dev/null 2>&1; then
+  echo "Error: curl is required" >&2
+  exit 1
+fi
+
+if ! command -v sha256sum >/dev/null 2>&1; then
+  echo "Error: sha256sum is required" >&2
+  exit 1
+fi
+
+mkdir -p "$DL_DIR"
+TARGET="$DL_DIR/$FILENAME"
+
+# Clean stale lock file for this artifact (bitbake will recreate when needed).
+rm -f "$TARGET.lock"
+
+attempt=1
+while [[ "$attempt" -le "$MAX_ATTEMPTS" ]]; do
+  echo "==> Attempt $attempt/$MAX_ATTEMPTS: $URL"
+
+  # Resume download from existing partial file if present.
+  curl -L --fail --connect-timeout "$CONNECT_TIMEOUT" -C - -o "$TARGET" "$URL" || true
+
+  if [[ -f "$TARGET" ]]; then
+    actual_sha="$(sha256sum "$TARGET" | awk '{print $1}')"
+    actual_size="$(wc -c "$TARGET" | awk '{print $1}')"
+    echo "==> Current file: $TARGET (${actual_size} bytes)"
+
+    if [[ "$actual_sha" == "$EXPECTED_SHA" ]]; then
+      echo "==> Checksum OK: $actual_sha"
+      exit 0
+    fi
+
+    echo "==> Checksum mismatch: got $actual_sha, expected $EXPECTED_SHA"
+  else
+    echo "==> No file downloaded yet"
+  fi
+
+  attempt=$((attempt + 1))
+  sleep "$SLEEP_SECONDS"
+done
+
+echo "Error: failed to download $FILENAME with expected checksum after $MAX_ATTEMPTS attempts" >&2
+exit 1

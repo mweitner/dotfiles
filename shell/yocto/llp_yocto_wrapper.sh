@@ -105,13 +105,31 @@ if [[ $source_rc -ne 0 ]]; then
     exit "$source_rc"
 fi
 
-echo "==> Running: bitbake -u ${BITBAKE_UI} ${BITBAKE_ARGS[*]}"
-if [[ -n "$LOG_FILE" ]]; then
+# Check if stdout is a TTY (needed for ncurses UI)
+HAS_TTY=0
+[[ -t 1 ]] && HAS_TTY=1
+
+# If ncurses requested but no TTY, fall back to knotty with warning
+EFFECTIVE_UI="$BITBAKE_UI"
+if [[ "$BITBAKE_UI" == "ncurses" && $HAS_TTY -eq 0 ]]; then
+    echo "Warning: ncurses UI requested but no TTY available (piped output or background)." >&2
+    echo "Falling back to knotty UI." >&2
+    EFFECTIVE_UI="knotty"
+fi
+
+echo "==> Running: bitbake -u ${EFFECTIVE_UI} ${BITBAKE_ARGS[*]}"
+
+# ncurses doesn't work through tee (breaks TTY); use direct terminal output.
+# For logging with ncurses, let output go interactively to terminal.
+# knotty (scrolling) mode benefits from tee piping to external log files.
+if [[ "$EFFECTIVE_UI" == "ncurses" ]]; then
+    bitbake -u "${EFFECTIVE_UI}" "${BITBAKE_ARGS[@]}"
+elif [[ -n "$LOG_FILE" ]]; then
     mkdir -p "$(dirname "$LOG_FILE")"
     echo "==> Full log: $LOG_FILE"
-    bitbake -u "$BITBAKE_UI" "${BITBAKE_ARGS[@]}" 2>&1 | tee -a "$LOG_FILE"
+    bitbake -u "${EFFECTIVE_UI}" "${BITBAKE_ARGS[@]}" 2>&1 | tee -a "$LOG_FILE"
     bb_rc=${PIPESTATUS[0]}
     exit "$bb_rc"
 else
-    bitbake -u "$BITBAKE_UI" "${BITBAKE_ARGS[@]}"
+    bitbake -u "${EFFECTIVE_UI}" "${BITBAKE_ARGS[@]}"
 fi

@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Prefetch Yocto recipe source by parsing SRC_URI and SRC_URI[sha256sum]
+# from a .bb/.inc file and delegating to yocto-prefetch-source.
+
+usage() {
+  cat <<'EOF'
+Usage:
+  yocto-prefetch-recipe-source --recipe <path/to/recipe.bb> [options]
+
+Required:
+  --recipe <path>        Path to recipe (.bb/.inc)
+
+Options:
+  --url <url>            Override parsed SRC_URI URL
+  --sha256 <hex>         Override parsed SHA256
+  --dl-dir <path>        Target Yocto DL_DIR (forwarded)
+  --attempts <n>         Retry attempts (forwarded)
+  --connect-timeout <s>  Connect timeout (forwarded)
+  --sleep <s>            Sleep between attempts (forwarded)
+  -h, --help             Show help
+
+Examples:
+  yocto-prefetch-recipe-source \
+    --recipe ~/lpo-dev/linux-lpo/layers/poky/meta/recipes-graphics/jpeg/libjpeg-turbo_3.0.1.bb
+
+  yocto-prefetch-recipe-source \
+    --recipe layers/poky/meta/recipes-graphics/jpeg/libjpeg-turbo_3.0.1.bb \
+    --dl-dir /opt/yocto/shared/downloads --attempts 30
+EOF
+}
+
+RECIPE_PATH=""
+URL_OVERRIDE=""
+SHA_OVERRIDE=""
+
+FORWARD_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --recipe)
+      RECIPE_PATH="${2:-}"
+      shift 2
+      ;;
+    --url)
+      URL_OVERRIDE="${2:-}"
+      shift 2
+      ;;
+    --sha256)
+      SHA_OVERRIDE="${2:-}"
+      shift 2
+      ;;
+    --dl-dir|--attempts|--connect-timeout|--sleep)
+      FORWARD_ARGS+=("$1" "${2:-}")
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Error: unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "$RECIPE_PATH" ]]; then
+  echo "Error: --recipe is required" >&2
+  usage
+  exit 2
+fi
+
+if [[ ! -f "$RECIPE_PATH" ]]; then
+  echo "Error: recipe not found: $RECIPE_PATH" >&2
+  exit 2
+fi
+
+if ! command -v yocto-prefetch-source >/dev/null 2>&1; then
+  echo "Error: yocto-prefetch-source not found in PATH" >&2
+  echo "       Link it via install-fedora.sh or add ~/.local/bin to PATH." >&2
+  exit 1
+fi
+
+resolve_from_recipe() {
+  local recipe="$1"
+  local stem bpn pv
+  local src_uri sha
+
+  stem="$(basename "$recipe")"
+  stem="${stem%.bb}"
+  stem="${stem%.inc}"
+
+  if [[ "$stem" == *_* ]]; then
+    bpn="${stem%%_*}"
+    pv="${stem#*_}"
+  else
+    bpn="$stem"
+    pv=""
+  fi
+
+  # Parse first non-comment sha256sum assignment.
+  sha="$(sed -nE 's/^[[:space:]]*SRC_URI\[sha256sum\][[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$recipe" | head -n1)"
+
+  # Parse a likely SRC_URI token from recipe (simple/common forms).
+  # Supports:
+  #   SRC_URI = "..."
+  #   SRC_URI += "..."
+  # and multi-line quote blocks.
+  src_uri="$(awk '
+    BEGIN { inq=0; buf="" }
+    /^[[:space:]]*#/ { next }
+    {
+      line=$0
+      if (!inq && line ~ /^[[:space:]]*SRC_URI[[:space:]]*[+?:]?=[[:space:]]*"/) {
+        inq=1
+        sub(/^[^"]*"/, "", line)
+        buf=line
+        if (line ~ /"[[:space:]]*$/) {
+          sub(/"[[:space:]]*$/, "", buf)
+          print buf
+          exit
+        }
+        next
+      }
+      if (inq) {
+        buf=buf " " line
+        if (line ~ /"[[:space:]]*$/) {
+          sub(/"[[:space:]]*$/, "", buf)
+          print buf
+          exit
+        }
+      }
+    }
+  ' "$recipe")"
+
+  # Tokenize and pick first candidate that looks like fetch URL/path template.
+  local token picked=""
+  for token in $src_uri; do
+    token="${token%;*}"
+    case "$token" in
+      *://*|\${SOURCEFORGE_MIRROR}/*|\${GNU_MIRROR}/*|\${KERNELORG_MIRROR}/*)
+        picked="$token"
+        break
+        ;;
+    esac
+  done
+
+  # Expand common Yocto mirrors + placeholders used by many recipes.
+  picked="${picked//\$\{SOURCEFORGE_MIRROR\}/https://downloads.sourceforge.net}"
+  picked="${picked//\$\{GNU_MIRROR\}/https://ftpmirror.gnu.org}"
+  picked="${picked//\$\{KERNELORG_MIRROR\}/https://cdn.kernel.org/pub}"
+  picked="${picked//\$\{BPN\}/$bpn}"
+  if [[ -n "$pv" ]]; then
+    picked="${picked//\$\{PV\}/$pv}"
+  fi
+
+  if [[ -z "$picked" ]]; then
+    echo "Error: could not resolve SRC_URI from recipe: $recipe" >&2
+    echo "Hint: pass --url explicitly." >&2
+    return 1
+  fi
+
+  if [[ -z "$sha" ]]; then
+    echo "Error: could not resolve SRC_URI[sha256sum] from recipe: $recipe" >&2
+    echo "Hint: pass --sha256 explicitly." >&2
+    return 1
+  fi
+
+  echo "$picked"
+  echo "$sha"
+}
+
+if [[ -n "$URL_OVERRIDE" ]]; then
+  RESOLVED_URL="$URL_OVERRIDE"
+  if [[ -n "$SHA_OVERRIDE" ]]; then
+    RESOLVED_SHA="$SHA_OVERRIDE"
+  else
+    RESOLVED_SHA="$(sed -nE 's/^[[:space:]]*SRC_URI\[sha256sum\][[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$RECIPE_PATH" | head -n1)"
+  fi
+else
+  mapfile -t resolved < <(resolve_from_recipe "$RECIPE_PATH")
+  RESOLVED_URL="${resolved[0]:-}"
+  RESOLVED_SHA="${resolved[1]:-}"
+  if [[ -n "$SHA_OVERRIDE" ]]; then
+    RESOLVED_SHA="$SHA_OVERRIDE"
+  fi
+fi
+
+if [[ -z "$RESOLVED_URL" || -z "$RESOLVED_SHA" ]]; then
+  echo "Error: missing resolved URL/SHA256" >&2
+  exit 1
+fi
+
+echo "==> Recipe: $RECIPE_PATH"
+echo "==> URL: $RESOLVED_URL"
+echo "==> SHA256: $RESOLVED_SHA"
+
+yocto-prefetch-source --url "$RESOLVED_URL" --sha256 "$RESOLVED_SHA" "${FORWARD_ARGS[@]}"

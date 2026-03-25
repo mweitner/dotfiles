@@ -1,0 +1,31 @@
+#!/bin/bash
+# lpo-build - Initialize Yocto build environment and execute commands
+# 
+# Usage:
+#   lpo-build bash                    # Enter initialized bash shell
+#   lpo-build bitbake -u knotty -v lpo-display-image
+#   lpo-build bitbake-clean
+#
+# The script initializes meta-liebherr-lpo-display distro layer and exports
+# all required secrets (Mosquitto PSK, private keys, auth tokens).
+
+set -e
+
+# Verify we're in a Yocto workspace
+if [[ ! -d "layers/poky" ]]; then
+    echo "ERROR: Must run from Yocto workspace root (layers/poky not found)" >&2
+    exit 1
+fi
+
+TOPDIR="$(pwd)"
+OEROOT="${TOPDIR}/layers/poky"
+
+# Source the init script - this sets up build environment and exports secrets
+source ~/.local/bin/llp_init_build.sh meta-liebherr-lpo-display
+
+# Execute provided command, or drop to interactive bash if none given
+if [[ $# -eq 0 ]]; then
+    exec bash
+else
+    exec "$@"
+fi

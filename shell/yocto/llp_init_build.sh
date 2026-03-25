@@ -71,6 +71,18 @@ function print_feature_summary() {
   cat "${project_root}/build/conf/feature_summary.txt"
 }
 
+function append_passthrough_var() {
+  local var_name="$1"
+  if [[ -z "${var_name}" ]]; then
+    return 0
+  fi
+
+  case " ${BB_ENV_PASSTHROUGH_ADDITIONS} " in
+    *" ${var_name} "*) ;;
+    *) export BB_ENV_PASSTHROUGH_ADDITIONS="${BB_ENV_PASSTHROUGH_ADDITIONS} ${var_name}" ;;
+  esac
+}
+
 function create_feature_summary() {
   local feature_file="${project_root}/build/conf/feature_summary.txt"
   rm -f "${feature_file}"
@@ -341,36 +353,62 @@ echo "[llp_init_build] ${project_source_root}/poky/oe-init-build-env ${project_b
 
 export SOTA_AUTH_TOKEN="${project_sota_auth_token}"
 echo "[llp_init_build] export SOTA_AUTH_TOKEN=${SOTA_AUTH_TOKEN}"
-export BB_ENV_PASSTHROUGH_ADDITIONS="${BB_ENV_PASSTHROUGH_ADDITIONS} SOTA_AUTH_TOKEN"
+append_passthrough_var "SOTA_AUTH_TOKEN"
 if [[ ! -z "${project_mqtt_password}" ]];then
-  export BB_ENV_PASSTHROUGH_ADDITIONS="${BB_ENV_PASSTHROUGH_ADDITIONS} LH_IOT_CLOUD_MQTT_PASSWORD"
+  append_passthrough_var "LH_IOT_CLOUD_MQTT_PASSWORD"
 fi
 if [[ "${sign_support}" = "1" ]];then
   export SWUPDATE_PASSWORD_FILE="${project_keys_path}/swupdate-password.txt"
   echo "[llp_init_build] export SWUPDATE_PASSWORD_FILE=${SWUPDATE_PASSWORD_FILE}"
-  export BB_ENV_PASSTHROUGH_ADDITIONS="${BB_ENV_PASSTHROUGH_ADDITIONS} SWUPDATE_PASSWORD_FILE"
+  append_passthrough_var "SWUPDATE_PASSWORD_FILE"
 else
   echo "[llp_init_buid] Warning: signing support is not enabled, do not extend BB_ENV_PASSTHROUGH_ADDITIONS variable"
 fi
 # quick fix add lpo variable LPO_DATASTATION_PRIVATEKEY
-if [[ -f "${project_keys_path}/id_rsa_lpo_datastation" ]]; then
+if [[ -n "${LPO_DATASTATION_PRIVATEKEY}" ]] && [[ -f "${LPO_DATASTATION_PRIVATEKEY}" ]]; then
+  echo "[llp_init_build] using externally provided LPO_DATASTATION_PRIVATEKEY key file"
+  echo "[llp_init_build] export LPO_DATASTATION_PRIVATEKEY=${LPO_DATASTATION_PRIVATEKEY}"
+  append_passthrough_var "LPO_DATASTATION_PRIVATEKEY"
+elif [[ -f "${project_keys_path}/id_rsa_lpo_datastation" ]]; then
   echo "[llp_init_build] found LPO_DATASTATION_PRIVATEKEY key file"
   export LPO_DATASTATION_PRIVATEKEY="${project_keys_path}/id_rsa_lpo_datastation"
   echo "[llp_init_build] export LPO_DATASTATION_PRIVATEKEY=${LPO_DATASTATION_PRIVATEKEY}"
-  export BB_ENV_PASSTHROUGH_ADDITIONS="${BB_ENV_PASSTHROUGH_ADDITIONS} LPO_DATASTATION_PRIVATEKEY"
+  append_passthrough_var "LPO_DATASTATION_PRIVATEKEY"
 else
   echo "[llp_init_build] Warning: LPO_DATASTATION_PRIVATEKEY key file not found"
 fi
 # quick fix add lpo variable MOSQUITTO_PSK_FILE
-if [[ -f "${project_keys_path}/mosquitto-psk.txt" ]]; then
+if [[ -n "${MOSQUITTO_PSK_FILE}" ]] && [[ -f "${MOSQUITTO_PSK_FILE}" ]]; then
+  echo "[llp_init_build] using externally provided MOSQUITTO_PSK_FILE key file"
+  echo "[llp_init_build] export MOSQUITTO_PSK_FILE=${MOSQUITTO_PSK_FILE}"
+  append_passthrough_var "MOSQUITTO_PSK_FILE"
+elif [[ -f "${project_keys_path}/mosquitto-psk.txt" ]]; then
   echo "[llp_init_build] found MOSQUITTO_PSK_FILE key file"
   export MOSQUITTO_PSK_FILE="${project_keys_path}/mosquitto-psk.txt"
   echo "[llp_init_build] export MOSQUITTO_PSK_FILE=${MOSQUITTO_PSK_FILE}"
-  export BB_ENV_PASSTHROUGH_ADDITIONS="${BB_ENV_PASSTHROUGH_ADDITIONS} MOSQUITTO_PSK_FILE"
+  append_passthrough_var "MOSQUITTO_PSK_FILE"
 else
   echo "[llp_init_build] Warning: MOSQUITTO_PSK_FILE key file not found"
 fi
+
+if [[ "${project_distro_layer}" == "meta-liebherr-lpo-display" ]]; then
+  if [[ -z "${MOSQUITTO_PSK_FILE}" ]] || [[ ! -f "${MOSQUITTO_PSK_FILE}" ]]; then
+    echo "[llp_init_build] Error: required MOSQUITTO_PSK_FILE is missing for ${project_distro_layer}."
+    echo "[llp_init_build] Set MOSQUITTO_PSK_FILE to a valid file or create ${project_keys_path}/mosquitto-psk.txt"
+    return 252
+  fi
+fi
+
 echo "[llp_init_build] export BB_ENV_PASSTHROUGH_ADDITIONS=${BB_ENV_PASSTHROUGH_ADDITIONS}"
+
+# Prefer the Yocto HTTPS source mirror before upstream hosts (for example,
+# flaky SourceForge mirrors that may return truncated payloads).
+cat <<EOT >> "${project_root}/build/conf/local.conf"
+
+# Yocto source mirror preference (HTTPS)
+INHERIT += "own-mirrors"
+SOURCE_MIRROR_URL = "https://downloads.yoctoproject.org/mirror/sources/"
+EOT
 
 if [ "${netboot_support}" = "1" ]; then
 cat <<EOT >> "${project_root}/build/conf/local.conf"
