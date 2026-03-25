@@ -8,7 +8,7 @@ set -euo pipefail
 # Hardware target:    HP ZBook Power G11 (HiDPI, Wayland/Sway)
 #
 # Usage:
-#   bash install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--with-ssh-secrets]
+#   bash install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--with-ssh-secrets] [--with-netrc-secrets]
 #
 # Idempotent: safe to re-run.  All symlinks use -sf (force/overwrite).
 #
@@ -17,6 +17,7 @@ SKIP_PACKAGES=false
 SKIP_SYMLINKS=false
 SKIP_SERVICES=false
 WITH_SSH_SECRETS=false
+WITH_NETRC_SECRETS=false
 
 for arg in "$@"; do
   case $arg in
@@ -24,6 +25,7 @@ for arg in "$@"; do
     --skip-symlinks) SKIP_SYMLINKS=true ;;
     --skip-services) SKIP_SERVICES=true ;;
     --with-ssh-secrets) WITH_SSH_SECRETS=true ;;
+    --with-netrc-secrets) WITH_NETRC_SECRETS=true ;;
   esac
 done
 
@@ -160,6 +162,26 @@ install_ssh_secrets_dev_pc() {
   echo "==> SSH profile installed from $src to $dst with hardened permissions."
 }
 
+# Install optional .netrc credentials from secrets.
+# Source defaults to: $DOTFILES/.secrets/home/$USER/.netrc
+# Target: ~/.netrc with mode 600.
+install_netrc_secrets() {
+  local src dst
+
+  src="${NETRC_SECRETS_SOURCE:-$DOTFILES/.secrets/home/$USER/.netrc}"
+  dst="$HOME/.netrc"
+
+  if [[ ! -f "$src" ]]; then
+    echo "WARN: .netrc secrets source not found at $src; skipping .netrc install."
+    return 0
+  fi
+
+  install -m 0600 "$src" "$dst"
+  chown "$USER:$USER" "$dst" 2>/dev/null || sudo chown "$USER:$USER" "$dst" 2>/dev/null || true
+
+  echo "==> Installed .netrc from $src to $dst (mode 600)."
+}
+
 echo "==> Dotfiles: $DOTFILES"
 echo "==> XDG_CONFIG_HOME: $XDG_CONFIG_HOME"
 
@@ -210,7 +232,12 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   sudo dnf install -y tio
 
   # Modern CLI tools
-  sudo dnf install -y ripgrep fd-find fzf zoxide htop btop
+  sudo dnf install -y ripgrep fd-find fzf zoxide htop btop repo
+
+  # Yocto host build tools that are commonly missed on minimal Fedora installs
+  sudo dnf install -y \
+    gawk diffstat chrpath rpcgen texinfo socat \
+    perl perl-Data-Dumper perl-Thread-Queue perl-Text-ParseWords
 
   # NAS/SMB client tools
   sudo dnf install -y cifs-utils
@@ -333,6 +360,9 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/setup-nas-ssh-key" ]] && ln -sf "$DOTFILES/shell/setup-nas-ssh-key" "$HOME/.local/bin/setup-nas-ssh-key"
   [[ -f "$DOTFILES/shell/setup-nas-ca-certificates" ]] && ln -sf "$DOTFILES/shell/setup-nas-ca-certificates" "$HOME/.local/bin/setup-nas-ca-certificates"
   [[ -f "$DOTFILES/shell/setup-nas-git-repo" ]] && ln -sf "$DOTFILES/shell/setup-nas-git-repo" "$HOME/.local/bin/setup-nas-git-repo"
+  [[ -f "$DOTFILES/shell/yocto/llp_init_build.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_init_build.sh" "$HOME/.local/bin/llp_init_build.sh"
+  [[ -f "$DOTFILES/shell/yocto/setup-yocto-project" ]] && ln -sf "$DOTFILES/shell/yocto/setup-yocto-project" "$HOME/.local/bin/setup-yocto-project"
+  [[ -f "$DOTFILES/shell/yocto/llp_yocto_wrapper.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_yocto_wrapper.sh" "$HOME/.local/bin/llp-yocto-build"
 
   # X11 monitor scripts (referenced by sway mode_display)
   rm -rf "$XDG_CONFIG_HOME/X11"
@@ -539,6 +569,25 @@ EOF
     echo "INFO: SSH profile install skipped (opt-in)."
     echo "      Re-run with --with-ssh-secrets to install from .secrets/ssh/dev-pc/.ssh"
   fi
+
+  echo ""
+  echo "── Phase 3h: .netrc credentials (secrets) ───────────────────────────────"
+  if [[ "$WITH_NETRC_SECRETS" == true ]]; then
+    install_netrc_secrets
+  else
+    echo "INFO: .netrc install skipped (opt-in)."
+    echo "      Re-run with --with-netrc-secrets to install from .secrets/home/$USER/.netrc"
+    echo "      Override source via NETRC_SECRETS_SOURCE=/path/to/.netrc"
+  fi
+
+  echo ""
+  echo "── Phase 3i: Yocto helper scripts ───────────────────────────────────────"
+  echo "INFO: llp_init_build.sh is linked to ~/.local/bin/llp_init_build.sh"
+  echo "INFO: setup-yocto-project is linked to ~/.local/bin/setup-yocto-project"
+  echo "INFO: llp-yocto-build is linked to ~/.local/bin/llp-yocto-build"
+  echo "      Example bootstrap: setup-yocto-project --project linux-dps"
+  echo "      Fish/tmux-safe build example:"
+  echo "      llp-yocto-build --workdir ~/lpo-dev/linux-lpo --distro-layer meta-liebherr-lpo-display lpo-display-image"
 fi
 
 # ── Phase 4: Yocto shared directory ───────────────────────────────────────────

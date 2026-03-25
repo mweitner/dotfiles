@@ -34,6 +34,25 @@ After the first reboot, log in to the TTY and update.
 
 `sudo dnf update -y sudo dnf install -y bash-completion curl wget git pciutils usbutils `
 
+### Dotfiles Bootstrap (Recommended)
+
+After cloning dotfiles, run the automated installer:
+
+```bash
+bash ~/dotfiles/install-fedora.sh --with-ssh-secrets --with-netrc-secrets
+```
+
+Notes:
+
+- `--with-ssh-secrets` installs `~/.ssh` from `~/dotfiles/.secrets/ssh/dev-pc/.ssh`
+- `--with-netrc-secrets` installs `~/.netrc` from `~/dotfiles/.secrets/home/$USER/.netrc`
+- installed `.netrc` is permission-hardened to mode `600`
+- override `.netrc` source if needed:
+
+```bash
+NETRC_SECRETS_SOURCE=/path/to/.netrc bash ~/dotfiles/install-fedora.sh --with-netrc-secrets
+```
+
 ## Phase 1.5: Yocto Shared Directory Setup
 
 `sudo mkdir -p /opt/yocto/shared/downloads sudo mkdir -p /opt/yocto/shared/sstate-cache sudo chown -R $USER:$USER /opt/yocto sudo chmod -R 775 /opt/yocto sudo chattr +C /opt/yocto/shared/downloads sudo chattr +C /opt/yocto/shared/sstate-cache `
@@ -91,6 +110,40 @@ sudo dnf install -y gawk make wget tar bzip2 gzip python3 patch \
     zlib-devel openssl-devel xz bzip2-devel libffi-devel \
     ncurses-devel sqlite-devel readline-devel \lz4 zstd 
 ```
+
+  ### 3.1 Yocto Bootstrap + Build (Validated In fish/tmux)
+
+  Use the bootstrap helper first:
+
+  ```bash
+  setup-yocto-project --project linux-lpo
+  ```
+
+  Notes from validated runs:
+
+  - `repo init` uses `--no-clone-bundle` by default to avoid corporate TLS proxy failures.
+  - `llp_init_build.sh` must run in bash context; fish cannot source it directly.
+  - `-llpmixed` requires `/opt/yocto/workspace`.
+  - `-llpsign` requires project keys under `/opt/yocto/keys/*`.
+
+  Recommended shell-agnostic build command (works from fish, tmux, and bash):
+
+  ```bash
+  llp-yocto-build --workdir ~/lpo-dev/linux-lpo --distro-layer meta-liebherr-lpo-display lpo-display-image
+  ```
+
+  Equivalent direct bash one-liner:
+
+  ```bash
+  cd ~/lpo-dev/linux-lpo
+  TOPDIR="$(pwd)" OEROOT="${TOPDIR}/layers/poky" source ~/.local/bin/llp_init_build.sh meta-liebherr-lpo-display -llpnetboot && bitbake lpo-display-image
+  ```
+
+  If external connectivity checks fail while VPN is disconnected, set this in your Yocto template `local.conf.sample`:
+
+  ```bash
+  CONNECTIVITY_CHECK_URIS = ""
+  ```
 
 ## Phase 4: Hardware & Power (HP ZBook G11)
 

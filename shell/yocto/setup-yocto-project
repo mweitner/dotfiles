@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Bootstrap Yocto project workspaces using repo manifests.
+# Supports common LLP projects and prints the llp_init_build.sh source command.
+
+PROJECT=""
+WORKDIR=""
+REPO_URL=""
+MANIFEST_PATH="manifest/default.xml"
+BRANCH="main"
+DISTRO_LAYER=""
+SYNC_JOBS="${SYNC_JOBS:-0}"
+SKIP_SYNC=false
+FORCE_REINIT=false
+USE_CLONE_BUNDLE=false
+TARGET_HINT="<target>"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  setup-yocto-project --project <linux-dps|linux-lpo> [options]
+  setup-yocto-project --project custom --workdir <path> --repo-url <url> [options]
+
+Options:
+  --project <name>       Project preset: linux-dps | linux-lpo | custom
+  --workdir <path>       Workspace path (default depends on project)
+  --repo-url <url>       Repo manifest git URL (required for custom)
+  --manifest <path>      Manifest path inside manifest repo (default: manifest/default.xml)
+  --branch <name>        Repo branch (default: main)
+  --distro-layer <name>  Layer for llp_init_build.sh hint (default depends on project)
+  --sync-jobs <n>        Pass -j <n> to repo sync (default: repo default)
+  --skip-sync            Run repo init only
+  --force-reinit         Remove existing .repo and re-run repo init
+  --use-clone-bundle     Enable repo clone.bundle optimization (disabled by default for corp TLS compatibility)
+  -h, --help             Show help
+
+Examples:
+  setup-yocto-project --project linux-dps
+  setup-yocto-project --project linux-lpo --sync-jobs 8
+  setup-yocto-project --project custom --workdir ~/dev/custom-yocto --repo-url https://example.com/org/repo.git --distro-layer meta-liebherr-dps
+EOF
+}
+
+require_tool() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Error: required tool not found: $1" >&2
+    exit 1
+  fi
+}
+
+apply_project_defaults() {
+  case "$PROJECT" in
+    linux-dps)
+      : "${WORKDIR:=$HOME/dps-dev/linux-dps}"
+      : "${REPO_URL:=https://lis-github.liebherr.com/liebherr/ldc_iot_linux_dps.git}"
+      : "${DISTRO_LAYER:=meta-liebherr-dps}"
+      TARGET_HINT="<dps-image-target>"
+      ;;
+    linux-lpo)
+      : "${WORKDIR:=$HOME/lpo-dev/linux-lpo}"
+      : "${REPO_URL:=https://lis-github.liebherr.com/liebherr/ldc_iot_linux_lpo.git}"
+      : "${DISTRO_LAYER:=meta-liebherr-lpo-display}"
+      TARGET_HINT="lpo-display-image"
+      ;;
+    custom)
+      if [[ -z "$WORKDIR" || -z "$REPO_URL" ]]; then
+        echo "Error: custom project requires --workdir and --repo-url" >&2
+        exit 2
+      fi
+      : "${DISTRO_LAYER:=meta-liebherr-distro}"
+      TARGET_HINT="<target>"
+      ;;
+    *)
+      echo "Error: unsupported --project '$PROJECT'" >&2
+      exit 2
+      ;;
+  esac
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --project)
+      PROJECT="${2:-}"
+      shift 2
+      ;;
+    --workdir)
+      WORKDIR="${2:-}"
+      shift 2
+      ;;
+    --repo-url)
+      REPO_URL="${2:-}"
+      shift 2
+      ;;
+    --manifest)
+      MANIFEST_PATH="${2:-}"
+      shift 2
+      ;;
+    --branch)
+      BRANCH="${2:-}"
+      shift 2
+      ;;
+    --distro-layer)
+      DISTRO_LAYER="${2:-}"
+      shift 2
+      ;;
+    --sync-jobs)
+      SYNC_JOBS="${2:-}"
+      shift 2
+      ;;
+    --skip-sync)
+      SKIP_SYNC=true
+      shift
+      ;;
+    --force-reinit)
+      FORCE_REINIT=true
+      shift
+      ;;
+    --use-clone-bundle)
+      USE_CLONE_BUNDLE=true
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "$PROJECT" ]]; then
+  echo "Error: missing --project" >&2
+  usage
+  exit 2
+fi
+
+require_tool repo
+apply_project_defaults
+
+mkdir -p "$WORKDIR"
+cd "$WORKDIR"
+
+echo "==> Project: $PROJECT"
+echo "==> Workdir: $WORKDIR"
+echo "==> Repo URL: $REPO_URL"
+echo "==> Manifest: $MANIFEST_PATH"
+echo "==> Branch: $BRANCH"
+
+if [[ "$FORCE_REINIT" == true && -d .repo ]]; then
+  echo "==> Removing existing .repo (--force-reinit)"
+  rm -rf .repo
+fi
+
+if [[ ! -d .repo ]]; then
+  echo "==> Running repo init"
+  if [[ "$USE_CLONE_BUNDLE" == true ]]; then
+    repo init -v -u "$REPO_URL" -m "$MANIFEST_PATH" -b "$BRANCH"
+  else
+    # clone.bundle download can fail in TLS-inspected networks; disable by default.
+    repo init -v --no-clone-bundle -u "$REPO_URL" -m "$MANIFEST_PATH" -b "$BRANCH"
+  fi
+else
+  echo "==> .repo already exists, skipping repo init"
+fi
+
+if [[ "$SKIP_SYNC" == true ]]; then
+  echo "==> Skipping repo sync (--skip-sync)"
+else
+  echo "==> Running repo sync"
+  if [[ "$SYNC_JOBS" =~ ^[0-9]+$ ]] && [[ "$SYNC_JOBS" -gt 0 ]]; then
+    repo sync -j "$SYNC_JOBS"
+  else
+    repo sync
+  fi
+fi
+
+echo ""
+echo "==> Next: initialize LLP build environment"
+echo "cd '$WORKDIR'"
+echo ""
+echo "Bash one-liner:"
+echo "TOPDIR=\"\$(pwd)\" OEROOT=\"\${TOPDIR}/layers/poky\" source ~/.local/bin/llp_init_build.sh $DISTRO_LAYER -llpnetboot && bitbake $TARGET_HINT"
+echo ""
+echo "Fish/tmux-safe one-liner:"
+echo "llp-yocto-build --workdir '$WORKDIR' --distro-layer '$DISTRO_LAYER' --ui ncurses --log-file '$WORKDIR/build/logs/$PROJECT-\$(date +%Y%m%d-%H%M%S).log' $TARGET_HINT"
+echo ""
+echo "Note: add -llpsign only when /opt/yocto/keys/* is available; add -llpmixed only when /opt/yocto/workspace exists."
