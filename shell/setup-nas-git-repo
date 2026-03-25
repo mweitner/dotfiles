@@ -60,7 +60,7 @@ esac
 NAS_USER="michael"
 REPO_BASE="/volume1/data/repos"
 REPO_PATH="${REPO_BASE}/${REPO_NAME}.git"
-GIT_URL="ssh://${NAS_USER}@${NAS_IP}${REPO_PATH}"
+GIT_URL="ssh://${NAS_HOST}${REPO_PATH}"
 
 echo "=== UGREEN NAS Git Repository Setup ==="
 echo "Repository: $REPO_NAME"
@@ -71,7 +71,7 @@ echo ""
 # Step 1: Delete repo if requested
 if [[ "$DELETE_REPO" == "true" ]]; then
   echo "⚠️  Deleting repo $REPO_NAME from NAS..."
-  if ssh -o ConnectTimeout=5 "$NAS_USER@$NAS_IP" "rm -rf '$REPO_PATH'" 2>/dev/null; then
+  if ssh -o ConnectTimeout=5 "$NAS_HOST" "rm -rf '$REPO_PATH'" 2>/dev/null; then
     echo "✓ Repository deleted"
     exit 0
   else
@@ -83,21 +83,31 @@ fi
 # Step 2: Create bare git repository on NAS
 echo "📝 Creating bare git repository..."
 
-SSH_CMD="
-  set -e
-  mkdir -p '$REPO_BASE'
-  if [[ -d '$REPO_PATH' ]]; then
-    echo 'Repository already exists'
-    exit 0
-  fi
-  git init --bare '$REPO_PATH'
-  chmod -R g+w '$REPO_PATH'
-  git -C '$REPO_PATH' config core.sharedRepository group
-  echo 'Repository created'
-"
+if ! ssh -o ConnectTimeout=10 "$NAS_HOST" bash -s -- "$REPO_BASE" "$REPO_PATH" "$NAS_HOST" <<'EOF'; then
+set -e
+REPO_BASE="$1"
+REPO_PATH="$2"
+HINT_HOST="$3"
 
-if ! ssh -o ConnectTimeout=10 "$NAS_USER@$NAS_IP" bash -c "$SSH_CMD" 2>/dev/null; then
+mkdir -p "$REPO_BASE"
+if ! command -v git >/dev/null 2>&1; then
+  echo "ERROR: git is not installed on NAS. Install it with an interactive SSH session (sudo needs a TTY):" >&2
+  echo "  ssh -t $HINT_HOST \"sudo apt-get update && sudo apt-get install -y git && git --version\"" >&2
+  exit 2
+fi
+
+if [[ -d "$REPO_PATH" ]]; then
+  echo "Repository already exists"
+  exit 0
+fi
+
+git init --bare "$REPO_PATH"
+chmod -R g+w "$REPO_PATH"
+git -C "$REPO_PATH" config core.sharedRepository group
+echo "Repository created"
+EOF
   echo "❌ Failed to create repository on NAS" >&2
+  echo "Hint: if git is missing, install with: ssh -t $NAS_HOST \"sudo apt-get update && sudo apt-get install -y git && git --version\"" >&2
   exit 1
 fi
 

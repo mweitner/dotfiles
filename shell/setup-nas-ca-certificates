@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Install enterprise CA certificates on UGREEN NAS so HTTPS apt works behind TLS inspection.
+# Default cert sources are from dotfiles/.secrets.
+#
+# Usage:
+#   setup-nas-ca-certificates [--host ugreen-nas|ugreen-nas-home] [--test-apt]
+#   setup-nas-ca-certificates --host ugreen-nas --root-ca /path/root.crt --enterprise-ca /path/enterprise.crt
+
+NAS_HOST="${NAS_HOST:-ugreen-nas}"
+DOTFILES="${DOTFILES:-$HOME/dotfiles}"
+ROOT_CA="${ROOT_CA:-$DOTFILES/.secrets/LiebherrRootCA2.crt}"
+ENTERPRISE_CA="${ENTERPRISE_CA:-$DOTFILES/.secrets/LiebherrEnterpriseCA02.crt}"
+TEST_APT=false
+
+usage() {
+  cat <<'EOF'
+Usage:
+  setup-nas-ca-certificates [--host <name>] [--root-ca <path>] [--enterprise-ca <path>] [--test-apt]
+
+Options:
+  --host <name>            NAS ssh host alias (default: ugreen-nas)
+  --root-ca <path>         Root CA file path (default: ~/dotfiles/.secrets/LiebherrRootCA2.crt)
+  --enterprise-ca <path>   Enterprise/intermediate CA file path (default: ~/dotfiles/.secrets/LiebherrEnterpriseCA02.crt)
+  --test-apt               Run apt update test after certificate installation
+  -h, --help               Show help
+
+Examples:
+  setup-nas-ca-certificates
+  setup-nas-ca-certificates --host ugreen-nas-home --test-apt
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --host)
+      NAS_HOST="${2:-}"
+      shift 2
+      ;;
+    --root-ca)
+      ROOT_CA="${2:-}"
+      shift 2
+      ;;
+    --enterprise-ca)
+      ENTERPRISE_CA="${2:-}"
+      shift 2
+      ;;
+    --test-apt)
+      TEST_APT=true
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [[ ! -f "$ROOT_CA" ]]; then
+  echo "Error: root CA not found: $ROOT_CA" >&2
+  exit 1
+fi
+
+if [[ ! -f "$ENTERPRISE_CA" ]]; then
+  echo "Error: enterprise CA not found: $ENTERPRISE_CA" >&2
+  exit 1
+fi
+
+echo "==> Installing CA certs on NAS host: $NAS_HOST"
+
+REMOTE_STAGE_DIR="$(ssh "$NAS_HOST" 'mkdir -p "$HOME/tmp" && printf "%s\n" "$HOME/tmp"')"
+if [[ -z "$REMOTE_STAGE_DIR" ]]; then
+  echo "Error: could not determine writable staging directory on NAS" >&2
+  exit 1
+fi
+
+echo "==> Copying certificate files to NAS ($REMOTE_STAGE_DIR)"
+cat "$ROOT_CA" | ssh "$NAS_HOST" "cat > '$REMOTE_STAGE_DIR/LiebherrRootCA2.crt'"
+cat "$ENTERPRISE_CA" | ssh "$NAS_HOST" "cat > '$REMOTE_STAGE_DIR/LiebherrEnterpriseCA02.crt'"
+
+ssh "$NAS_HOST" "test -s '$REMOTE_STAGE_DIR/LiebherrRootCA2.crt' && test -s '$REMOTE_STAGE_DIR/LiebherrEnterpriseCA02.crt'"
+
+echo "==> Installing certificates into system trust store"
+ssh -t "$NAS_HOST" '
+  sudo install -m 0644 '"$REMOTE_STAGE_DIR"'/LiebherrRootCA2.crt /usr/local/share/ca-certificates/LiebherrRootCA2.crt &&
+  sudo install -m 0644 '"$REMOTE_STAGE_DIR"'/LiebherrEnterpriseCA02.crt /usr/local/share/ca-certificates/LiebherrEnterpriseCA02.crt &&
+  sudo update-ca-certificates
+'
+
+echo "==> Verifying certificate chain for deb.debian.org"
+ssh "$NAS_HOST" "echo | openssl s_client -connect deb.debian.org:443 -servername deb.debian.org 2>/dev/null | openssl x509 -noout -issuer -subject -dates"
+
+if [[ "$TEST_APT" == "true" ]]; then
+  echo "==> Testing apt update over HTTPS"
+  ssh -t "$NAS_HOST" "sudo apt-get -o Acquire::ForceIPv4=true update"
+fi
+
+echo "==> Done. NAS trust store updated."

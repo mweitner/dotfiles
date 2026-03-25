@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Enable internet sharing/NAT for machine networks.
+# Default route: 192.168.3.0/24 (machine network) -> uplink.
+
+IN_IF="${MACHINE_IFACE:-enx00e04cb828b5}"
+OUT_IF="${UPLINK_IFACE:-enx98e74325ccf7}"
+LAN_CIDR="${MACHINE_CIDR:-192.168.3.0/24}"
+SHOW_ONLY=false
+
+usage() {
+  cat <<'EOF'
+Usage:
+  setup-machine-internet-sharing [--in-if <ifname>] [--out-if <ifname>] [--cidr <subnet>] [--show]
+
+Options:
+  --in-if <ifname>   Incoming machine-network interface (default: enx00e04cb828b5)
+  --out-if <ifname>  Outgoing uplink interface (default: enx98e74325ccf7)
+  --cidr <subnet>    Machine subnet to masquerade (default: 192.168.3.0/24)
+  --show             Show current forwarding/NAT state only
+  -h, --help         Show this help
+
+Examples:
+  setup-machine-internet-sharing
+  setup-machine-internet-sharing --in-if enx00e04cb828b5 --out-if enx98e74325ccf7
+  setup-machine-internet-sharing --cidr 192.168.3.0/24
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --in-if)
+      IN_IF="${2:-}"
+      shift 2
+      ;;
+    --out-if)
+      OUT_IF="${2:-}"
+      shift 2
+      ;;
+    --cidr)
+      LAN_CIDR="${2:-}"
+      shift 2
+      ;;
+    --show)
+      SHOW_ONLY=true
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+for ifname in "$IN_IF" "$OUT_IF"; do
+  if [[ ! -d "/sys/class/net/$ifname" ]]; then
+    echo "Error: interface '$ifname' not found." >&2
+    exit 1
+  fi
+done
+
+if [[ "$SHOW_ONLY" == "true" ]]; then
+  echo "IPv4 forwarding: $(sysctl -n net.ipv4.ip_forward 2>/dev/null || echo unknown)"
+  if sudo firewall-cmd --state >/dev/null 2>&1; then
+    out_zone="$(sudo firewall-cmd --get-zone-of-interface="$OUT_IF" 2>/dev/null || true)"
+    if [[ -z "$out_zone" ]]; then
+      out_zone="$(sudo firewall-cmd --get-default-zone 2>/dev/null || echo unknown)"
+    fi
+    echo "firewalld: active (outgoing zone: $out_zone)"
+    echo "firewalld masquerade: $(sudo firewall-cmd --zone="$out_zone" --query-masquerade 2>/dev/null || echo unknown)"
+    echo "firewalld direct rules:"
+    sudo firewall-cmd --direct --get-all-rules | grep -E "($IN_IF|$OUT_IF|$LAN_CIDR|MASQUERADE)" || true
+  fi
+  if command -v iptables >/dev/null 2>&1; then
+    echo "NAT/forward rules (iptables):"
+    sudo iptables -t nat -S POSTROUTING | grep -F "$OUT_IF" || true
+    sudo iptables -S FORWARD | grep -E "($IN_IF|$OUT_IF)" || true
+  elif command -v nft >/dev/null 2>&1; then
+    echo "NAT/forward rules (nft):"
+    sudo nft list ruleset | grep -E "(masquerade|$IN_IF|$OUT_IF|$LAN_CIDR)" || true
+  else
+    echo "Neither iptables nor nft found." >&2
+    exit 1
+  fi
+  exit 0
+fi
+
+echo "==> Enabling IPv4 forwarding"
+sudo sysctl -w net.ipv4.ip_forward=1 >/dev/null
+
+# firewalld is authoritative on Fedora; configure it first when active.
+if sudo firewall-cmd --state >/dev/null 2>&1; then
+  echo "==> Configuring forwarding/NAT with firewalld"
+  OUT_ZONE="$(sudo firewall-cmd --get-zone-of-interface="$OUT_IF" 2>/dev/null || true)"
+  if [[ -z "$OUT_ZONE" ]]; then
+    OUT_ZONE="$(sudo firewall-cmd --get-default-zone)"
+  fi
+
+  sudo firewall-cmd --zone="$OUT_ZONE" --query-masquerade >/dev/null 2>&1 || sudo firewall-cmd --zone="$OUT_ZONE" --add-masquerade
+  sudo firewall-cmd --permanent --zone="$OUT_ZONE" --query-masquerade >/dev/null 2>&1 || sudo firewall-cmd --permanent --zone="$OUT_ZONE" --add-masquerade
+
+  sudo firewall-cmd --direct --query-rule ipv4 filter FORWARD 0 -i "$IN_IF" -o "$OUT_IF" -s "$LAN_CIDR" -j ACCEPT >/dev/null 2>&1 \
+    || sudo firewall-cmd --direct --add-rule ipv4 filter FORWARD 0 -i "$IN_IF" -o "$OUT_IF" -s "$LAN_CIDR" -j ACCEPT
+  sudo firewall-cmd --permanent --direct --query-rule ipv4 filter FORWARD 0 -i "$IN_IF" -o "$OUT_IF" -s "$LAN_CIDR" -j ACCEPT >/dev/null 2>&1 \
+    || sudo firewall-cmd --permanent --direct --add-rule ipv4 filter FORWARD 0 -i "$IN_IF" -o "$OUT_IF" -s "$LAN_CIDR" -j ACCEPT
+
+  sudo firewall-cmd --direct --query-rule ipv4 filter FORWARD 0 -i "$OUT_IF" -o "$IN_IF" -d "$LAN_CIDR" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT >/dev/null 2>&1 \
+    || sudo firewall-cmd --direct --add-rule ipv4 filter FORWARD 0 -i "$OUT_IF" -o "$IN_IF" -d "$LAN_CIDR" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+  sudo firewall-cmd --permanent --direct --query-rule ipv4 filter FORWARD 0 -i "$OUT_IF" -o "$IN_IF" -d "$LAN_CIDR" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT >/dev/null 2>&1 \
+    || sudo firewall-cmd --permanent --direct --add-rule ipv4 filter FORWARD 0 -i "$OUT_IF" -o "$IN_IF" -d "$LAN_CIDR" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+  sudo firewall-cmd --direct --query-rule ipv4 nat POSTROUTING 0 -s "$LAN_CIDR" -o "$OUT_IF" -j MASQUERADE >/dev/null 2>&1 \
+    || sudo firewall-cmd --direct --add-rule ipv4 nat POSTROUTING 0 -s "$LAN_CIDR" -o "$OUT_IF" -j MASQUERADE
+  sudo firewall-cmd --permanent --direct --query-rule ipv4 nat POSTROUTING 0 -s "$LAN_CIDR" -o "$OUT_IF" -j MASQUERADE >/dev/null 2>&1 \
+    || sudo firewall-cmd --permanent --direct --add-rule ipv4 nat POSTROUTING 0 -s "$LAN_CIDR" -o "$OUT_IF" -j MASQUERADE
+
+  sudo firewall-cmd --reload >/dev/null
+elif command -v iptables >/dev/null 2>&1; then
+  echo "==> Configuring NAT/forwarding with iptables"
+  sudo iptables -C FORWARD -i "$IN_IF" -o "$OUT_IF" -s "$LAN_CIDR" -j ACCEPT 2>/dev/null \
+    || sudo iptables -I FORWARD 1 -i "$IN_IF" -o "$OUT_IF" -s "$LAN_CIDR" -j ACCEPT
+
+  sudo iptables -C FORWARD -i "$OUT_IF" -o "$IN_IF" -d "$LAN_CIDR" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null \
+    || sudo iptables -I FORWARD 1 -i "$OUT_IF" -o "$IN_IF" -d "$LAN_CIDR" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+  sudo iptables -t nat -C POSTROUTING -s "$LAN_CIDR" -o "$OUT_IF" -j MASQUERADE 2>/dev/null \
+    || sudo iptables -t nat -A POSTROUTING -s "$LAN_CIDR" -o "$OUT_IF" -j MASQUERADE
+elif command -v nft >/dev/null 2>&1; then
+  echo "==> Configuring NAT/forwarding with nft"
+  sudo nft list table ip dotfiles_machine >/dev/null 2>&1 || sudo nft add table ip dotfiles_machine
+  sudo nft list chain ip dotfiles_machine forward >/dev/null 2>&1 \
+    || sudo nft add chain ip dotfiles_machine forward '{ type filter hook forward priority 10; policy accept; }'
+  sudo nft list chain ip dotfiles_machine postrouting >/dev/null 2>&1 \
+    || sudo nft add chain ip dotfiles_machine postrouting '{ type nat hook postrouting priority srcnat; policy accept; }'
+
+  sudo nft list chain ip dotfiles_machine forward | grep -F "iifname \"$IN_IF\" oifname \"$OUT_IF\" ip saddr $LAN_CIDR accept" >/dev/null 2>&1 \
+    || sudo nft add rule ip dotfiles_machine forward iifname "$IN_IF" oifname "$OUT_IF" ip saddr "$LAN_CIDR" accept
+
+  sudo nft list chain ip dotfiles_machine forward | grep -F "iifname \"$OUT_IF\" oifname \"$IN_IF\" ip daddr $LAN_CIDR ct state established,related accept" >/dev/null 2>&1 \
+    || sudo nft add rule ip dotfiles_machine forward iifname "$OUT_IF" oifname "$IN_IF" ip daddr "$LAN_CIDR" ct state established,related accept
+
+  sudo nft list chain ip dotfiles_machine postrouting | grep -F "ip saddr $LAN_CIDR oifname \"$OUT_IF\" masquerade" >/dev/null 2>&1 \
+    || sudo nft add rule ip dotfiles_machine postrouting ip saddr "$LAN_CIDR" oifname "$OUT_IF" masquerade
+else
+  echo "Error: neither iptables nor nft command is available." >&2
+  exit 1
+fi
+
+echo "==> Internet sharing is active: $LAN_CIDR via $OUT_IF (ingress: $IN_IF)"

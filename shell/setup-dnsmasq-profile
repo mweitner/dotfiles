@@ -122,6 +122,24 @@ sudo install -m 0644 "$SRC_FILE" "$ACTIVE_FILE"
 
 echo "$PROFILE" | sudo tee "$STATE_FILE" >/dev/null
 
+# If firewalld is active, ensure DNS/DHCP from machine networks can reach dnsmasq.
+if sudo firewall-cmd --state >/dev/null 2>&1; then
+  ifname="$(awk -F= '/^interface=/{print $2; exit}' "$SRC_FILE" 2>/dev/null || true)"
+  zone=""
+  if [[ -n "$ifname" ]]; then
+    zone="$(sudo firewall-cmd --get-zone-of-interface="$ifname" 2>/dev/null || true)"
+  fi
+  if [[ -z "$zone" ]]; then
+    zone="$(sudo firewall-cmd --get-default-zone 2>/dev/null || echo FedoraServer)"
+  fi
+
+  sudo firewall-cmd --zone="$zone" --query-service=dns >/dev/null 2>&1 || sudo firewall-cmd --zone="$zone" --add-service=dns
+  sudo firewall-cmd --permanent --zone="$zone" --query-service=dns >/dev/null 2>&1 || sudo firewall-cmd --permanent --zone="$zone" --add-service=dns
+  sudo firewall-cmd --zone="$zone" --query-service=dhcp >/dev/null 2>&1 || sudo firewall-cmd --zone="$zone" --add-service=dhcp
+  sudo firewall-cmd --permanent --zone="$zone" --query-service=dhcp >/dev/null 2>&1 || sudo firewall-cmd --permanent --zone="$zone" --add-service=dhcp
+  sudo firewall-cmd --reload >/dev/null
+fi
+
 if ! sudo dnsmasq --test --conf-file=/etc/dnsmasq.conf >/dev/null; then
   echo "ERROR: dnsmasq config test failed. Service not restarted." >&2
   exit 1

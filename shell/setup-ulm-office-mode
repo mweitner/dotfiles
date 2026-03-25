@@ -5,18 +5,20 @@ DOTFILES="${DOTFILES:-$HOME/dotfiles}"
 DNS_PROFILE="${DNSMASQ_PROFILE:-ulm-nas}"
 NM_CONNECTION="${ULM_NM_CONNECTION:-Machine-mining-excavator-GW}"
 NM_INTERFACE="${ULM_NM_INTERFACE:-}"
+UPLINK_INTERFACE="${ULM_UPLINK_INTERFACE:-enx98e74325ccf7}"
 NAS_SITE="${UGREEN_NAS_SITE:-auto}"
 
 usage() {
   cat <<'EOF'
 Usage:
-  setup-ulm-office-mode [--interface <ifname>] [--connection <nm-connection>] [--dns-profile <profile>] [--site auto|home|work]
+  setup-ulm-office-mode [--interface <ifname>] [--uplink <ifname>] [--connection <nm-connection>] [--dns-profile <profile>] [--site auto|home|work]
 
 What it does:
   1) Rebind mining network profile to active adapter MAC and bring up gateway profile (192.168.3.1)
   2) Activate dnsmasq profile (default: ulm-nas)
-  3) Configure NAS automount via systemd-units and site-aware host ordering
-  4) Trigger mount and print nas-status
+  3) Enable internet sharing/NAT from machine network to uplink
+  4) Configure NAS automount via systemd-units and site-aware host ordering
+  5) Trigger mount and print nas-status
 EOF
 }
 
@@ -28,6 +30,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --connection)
       NM_CONNECTION="${2:-}"
+      shift 2
+      ;;
+    --uplink)
+      UPLINK_INTERFACE="${2:-}"
       shift 2
       ;;
     --dns-profile)
@@ -74,7 +80,7 @@ if ! command -v nmcli >/dev/null 2>&1; then
   exit 1
 fi
 
-for helper in setup-machine-network-profiles.sh setup-dnsmasq-profile setup-ugreen-nas-mount; do
+for helper in setup-machine-network-profiles.sh setup-dnsmasq-profile setup-machine-internet-sharing setup-ugreen-nas-mount; do
   if [[ ! -x "$DOTFILES/shell/$helper" ]]; then
     echo "Error: required helper missing or not executable: $DOTFILES/shell/$helper" >&2
     exit 1
@@ -92,6 +98,9 @@ nmcli connection up "$NM_CONNECTION" ifname "$NM_INTERFACE"
 
 echo "==> Activating dnsmasq profile: $DNS_PROFILE"
 "$DOTFILES/shell/setup-dnsmasq-profile" --profile "$DNS_PROFILE"
+
+echo "==> Enabling internet sharing: $NM_INTERFACE -> $UPLINK_INTERFACE"
+"$DOTFILES/shell/setup-machine-internet-sharing" --in-if "$NM_INTERFACE" --out-if "$UPLINK_INTERFACE" --cidr 192.168.3.0/24
 
 echo "==> Configuring NAS mount (systemd units, site=$NAS_SITE)..."
 "$DOTFILES/shell/setup-ugreen-nas-mount" --mode systemd-units --site "$NAS_SITE"

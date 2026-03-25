@@ -68,30 +68,45 @@ echo "📤 Adding public key to NAS authorized_keys..."
 
 PUBLIC_KEY=$(cat "$KEY_PATH.pub")
 
+# Remote script passed to 'bash -s -- "$PUBLIC_KEY"' on the NAS.
+# Uses sudo to create the home dir if missing (UGREEN admin users have sudo),
+# then installs the key at the passwd-defined home path that sshd expects.
+read -r -d '' REMOTE_SCRIPT << 'ENDRS' || true
+PUB_KEY="$1"
+UNAME=$(id -un)
+UHOME=$(getent passwd "$UNAME" | cut -d: -f6)
+if [ ! -d "$UHOME" ]; then
+  sudo mkdir -p "$UHOME" && sudo chown "$UNAME:" "$UHOME" || {
+    echo "ERROR: cannot create $UHOME - run manually: sudo mkdir -p $UHOME && sudo chown $UNAME: $UHOME" >&2
+    exit 1
+  }
+fi
+mkdir -p "$UHOME/.ssh"
+grep -qxF "$PUB_KEY" "$UHOME/.ssh/authorized_keys" 2>/dev/null \
+  || printf '%s\n' "$PUB_KEY" >> "$UHOME/.ssh/authorized_keys"
+chmod 700 "$UHOME/.ssh"
+chmod 600 "$UHOME/.ssh/authorized_keys"
+ENDRS
+
 # Check if we can connect via ssh-agent first
 if sshpass -V >/dev/null 2>&1 || ssh-keyscan -t ed25519 "$NAS_IP" >/dev/null 2>&1 2>&1; then
   # Try to use sshpass if password is provided
   if [[ -v NAS_PASSWORD ]]; then
     echo "Adding key using password authentication..."
-    sshpass -p "$NAS_PASSWORD" ssh -o StrictHostKeyChecking=no "$NAS_USER@$NAS_IP" \
-      "mkdir -p ~/.ssh && echo '$PUBLIC_KEY' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys" \
-      2>/dev/null || {
+    echo "$REMOTE_SCRIPT" | sshpass -p "$NAS_PASSWORD" \
+      ssh -o PreferredAuthentications=password,keyboard-interactive "$NAS_HOST" bash -s -- "$PUBLIC_KEY" 2>/dev/null || {
       echo "❌ Failed to add key via password" >&2
       exit 1
     }
   else
-    # Fallback: prompt user to manually run command
+    # No --password flag: connect interactively (user types NAS password at prompt)
     echo ""
     echo "⚠️  Interactive SSH connection required."
     echo "You will be prompted for the NAS password."
     echo ""
-    echo "When connected, run this command on the NAS:"
-    echo "  mkdir -p ~/.ssh && echo '$PUBLIC_KEY' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
-    echo ""
-    echo "Connecting to $NAS_USER@$NAS_IP..."
-    ssh -o StrictHostKeyChecking=no "$NAS_USER@$NAS_IP" \
-      "mkdir -p ~/.ssh && echo '$PUBLIC_KEY' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys" \
-      || {
+    echo "Connecting to $NAS_HOST..."
+    echo "$REMOTE_SCRIPT" | \
+      ssh -o PreferredAuthentications=password,keyboard-interactive "$NAS_HOST" bash -s -- "$PUBLIC_KEY" || {
       echo "❌ Failed to add key" >&2
       exit 1
     }
@@ -101,9 +116,11 @@ else
   echo ""
   echo "⚠️  Cannot auto-connect to NAS. Manual setup required:"
   echo ""
-  echo "1. SSH into NAS: ssh michael@$NAS_IP"
-  echo "2. Run this command:"
-  echo "   mkdir -p ~/.ssh && echo '$PUBLIC_KEY' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+  echo "1. SSH into NAS: ssh $NAS_HOST"
+  echo "2. Create your home dir (requires sudo, which UGREEN admin users have):"
+  echo "   sudo mkdir -p /home/michael && sudo chown michael: /home/michael"
+  echo "3. Add the public key:"
+  echo "   mkdir -p ~/.ssh && printf '%s\\n' '$PUBLIC_KEY' >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
   echo ""
   read -p "Done? (y/n) " -n 1 -r
   echo
@@ -115,7 +132,7 @@ echo ""
 
 # Step 3: Test SSH connection
 echo "🧪 Testing SSH connection to $NAS_HOST..."
-if ssh -i "$KEY_PATH" -o ConnectTimeout=5 -o StrictHostKeyChecking=no "$NAS_USER@$NAS_IP" "echo 'SSH connection successful'" >/dev/null 2>&1; then
+if ssh -o ConnectTimeout=5 "$NAS_HOST" "echo 'SSH connection successful'" >/dev/null 2>&1; then
   echo "✓ SSH connection verified"
 else
   echo "❌ SSH connection failed" >&2
@@ -129,6 +146,6 @@ echo "  ssh $NAS_HOST"
 echo "  ssh-copy-id -i $KEY_PATH $NAS_HOST"
 echo ""
 echo "For git operations, use:"
-echo "  git clone ssh://michael@$NAS_IP/volume1/data/repos/PROJECT.git"
+echo "  git clone ssh://$NAS_HOST/volume1/data/repos/PROJECT.git"
 echo "  git push origin main"
 echo ""

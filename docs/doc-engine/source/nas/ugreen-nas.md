@@ -48,6 +48,11 @@ Check current status:
 nas-status
 ```
 
+If setup fails with known signatures (`sudo` TTY, `scp` destination path,
+TLS cert trust, apt broken dependencies), jump to:
+
+- [Known Issue Signatures And Fixes](#known-issue-signatures-and-fixes)
+
 ---
 
 ## Recommended (Automated): Native systemd `.mount` + `.automount`
@@ -107,8 +112,20 @@ What it does:
 - rebinds mining profile to the currently attached adapter MAC
 - activates `Machine-mining-excavator-GW` (expected `192.168.3.1/24`)
 - switches dnsmasq to `ulm-nas` profile
+- enables IPv4 forwarding + NAT masquerading for `192.168.3.0/24` to the uplink
 - applies NAS automount via `systemd` units
 - triggers mount and prints `nas-status`
+
+Default interface mapping in this environment:
+
+- machine network ingress: `enx00e04cb828b5` (`192.168.3.1/24`)
+- internet uplink egress: `enx98e74325ccf7` (`10.146.72.96/23`)
+
+Show current forwarding/NAT state:
+
+```bash
+setup-machine-internet-sharing --show
+```
 
 ## Dual-Adapter Workflow: Mining + LPO At The Same Time
 
@@ -173,6 +190,27 @@ setup-ulm-office-mode --site work
 The NAS can host bare git repositories at `/volume1/data/repos/` for remote backup
 or collaborative development. SSH-based authentication is used (key-based, passwordless).
 
+### Prerequisite: CA Trust For Office TLS Inspection
+
+On the ULM office network, outbound HTTPS from NAS may be TLS-inspected. Before
+`apt` can install `git`, install enterprise CA certificates onto NAS:
+
+```bash
+setup-nas-ca-certificates --host ugreen-nas --test-apt
+```
+
+Then install git:
+
+```bash
+ssh -t ugreen-nas "sudo apt-get install -y git && git --version"
+```
+
+If apt reports broken dependencies, repair once then retry install:
+
+```bash
+ssh -t ugreen-nas "sudo dpkg --configure -a && sudo apt-get --fix-broken install -y && sudo apt-get install -y git"
+```
+
 ### Initial SSH Setup (One-Time)
 
 Generate SSH key and add it to NAS authorized_keys:
@@ -210,7 +248,7 @@ Host: ugreen-nas (192.168.3.91)
 Path: /volume1/data/repos/my-project.git
 
 Clone this repository:
-  git clone ssh://michael@192.168.3.91/volume1/data/repos/my-project.git my-project
+  git clone ssh://ugreen-nas/volume1/data/repos/my-project.git my-project
 ```
 
 Clone and initialize:
@@ -227,7 +265,7 @@ This creates the repo, clones it locally, and pushes an initial commit.
 If you have an existing git repository, add the NAS as a remote:
 
 ```bash
-git remote add nas-storage ssh://michael@192.168.3.91/volume1/data/repos/project-name.git
+git remote add nas-storage ssh://ugreen-nas/volume1/data/repos/project-name.git
 git branch -M main
 git push -u nas-storage main
 ```
@@ -258,13 +296,13 @@ Both use SSH key `~/.ssh/id_ed25519_ugreen_nas` and connect as user `michael`.
 Direct SSH:
 
 ```bash
-git clone ssh://michael@192.168.3.91/volume1/data/repos/project-name.git
+git clone ssh://ugreen-nas/volume1/data/repos/project-name.git
 ```
 
 Via SSH host alias:
 
 ```bash
-git clone ssh://michael@ugreen-nas/volume1/data/repos/project-name.git
+git clone ssh://ugreen-nas/volume1/data/repos/project-name.git
 ```
 
 Shorthand (if set up as remote):
@@ -315,6 +353,69 @@ ls /mnt/data
 ```bash
 systemctl status mnt-data.automount
 systemctl status mnt-data.mount
+```
+
+### Known Issue Signatures And Fixes
+
+Use this quick map when NAS setup fails with familiar messages.
+
+1. `sudo: a terminal is required to read the password`
+
+Cause: command executed via non-interactive SSH.
+
+Fix:
+
+```bash
+ssh -t ugreen-nas "sudo <command>"
+```
+
+2. `scp: dest open ... No such file or directory` (on NAS uploads)
+
+Cause: NAS `scp/sftp` destination path behavior is inconsistent in this environment.
+
+Fix: use `setup-nas-ca-certificates` (it streams files over SSH to `$HOME/tmp`
+instead of relying on `scp`).
+
+3. `Certificate verification failed: The certificate is NOT trusted` (apt)
+
+Cause: office network TLS inspection (`LIS-SSL-SCAN-CA02`) not trusted on NAS.
+
+Fix:
+
+```bash
+setup-nas-ca-certificates --host ugreen-nas --test-apt
+```
+
+4. `Ign: ... deb.debian.org ...` / apt hangs at `0% [Working]`
+
+Cause: dev-pc machine-network routing or DNS path not fully active.
+
+Fix:
+
+```bash
+setup-ulm-office-mode --site auto
+setup-machine-internet-sharing --show
+setup-dnsmasq-profile --show
+```
+
+5. `E: Unable to locate package git` after TLS errors
+
+Cause: apt index not updated because HTTPS trust failed.
+
+Fix: resolve TLS trust first (see #3), then run:
+
+```bash
+ssh -t ugreen-nas "sudo apt-get update && sudo apt-get install -y git"
+```
+
+6. `You might want to run 'apt --fix-broken install'`
+
+Cause: partially broken package state on NAS.
+
+Fix:
+
+```bash
+ssh -t ugreen-nas "sudo dpkg --configure -a && sudo apt-get --fix-broken install -y && sudo apt-get install -y git"
 ```
 
 ---
