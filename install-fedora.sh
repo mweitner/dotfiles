@@ -8,7 +8,7 @@ set -euo pipefail
 # Hardware target:    HP ZBook Power G11 (HiDPI, Wayland/Sway)
 #
 # Usage:
-#   bash install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--with-ssh-secrets] [--with-netrc-secrets]
+#   bash install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--skip-docker] [--skip-docker-daemon-config] [--with-ssh-secrets] [--with-netrc-secrets]
 #
 # Idempotent: safe to re-run.  All symlinks use -sf (force/overwrite).
 #
@@ -18,16 +18,42 @@ SKIP_SYMLINKS=false
 SKIP_SERVICES=false
 WITH_SSH_SECRETS=false
 WITH_NETRC_SECRETS=false
+SKIP_DOCKER=false
+SKIP_DOCKER_DAEMON_CONFIG=false
 
 for arg in "$@"; do
   case $arg in
     --skip-packages) SKIP_PACKAGES=true ;;
     --skip-symlinks) SKIP_SYMLINKS=true ;;
     --skip-services) SKIP_SERVICES=true ;;
+    --skip-docker) SKIP_DOCKER=true ;;
+    --skip-docker-daemon-config) SKIP_DOCKER_DAEMON_CONFIG=true ;;
     --with-ssh-secrets) WITH_SSH_SECRETS=true ;;
     --with-netrc-secrets) WITH_NETRC_SECRETS=true ;;
   esac
 done
+
+setup_fedora_docker() {
+  local docker_setup_script
+  local -a docker_args
+
+  docker_setup_script="$DOTFILES/shell/setup-docker-fedora-native.sh"
+  if [[ ! -f "$docker_setup_script" ]]; then
+    echo "WARN: Docker setup script not found at $docker_setup_script"
+    echo "      Skipping Docker setup phase."
+    return 0
+  fi
+
+  chmod +x "$docker_setup_script" 2>/dev/null || true
+  docker_args=()
+  if [[ "$SKIP_DOCKER_DAEMON_CONFIG" == true ]]; then
+    docker_args+=(--skip-daemon-config)
+  else
+    docker_args+=(--apply-daemon-config)
+  fi
+
+  "$docker_setup_script" "${docker_args[@]}"
+}
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 DOTFILES="${DOTFILES:-$HOME/dotfiles}"
@@ -650,6 +676,14 @@ EOF
   echo "      yocto-prefetch-source --url https://downloads.yoctoproject.org/mirror/sources/libjpeg-turbo-3.0.1.tar.gz --sha256 22429507714ae147b3acacd299e82099fce5d9f456882fc28e252e4579ba2a75"
   echo "      Recipe-aware prefetch helper example:"
   echo "      yocto-prefetch-recipe-source --recipe ~/lpo-dev/linux-lpo/layers/poky/meta/recipes-graphics/jpeg/libjpeg-turbo_3.0.1.bb"
+
+  echo ""
+  echo "── Phase 3j: Docker engine (Fedora native) ─────────────────────────────"
+  if [[ "$SKIP_DOCKER" == false ]]; then
+    setup_fedora_docker
+  else
+    echo "INFO: Docker setup skipped (--skip-docker)."
+  fi
 fi
 
 # ── Phase 4: Yocto shared directory ───────────────────────────────────────────
