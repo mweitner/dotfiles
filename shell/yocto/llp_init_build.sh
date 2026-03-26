@@ -351,18 +351,53 @@ echo "[llp_init_build] ${project_source_root}/poky/oe-init-build-env ${project_b
 # The oe-init-build-env script will now use the TEMPLATECONF we exported above
 . "${project_source_root}/poky/oe-init-build-env" "${project_build_root}"
 
+# Apply Python 3.14 multiprocessing compatibility patch to BitBake if needed.
+# BitBake uses nested functions/lambdas as process targets; these cannot be
+# pickled under Python 3.14's new default 'forkserver' start method.
+# The patch forces 'fork' in both bin/bitbake and bin/bitbake-server entry points.
+_llp_patch="${BASH_SOURCE[0]%/*}/bitbake-python314-multiprocessing-fork.patch"
+_llp_bitbake_bin="${project_source_root}/poky/bitbake/bin/bitbake-server"
+if [[ -f "${_llp_patch}" ]] && [[ -f "${_llp_bitbake_bin}" ]]; then
+  if ! grep -q "set_start_method" "${_llp_bitbake_bin}" 2>/dev/null; then
+    echo "[llp_init_build] Applying bitbake-python314-multiprocessing-fork.patch ..."
+    patch -p1 -d "${project_source_root}/poky" < "${_llp_patch}" \
+      && echo "[llp_init_build] Patch applied successfully." \
+      || echo "[llp_init_build] Warning: patch failed or was already applied (check output above)."
+  else
+    echo "[llp_init_build] Python 3.14 BitBake patch already present, skipping."
+  fi
+fi
+unset _llp_patch _llp_bitbake_bin
+
 export SOTA_AUTH_TOKEN="${project_sota_auth_token}"
 echo "[llp_init_build] export SOTA_AUTH_TOKEN=${SOTA_AUTH_TOKEN}"
 append_passthrough_var "SOTA_AUTH_TOKEN"
 if [[ ! -z "${project_mqtt_password}" ]];then
   append_passthrough_var "LH_IOT_CLOUD_MQTT_PASSWORD"
 fi
-if [[ "${sign_support}" = "1" ]];then
-  export SWUPDATE_PASSWORD_FILE="${project_keys_path}/swupdate-password.txt"
-  echo "[llp_init_build] export SWUPDATE_PASSWORD_FILE=${SWUPDATE_PASSWORD_FILE}"
-  append_passthrough_var "SWUPDATE_PASSWORD_FILE"
+# SWUpdate signing: auto-detect from key files if they exist in project_keys_path
+# OR explicitly enabled with -llpsign flag
+if [[ "${sign_support}" = "1" ]] || [[ -f "${project_keys_path}/swupdate-private.pem" ]]; then
+  # Export SWUpdate password file if it exists
+  if [[ -f "${project_keys_path}/swupdate-password.txt" ]]; then
+    export SWUPDATE_PASSWORD_FILE="${project_keys_path}/swupdate-password.txt"
+    echo "[llp_init_build] export SWUPDATE_PASSWORD_FILE=${SWUPDATE_PASSWORD_FILE}"
+    append_passthrough_var "SWUPDATE_PASSWORD_FILE"
+  fi
+  # Export SWUpdate private key
+  if [[ -f "${project_keys_path}/swupdate-private.pem" ]]; then
+    export SWUPDATE_PRIVATE_KEY="${project_keys_path}/swupdate-private.pem"
+    echo "[llp_init_build] export SWUPDATE_PRIVATE_KEY=${SWUPDATE_PRIVATE_KEY}"
+    append_passthrough_var "SWUPDATE_PRIVATE_KEY"
+  fi
+  # Export SWUpdate public key  
+  if [[ -f "${project_keys_path}/swupdate-public.pem" ]]; then
+    export SWUPDATE_PUBLIC_KEY="${project_keys_path}/swupdate-public.pem"
+    echo "[llp_init_build] export SWUPDATE_PUBLIC_KEY=${SWUPDATE_PUBLIC_KEY}"
+    append_passthrough_var "SWUPDATE_PUBLIC_KEY"
+  fi
 else
-  echo "[llp_init_buid] Warning: signing support is not enabled, do not extend BB_ENV_PASSTHROUGH_ADDITIONS variable"
+  echo "[llp_init_build] Note: SWUpdate signing files not found in ${project_keys_path}"
 fi
 # quick fix add lpo variable LPO_DATASTATION_PRIVATEKEY
 if [[ -n "${LPO_DATASTATION_PRIVATEKEY}" ]] && [[ -f "${LPO_DATASTATION_PRIVATEKEY}" ]]; then
@@ -401,6 +436,20 @@ fi
 
 echo "[llp_init_build] export BB_ENV_PASSTHROUGH_ADDITIONS=${BB_ENV_PASSTHROUGH_ADDITIONS}"
 
+# Python 3.14 switched default multiprocessing start method on Linux to
+# 'forkserver'. Older BitBake hashserv code starts a process with a nested
+# function target, which breaks under forkserver/spawn due to pickling.
+bitbake_mp_start_method=""
+if command -v python3 >/dev/null 2>&1; then
+  bitbake_mp_start_method=$(python3 -c "import multiprocessing as mp; print(mp.get_start_method())" 2>/dev/null || true)
+fi
+disable_hashserve_compat=0
+if [[ "${bitbake_mp_start_method}" == "forkserver" ]] || [[ "${bitbake_mp_start_method}" == "spawn" ]]; then
+  disable_hashserve_compat=1
+  echo "[llp_init_build] Detected python multiprocessing start method '${bitbake_mp_start_method}'."
+  echo "[llp_init_build] Applying compatibility overrides: BB_HASHSERVE=\"\", BB_SIGNATURE_HANDLER=\"OEBasicHash\""
+fi
+
 # Prefer the Yocto HTTPS source mirror before upstream hosts (for example,
 # flaky SourceForge mirrors that may return truncated payloads).
 cat <<EOT >> "${project_root}/build/conf/local.conf"
@@ -408,7 +457,23 @@ cat <<EOT >> "${project_root}/build/conf/local.conf"
 # Yocto source mirror preference (HTTPS)
 INHERIT += "own-mirrors"
 SOURCE_MIRROR_URL = "https://downloads.yoctoproject.org/mirror/sources/"
+
+
+# new fix regonized on fedora-43
+# Disable connectivity check for development without full VPN
+CONNECTIVITY_CHECK_URIS = ""
+
 EOT
+
+if [[ "${disable_hashserve_compat}" = "1" ]]; then
+cat <<EOT >> "${project_root}/build/conf/local.conf"
+# Workaround for Python 3.14 multiprocessing default (forkserver/spawn)
+# with older BitBake hashserv implementation.
+BB_HASHSERVE = ""
+BB_SIGNATURE_HANDLER = "OEBasicHash"
+
+EOT
+fi
 
 if [ "${netboot_support}" = "1" ]; then
 cat <<EOT >> "${project_root}/build/conf/local.conf"

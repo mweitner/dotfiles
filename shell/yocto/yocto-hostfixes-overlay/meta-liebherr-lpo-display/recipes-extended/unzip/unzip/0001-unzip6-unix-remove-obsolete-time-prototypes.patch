@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: lpo build fix <noreply@example.com>
+Date: Thu, 26 Mar 2026 00:00:00 +0000
+Subject: [PATCH] unzip: remove obsolete gmtime/localtime redeclarations
+
+Upstream-Status: Inappropriate [toolchain-specific compatibility fix]
+
+Modern libc headers provide prototypes with typed arguments:
+- gmtime(const time_t *)
+- localtime(const time_t *)
+
+The legacy declaration in unix/unxcfg.h uses K&R-style empty argument
+lists, which now conflicts with the standard declarations and fails the
+build on newer toolchains.
+
+---
+ unix/unxcfg.h | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/unix/unxcfg.h b/unix/unxcfg.h
+index fa200ce..ccdb7d7 100644
+--- a/unix/unxcfg.h
++++ b/unix/unxcfg.h
+@@ -117,7 +117,6 @@
+ #  endif
+ #else
+ #  include <time.h>
+-   struct tm *gmtime(), *localtime();
+ #endif
+ 
+ #if (defined(BSD4_4) || (defined(SYSV) && defined(MODERN)))
+-- 
+2.43.0

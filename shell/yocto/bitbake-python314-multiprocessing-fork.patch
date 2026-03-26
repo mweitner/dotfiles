@@ -1,0 +1,81 @@
+diff --git a/bitbake/bin/bitbake b/bitbake/bin/bitbake
+index f494eaa132..379d826034 100755
+--- a/bitbake/bin/bitbake
++++ b/bitbake/bin/bitbake
+@@ -15,6 +15,16 @@ import sys
+ import warnings
+ warnings.simplefilter("default")
+ 
++# Python 3.14+ changed the default multiprocessing start method on Linux from
++# 'fork' to 'forkserver'.  BitBake uses nested functions and lambdas as process
++# targets, which are not picklable and break under forkserver/spawn.  Force
++# 'fork' (the previous default) before any BitBake module is imported so the
++# setting is inherited by every subprocess spawned by BitBake.
++if sys.platform.startswith('linux'):
++    import multiprocessing
++    if multiprocessing.get_start_method(allow_none=True) != 'fork':
++        multiprocessing.set_start_method('fork', force=True)
++
+ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                                 'lib'))
+ try:
+diff --git a/bitbake/bin/bitbake-server b/bitbake/bin/bitbake-server
+index 454a3919aa..0d41e534ad 100755
+--- a/bitbake/bin/bitbake-server
++++ b/bitbake/bin/bitbake-server
+@@ -10,6 +10,15 @@ import sys
+ import warnings
+ warnings.simplefilter("default")
+ import logging
++
++# Python 3.14+ changed the default multiprocessing start method on Linux from
++# 'fork' to 'forkserver'.  BitBake uses nested functions and lambdas as process
++# targets, which are not picklable and break under forkserver/spawn.  Force
++# 'fork' (the previous default) before any BitBake module is imported.
++if sys.platform.startswith('linux'):
++    import multiprocessing
++    if multiprocessing.get_start_method(allow_none=True) != 'fork':
++        multiprocessing.set_start_method('fork', force=True)
+ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(sys.argv[0])), 'lib'))
+ 
+ import bb
+diff --git a/bitbake/bin/bitbake-worker b/bitbake/bin/bitbake-worker
+index e8073f2ac3..f880dbe498 100755
+--- a/bitbake/bin/bitbake-worker
++++ b/bitbake/bin/bitbake-worker
+@@ -9,6 +9,16 @@ import os
+ import sys
+ import warnings
+ warnings.simplefilter("default")
++
++# Python 3.14+ changed the default multiprocessing start method on Linux from
++# 'fork' to 'forkserver'.  BitBake/OE worker task helpers use local classes as
++# process targets, which are not picklable and break under forkserver/spawn.
++# Force 'fork' (the previous default) before importing BitBake modules.
++if sys.platform.startswith('linux'):
++    import multiprocessing
++    if multiprocessing.get_start_method(allow_none=True) != 'fork':
++        multiprocessing.set_start_method('fork', force=True)
++
+ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(sys.argv[0])), 'lib'))
+ from bb import fetch2
+ import logging
+diff --git a/bitbake/lib/bb/main.py b/bitbake/lib/bb/main.py
+index bca8ebfa09..466ca9f0c8 100755
+--- a/bitbake/lib/bb/main.py
++++ b/bitbake/lib/bb/main.py
+@@ -352,6 +352,14 @@ class BitBakeConfigParameters(cookerdata.ConfigParameters):
+ 
+ def bitbake_main(configParams, configuration):
+ 
++    # Python 3.14+ changed the default multiprocessing start method on Linux
++    # from 'fork' to 'forkserver'. BitBake uses nested/lambda function targets
++    # that are not picklable, so forkserver/spawn both fail.  Force 'fork' which
++    # was the previous default and is safe inside the BitBake process tree.
++    import multiprocessing
++    if sys.platform.startswith('linux') and multiprocessing.get_start_method(allow_none=True) != 'fork':
++        multiprocessing.set_start_method('fork', force=True)
++
+     # Python multiprocessing requires /dev/shm on Linux
+     if sys.platform.startswith('linux') and not os.access('/dev/shm', os.W_OK | os.X_OK):
+         raise BBMainException("FATAL: /dev/shm does not exist or is not writable")
