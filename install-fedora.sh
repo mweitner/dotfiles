@@ -305,10 +305,16 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   # Modern CLI tools
   sudo dnf install -y ripgrep fd-find fzf zoxide htop btop repo
 
+  # Git hooks framework (used by many Python/CI repos)
+  sudo dnf install -y pre-commit
+
   # Yocto host build tools that are commonly missed on minimal Fedora installs
   sudo dnf install -y \
     gawk diffstat chrpath rpcgen texinfo socat \
     perl perl-Data-Dumper perl-Thread-Queue perl-Text-ParseWords
+
+  # Development languages (Go, etc.)
+  sudo dnf install -y golang
 
   # NAS/SMB client tools
   sudo dnf install -y cifs-utils
@@ -437,6 +443,13 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/yocto/yocto-prefetch-source" ]] && ln -sf "$DOTFILES/shell/yocto/yocto-prefetch-source" "$HOME/.local/bin/yocto-prefetch-source"
   [[ -f "$DOTFILES/shell/yocto/yocto-prefetch-recipe-source" ]] && ln -sf "$DOTFILES/shell/yocto/yocto-prefetch-recipe-source" "$HOME/.local/bin/yocto-prefetch-recipe-source"
   [[ -f "$DOTFILES/shell/yocto/lpo-build" ]] && ln -sf "$DOTFILES/shell/yocto/lpo-build" "$HOME/.local/bin/lpo-build"
+  [[ -f "$DOTFILES/shell/yocto/llp_lpo_docker_shell.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_lpo_docker_shell.sh" "$HOME/.local/bin/llp_lpo_docker_shell.sh"
+  [[ -f "$DOTFILES/shell/yocto/llp_apply_hostfixes.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_apply_hostfixes.sh" "$HOME/.local/bin/llp_apply_hostfixes.sh"
+  [[ -f "$DOTFILES/shell/setup-docker-fedora-native.sh" ]] && ln -sf "$DOTFILES/shell/setup-docker-fedora-native.sh" "$HOME/.local/bin/setup-docker-fedora-native"
+
+  # Pre-commit helpers (for managing Git hooks + SSL certificate issues with go.dev)
+  [[ -f "$DOTFILES/shell/pre-commit/setup-pre-commit.sh" ]] && ln -sf "$DOTFILES/shell/pre-commit/setup-pre-commit.sh" "$HOME/.local/bin/setup-pre-commit"
+  [[ -f "$DOTFILES/shell/pre-commit/pre-commit-helper.sh" ]] && ln -sf "$DOTFILES/shell/pre-commit/pre-commit-helper.sh" "$HOME/.local/bin/pre-commit-helper"
 
   # Yocto key secrets exposed at /opt/yocto/keys/<project>
   setup_yocto_key_links
@@ -684,6 +697,28 @@ EOF
   else
     echo "INFO: Docker setup skipped (--skip-docker)."
   fi
+
+  echo ""
+  echo "── Phase 3k: Pre-commit Git hooks management ───────────────────────────"
+  echo "INFO: pre-commit package installed; helpers available:"
+  echo "      setup-pre-commit        Set up pre-commit hooks (run once per repo)"
+  echo "      pre-commit-helper       Manage commits with hook fallback"
+  echo ""
+  echo "⚠️  Pre-commit may fail with Python 3.14 SSL certificate errors when"
+  echo "    downloading runtimes (for example nodejs.org or go.dev)."
+  echo "    This is a known Python 3.14 SSL module bug, not a network issue."
+  echo ""
+  echo "Quick start in a repo with .pre-commit-config.yaml:"
+  echo "  1. setup-pre-commit          # Set up hooks + pre-cache environments"
+  echo "  2. git commit -m 'msg'       # Normal commits (hooks enabled)"
+  echo "  3. pre-commit-helper --run   # Run checks manually if needed"
+  echo ""
+  echo "If SSL errors occur during commit:"
+  echo "  git commit -m 'msg' --no-verify              # Bypass hooks for now"
+  echo "  pre-commit-helper --fix-config               # Patch node/golang to system"
+  echo "  setup-pre-commit                             # Re-run setup + pre-cache hooks"
+  echo ""
+  echo "See $DOTFILES/docs/doc-engine/source/shell/pre-commit/ssl-certificate-issue.md for details."
 fi
 
 # ── Phase 4: Yocto shared directory ───────────────────────────────────────────

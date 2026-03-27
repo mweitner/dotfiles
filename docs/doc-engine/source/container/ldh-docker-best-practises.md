@@ -60,6 +60,25 @@ I am using native docker installation to prevent the snap more isolated installa
 
 For Fedora development hosts, use native Docker CE packages and avoid mixed runtimes.
 
+### Integrated with install-fedora.sh
+
+Docker setup is integrated into `install-fedora.sh` (service phase), using:
+
+* `shell/setup-docker-fedora-native.sh --apply-daemon-config` (default)
+
+Useful installer flags:
+
+* `--skip-docker` to skip Docker setup entirely
+* `--skip-docker-daemon-config` to install Docker but keep existing `/etc/docker/daemon.json`
+
+Examples:
+
+```bash
+bash install-fedora.sh
+bash install-fedora.sh --skip-docker
+bash install-fedora.sh --skip-docker-daemon-config
+```
+
 Quick setup from dotfiles:
 
 ```bash

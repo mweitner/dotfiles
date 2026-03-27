@@ -56,3 +56,4 @@ Then log out and log in again.
 1. `docs/doc-engine/source/shell/ldh - Shell/Shell - fish.md`
 2. `docs/doc-engine/source/window-manager/sway/take-screenshot.md`
 3. `docs/doc-engine/source/window-manager/sway/diff.md`
+4. `docs/doc-engine/source/shell/pre-commit/ssl-certificate-issue.md`
