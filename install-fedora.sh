@@ -263,7 +263,7 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   echo ""
   echo "── Phase 1: Installing packages ─────────────────────────────────────────"
   sudo dnf install -y \
-    bash-completion curl wget git pciutils usbutils xdg-utils \
+    bash-completion curl wget git git-filter-repo pciutils usbutils xdg-utils \
     NetworkManager NetworkManager-tui iwd
 
   # NM GUI tools naming differs by Fedora release. Prefer legacy meta package,
