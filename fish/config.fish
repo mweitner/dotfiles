@@ -76,6 +76,20 @@ function compress --description 'Create tar.gz archive from a directory'
     tar cvzf "$argv[1].tar.gz" "$argv[1]"
 end
 
+function zipdir --description 'Create a .zip archive from a directory (Windows-friendly)'
+    if test -z "$argv[1]"
+        echo "usage: zipdir <directory>"
+        return 1
+    end
+
+    if not test -d "$argv[1]"
+        echo "error: directory not found: $argv[1]"
+        return 1
+    end
+
+    command zip -r "$argv[1].zip" "$argv[1]"
+end
+
 function wikipedia --description 'Search Wikipedia in qutebrowser'
     qutebrowser "https://en.wikipedia.org/wiki?search=$argv"
 end

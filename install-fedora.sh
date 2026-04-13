@@ -8,7 +8,7 @@ set -euo pipefail
 # Hardware target:    HP ZBook Power G11 (HiDPI, Wayland/Sway)
 #
 # Usage:
-#   bash install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--skip-docker] [--skip-docker-daemon-config] [--with-ssh-secrets] [--with-netrc-secrets]
+#   bash install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--skip-docker] [--skip-docker-daemon-config] [--skip-dev] [--with-ssh-secrets] [--with-netrc-secrets]
 #
 # Idempotent: safe to re-run.  All symlinks use -sf (force/overwrite).
 #
@@ -20,6 +20,7 @@ WITH_SSH_SECRETS=false
 WITH_NETRC_SECRETS=false
 SKIP_DOCKER=false
 SKIP_DOCKER_DAEMON_CONFIG=false
+SKIP_DEV=false
 
 for arg in "$@"; do
   case $arg in
@@ -28,6 +29,7 @@ for arg in "$@"; do
     --skip-services) SKIP_SERVICES=true ;;
     --skip-docker) SKIP_DOCKER=true ;;
     --skip-docker-daemon-config) SKIP_DOCKER_DAEMON_CONFIG=true ;;
+    --skip-dev) SKIP_DEV=true ;;
     --with-ssh-secrets) WITH_SSH_SECRETS=true ;;
     --with-netrc-secrets) WITH_NETRC_SECRETS=true ;;
   esac
@@ -287,11 +289,8 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   # ImageMagick provides both magick and convert used by lock.sh blur step
   sudo dnf install -y grim slurp ImageMagick
 
-  # Diff tooling
-  sudo dnf install -y \
-    git-delta \
-    meld \
-    neovim
+  # Graphics editor
+  sudo dnf install -y gimp
 
   # Audio mixer (PipeWire-compatible via pipewire-pulseaudio)
   sudo dnf install -y pavucontrol
@@ -305,16 +304,8 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   # Modern CLI tools
   sudo dnf install -y ripgrep fd-find fzf zoxide htop btop repo
 
-  # Git hooks framework (used by many Python/CI repos)
-  sudo dnf install -y pre-commit
-
-  # Yocto host build tools that are commonly missed on minimal Fedora installs
-  sudo dnf install -y \
-    gawk diffstat chrpath rpcgen texinfo socat \
-    perl perl-Data-Dumper perl-Thread-Queue perl-Text-ParseWords
-
-  # Development languages (Go, etc.)
-  sudo dnf install -y golang
+  # Cross-platform archive tooling (Windows-compatible .zip exchange)
+  sudo dnf install -y zip unzip
 
   # NAS/SMB client tools
   sudo dnf install -y cifs-utils
@@ -352,6 +343,20 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
 
   # Thunderbolt device manager — auto-authorizes docks (Dell WD19TB needs this for USB)
   sudo dnf install -y bolt
+
+  # ── Dev tooling (editors, languages, Yocto, VS Code) ─────────────────────────
+  # Extracted to install-fedora-dev.sh for independent version pinning and upgrades.
+  if [[ "$SKIP_DEV" == false ]]; then
+    DEV_SCRIPT="$DOTFILES/install-fedora-dev.sh"
+    if [[ -f "$DEV_SCRIPT" ]]; then
+      bash "$DEV_SCRIPT"
+    else
+      echo "WARN: $DEV_SCRIPT not found; skipping dev tools."
+      echo "      Run manually: bash install-fedora-dev.sh"
+    fi
+  else
+    echo "INFO: Dev tools skipped (--skip-dev). Run manually: bash install-fedora-dev.sh"
+  fi
 
   echo "==> Packages installed."
 fi
@@ -465,6 +470,11 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   ln -sf "$DOTFILES/zsh/aliases" "$XDG_CONFIG_HOME/zsh/aliases"
   rm -rf "$XDG_CONFIG_HOME/zsh/external"
   ln -sf "$DOTFILES/zsh/external" "$XDG_CONFIG_HOME/zsh/external"
+
+  # bash shell
+  [[ -f "$DOTFILES/bash/.bashrc" ]] && ln -sf "$DOTFILES/bash/.bashrc" "$HOME/.bashrc"
+  [[ -f "$DOTFILES/bash/.bash_profile" ]] && ln -sf "$DOTFILES/bash/.bash_profile" "$HOME/.bash_profile"
+  [[ -f "$DOTFILES/bash/.bash_aliases" ]] && ln -sf "$DOTFILES/bash/.bash_aliases" "$HOME/.bash_aliases"
 
   # git
   mkdir -p "$XDG_CONFIG_HOME/git"
