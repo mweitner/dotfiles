@@ -311,6 +311,55 @@ Shorthand (if set up as remote):
 git clone ugreen-nas:repos/project-name.git
 ```
 
+### Troubleshooting: Dubious Ownership Error
+
+**Problem**: Fetching from a moved repo on NAS fails with:
+
+```
+fatal: detected dubious ownership in repository at '/volume1/data/repos/ad-lpo.git'
+```
+
+**Root cause**: The repo was moved/created with different ownership than the NAS user (`michael`).
+
+**Solution 1 (Recommended): Fix ownership on NAS**
+
+SSH into the NAS and fix the repo ownership:
+
+```bash
+ssh ugreen-nas
+sudo chown -R michael:michael /volume1/data/repos/ad-lpo.git
+exit
+```
+
+Then retry:
+
+```bash
+git fetch nas-storage --prune
+```
+
+**Solution 2 (Temporary): Add safe.directory exception**
+
+If you don't have NAS sudo access or prefer a quick workaround:
+
+```bash
+git config --global --add safe.directory /volume1/data/repos/ad-lpo.git
+```
+
+Then retry:
+
+```bash
+git fetch nas-storage --prune
+```
+
+**Best practice**: When migrating repos to NAS, ensure they're owned by the NAS user:
+
+```bash
+# Before pushing, create fresh repo on NAS with correct ownership
+setup-nas-git-repo project-name
+git remote add nas-storage ssh://ugreen-nas/volume1/data/repos/project-name.git
+git push -u nas-storage main
+```
+
 ---
 
 ## Manual fstab Entry (Reference)
@@ -347,6 +396,9 @@ ls /mnt/data
 - mount hangs on one site
   - verify NAS is reachable in current network (`ping 192.168.1.110` or `ping 192.168.3.91`)
   - check `/etc/hosts` managed block from the helper script
+
+- git: `fatal: detected dubious ownership in repository`
+  - see [Troubleshooting: Dubious Ownership Error](#troubleshooting-dubious-ownership-error) in Git Repository Management
 
 - verify automount state
 

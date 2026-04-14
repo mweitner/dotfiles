@@ -287,7 +287,8 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   # Screenshot tooling
   # requires sway stack packages wl-clipboard libnotify
   # ImageMagick provides both magick and convert used by lock.sh blur step
-  sudo dnf install -y grim slurp ImageMagick
+  # zenity provides GTK file-save dialog for the save-as screenshot variants
+  sudo dnf install -y grim slurp ImageMagick zenity
 
   # Graphics editor
   sudo dnf install -y gimp
@@ -448,7 +449,9 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/yocto/yocto-prefetch-source" ]] && ln -sf "$DOTFILES/shell/yocto/yocto-prefetch-source" "$HOME/.local/bin/yocto-prefetch-source"
   [[ -f "$DOTFILES/shell/yocto/yocto-prefetch-recipe-source" ]] && ln -sf "$DOTFILES/shell/yocto/yocto-prefetch-recipe-source" "$HOME/.local/bin/yocto-prefetch-recipe-source"
   [[ -f "$DOTFILES/shell/yocto/lpo-build" ]] && ln -sf "$DOTFILES/shell/yocto/lpo-build" "$HOME/.local/bin/lpo-build"
-  [[ -f "$DOTFILES/shell/yocto/llp_lpo_docker_shell.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_lpo_docker_shell.sh" "$HOME/.local/bin/llp_lpo_docker_shell.sh"
+  [[ -f "$DOTFILES/shell/yocto/llp_docker_shell.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_docker_shell.sh" "$HOME/.local/bin/llp_docker_shell.sh"
+  # Backward compatibility symlink
+  [[ -f "$DOTFILES/shell/yocto/llp_docker_shell.sh" ]] && ln -sf "$HOME/.local/bin/llp_docker_shell.sh" "$HOME/.local/bin/llp_lpo_docker_shell.sh" 2>/dev/null || true
   [[ -f "$DOTFILES/shell/yocto/llp_apply_hostfixes.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_apply_hostfixes.sh" "$HOME/.local/bin/llp_apply_hostfixes.sh"
   [[ -f "$DOTFILES/shell/setup-docker-fedora-native.sh" ]] && ln -sf "$DOTFILES/shell/setup-docker-fedora-native.sh" "$HOME/.local/bin/setup-docker-fedora-native"
 

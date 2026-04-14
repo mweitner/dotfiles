@@ -4,19 +4,22 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  llp_lpo_docker_shell.sh [options]
+  llp_docker_shell.sh [options]
 
-Launch the LLP Yocto build container for linux-lpo via:
-  layers/liebherr/ci/docker-compose.yml
+Launch a Yocto build container via docker-compose.yml in the workspace.
+
+Supports any Liebherr Yocto project (linux-lpo, linux-dps, etc.) via --project and --project-keys flags.
 
 Options:
-  --workdir <path>                  Yocto project root (default: ~/lpo-dev/linux-lpo)
+  --workdir <path>                  Yocto project root (default: auto-detect from pwd,
+                                    fallback to ~/lpo-dev/linux-lpo)
   --project <name>                  PROJECT env value (default: linux-lpo)
   --project-keys <name>             PROJECT_KEYS env value (default: lpo)
   --swupdate-password-file <path>   SWUPDATE_PASSWORD_FILE (default: /opt/yocto/keys/<project-keys>/swupdate-password.txt)
   --sota-auth-token <token>         SOTA_AUTH_TOKEN value (default: from environment)
   --templateconf <path>             TEMPLATECONF path in container
-                                    (default: /opt/yocto/workspace/layers/meta-liebherr-lpo-display/conf/templates/default)
+                                    (default: auto-detect from project-specific meta layers,
+                                     fallback to meta-liebherr-lpo-display or poky)
   --docker-build-dir <path>         Host build dir target for /opt/yocto/build/<project> symlink
                                     (default: <workdir>/build-docker)
   --no-build-symlink                Do not manage /opt/yocto/build/<project> symlink
@@ -35,18 +38,34 @@ Environment:
   SOTA_AUTH_TOKEN can be provided via environment instead of CLI.
 
 Examples:
-  llp_lpo_docker_shell.sh
-  llp_lpo_docker_shell.sh --print-only
-  llp_lpo_docker_shell.sh --sota-auth-token "$SOTA_AUTH_TOKEN"
+  llp_docker_shell.sh --project linux-lpo --project-keys lpo
+  llp_docker_shell.sh --project linux-dps --project-keys dps
+  llp_docker_shell.sh --project linux-dps --project-keys dps --print-only
+  llp_docker_shell.sh --project linux-lpo --project-keys lpo --sota-auth-token "$SOTA_AUTH_TOKEN"
 EOF
 }
 
-WORKDIR="${WORKDIR:-$HOME/lpo-dev/linux-lpo}"
+# Auto-detect workspace root from current directory if not specified
+auto_detect_workdir() {
+  local cwd="$PWD"
+  while [[ "$cwd" != "/" ]]; do
+    if [[ -f "$cwd/layers/liebherr/ci/docker-compose.yml" ]]; then
+      echo "$cwd"
+      return 0
+    fi
+    cwd="$(dirname "$cwd")"
+  done
+  # Fallback to linux-lpo default if not found
+  echo "$HOME/lpo-dev/linux-lpo"
+}
+
+WORKDIR="${WORKDIR:-$(auto_detect_workdir)}"
 PROJECT="${PROJECT:-linux-lpo}"
 PROJECT_KEYS="${PROJECT_KEYS:-lpo}"
 SWUPDATE_PASSWORD_FILE=""
 SOTA_AUTH_TOKEN="${SOTA_AUTH_TOKEN:-}"
-TEMPLATECONF="${TEMPLATECONF:-/opt/yocto/workspace/layers/meta-liebherr-lpo-display/conf/templates/default}"
+# TEMPLATECONF will be auto-detected later based on available meta layers
+TEMPLATECONF="${TEMPLATECONF:-}"
 DOCKER_BUILD_DIR=""
 MANAGE_BUILD_SYMLINK=1
 NETRC_FILE="${NETRC_FILE:-$HOME/.netrc}"
@@ -149,13 +168,43 @@ if [[ -z "${DOCKER_BUILD_DIR}" ]]; then
   DOCKER_BUILD_DIR="${WORKDIR}/build-docker"
 fi
 
-# Normalize TEMPLATECONF for Yocto templates layout.
-# oe-init-build-env expects: meta-<layer>/conf/templates/<template-name>
-if [[ "${TEMPLATECONF}" == */conf ]]; then
-  guessed_templateconf="${TEMPLATECONF}/templates/default"
-  echo "Info: TEMPLATECONF points to .../conf; using ${guessed_templateconf}"
-  TEMPLATECONF="${guessed_templateconf}"
-fi
+ # Auto-detect TEMPLATECONF based on project and available meta layers
+ if [[ -z "${TEMPLATECONF}" ]]; then
+   # Try project-specific naming first
+   if [[ "${PROJECT}" == "linux-dps" ]]; then
+     # Kirkstone (linux-dps) uses old-style templates directly in /conf (no /conf/templates/ subdir)
+     if [[ -f "${WORKDIR}/layers/meta-liebherr-dps/conf/bblayers.conf.sample" ]]; then
+       TEMPLATECONF="/opt/yocto/workspace/layers/meta-liebherr-dps/conf"
+     else
+       # Fall back to generic default
+       TEMPLATECONF="/opt/yocto/workspace/layers/poky/meta-poky/conf/templates/default"
+     fi
+   elif [[ "${PROJECT}" == "linux-lpo" ]]; then
+     # Scarthgap (linux-lpo) uses newer-style templates in /conf/templates/
+     TEMPLATECONF="/opt/yocto/workspace/layers/meta-liebherr-lpo-display/conf/templates/default"
+   else
+     # Generic fallback for unknown projects
+     TEMPLATECONF="/opt/yocto/workspace/layers/poky/meta-poky/conf/templates/default"
+   fi
+ fi
+
+ # Normalize TEMPLATECONF for Yocto templates layout only if the auto-detected path requires it.
+ # For kirkstone: /conf is the template directory itself (old-style, .sample files)
+ # For scarthgap+: /conf/templates/default is the template directory (new-style)
+ # Only normalize if path ends with /conf AND contains no templates/ subdirectory.
+ if [[ "${TEMPLATECONF}" == */conf ]] && [[ ! "${TEMPLATECONF}" =~ /templates/ ]]; then
+   # Check if this looks like an old-style (kirkstone) template directory
+   if [[ -f "${WORKDIR}/layers/meta-liebherr-dps/conf/bblayers.conf.sample" && \
+         "${TEMPLATECONF}" == */meta-liebherr-dps/conf ]]; then
+     # Old kirkstone style: keep /conf as-is
+     :
+   else
+     # New style: assume /conf needs /templates/default appended
+     guessed_templateconf="${TEMPLATECONF}/templates/default"
+     echo "Info: TEMPLATECONF points to .../conf; using ${guessed_templateconf}"
+     TEMPLATECONF="${guessed_templateconf}"
+   fi
+ fi
 
 COMPOSE_FILE="${WORKDIR}/layers/liebherr/ci/docker-compose.yml"
 if [[ ! -f "${COMPOSE_FILE}" ]]; then

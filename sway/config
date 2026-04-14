@@ -78,9 +78,12 @@ bindsym $mod+Shift+q kill
 # Use wofi as launcher (Wayland-native)
 bindsym $mod+d exec wofi --show run
 
-# Screenshots
-bindsym Print exec ~/.config/sway/scripts/grimshot.sh full
-bindsym $mod+Print exec ~/.config/sway/scripts/grimshot.sh region
+# Screenshots — quick save to ~/pictures/screenshots + clipboard
+bindsym $mod+Shift+s exec ~/.config/sway/scripts/grimshot.sh region
+bindsym $mod+Ctrl+s exec ~/.config/sway/scripts/grimshot.sh full
+# Screenshots — pick save location via file dialog
+bindsym $mod+Mod1+s exec ~/.config/sway/scripts/grimshot.sh region-save-as
+bindsym $mod+Mod1+Ctrl+s exec ~/.config/sway/scripts/grimshot.sh full-save-as
 
 # change focus within workspace (using arrow keys)
 bindsym $mod+Left focus left
@@ -128,9 +131,7 @@ bindsym $mod+space focus mode_toggle
 
 # inspired by freebsd forum about sticky floating window
 # when switching workspace (container)
-# typically use $mod+Shift+s is already reserved for
-# my 1password floating window to remember s like security
-# instead using g for glue ;-)
+# using g for glue ;-)
 bindsym $mod+Shift+g sticky toggle
 
 # focus the parent container
@@ -389,7 +390,8 @@ for_window [app_id="(?i).*1password.*"] floating enable
 for_window [app_id="(?i).*1password.*"] mark scratchpad-1password
 for_window [app_id="(?i).*1password.*"] move scratchpad
 for_window [app_id="(?i).*1password.*"] border none
-bindsym $mod+Shift+s exec --no-startup-id $HOME/.config/sway/scripts/toggle-scratchpad-1password.sh
+# $mod+Ctrl+p -> p like password
+bindsym $mod+Ctrl+p exec --no-startup-id $HOME/.config/sway/scripts/toggle-scratchpad-1password.sh
 
 # move floating windows with keys
 # inspired by faq.i3wm.org 4615 how-can-i-move-a-floating-with-keys
