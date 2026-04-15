@@ -35,6 +35,33 @@ echo "── Dev: Git hooks ─────────────────�
 sudo dnf install -y pre-commit
 
 echo ""
+echo "── Dev: SCM CLI tooling ────────────────────────────────────────────────"
+sudo dnf install -y gh
+
+echo ""
+echo "── Dev: 1Password app + CLI ────────────────────────────────────────────"
+if sudo rpm --import https://downloads.1password.com/linux/keys/1password.asc; then
+  sudo tee /etc/yum.repos.d/1password.repo >/dev/null <<'REPOEOF'
+[1password]
+name=1Password Stable Channel
+baseurl=https://downloads.1password.com/linux/rpm/stable/$basearch
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://downloads.1password.com/linux/keys/1password.asc
+REPOEOF
+
+  if sudo dnf install -y 1password 1password-cli; then
+    echo "==> 1Password desktop app and CLI installed."
+  else
+    echo "WARN: Could not install 1password packages from official repo."
+    echo "      Verify network/CA access and rerun install-fedora-dev.sh."
+  fi
+else
+  echo "WARN: Could not import 1Password GPG key; skipping 1Password package installation."
+fi
+
+echo ""
 echo "── Dev: Yocto host build dependencies ──────────────────────────────────"
 # Tools commonly absent on minimal Fedora installs that Yocto requires at build time.
 sudo dnf install -y \

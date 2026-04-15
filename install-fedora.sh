@@ -8,7 +8,7 @@ set -euo pipefail
 # Hardware target:    HP ZBook Power G11 (HiDPI, Wayland/Sway)
 #
 # Usage:
-#   bash install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--skip-docker] [--skip-docker-daemon-config] [--skip-dev] [--with-ssh-secrets] [--with-netrc-secrets]
+#   bash install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--skip-docker] [--skip-docker-daemon-config] [--skip-dev] [--with-ssh-secrets] [--with-netrc-secrets] [--with-1password-ssh-agent]
 #
 # Idempotent: safe to re-run.  All symlinks use -sf (force/overwrite).
 #
@@ -18,6 +18,7 @@ SKIP_SYMLINKS=false
 SKIP_SERVICES=false
 WITH_SSH_SECRETS=false
 WITH_NETRC_SECRETS=false
+WITH_1PASSWORD_SSH_AGENT=false
 SKIP_DOCKER=false
 SKIP_DOCKER_DAEMON_CONFIG=false
 SKIP_DEV=false
@@ -32,6 +33,7 @@ for arg in "$@"; do
     --skip-dev) SKIP_DEV=true ;;
     --with-ssh-secrets) WITH_SSH_SECRETS=true ;;
     --with-netrc-secrets) WITH_NETRC_SECRETS=true ;;
+    --with-1password-ssh-agent) WITH_1PASSWORD_SSH_AGENT=true ;;
   esac
 done
 
@@ -443,6 +445,7 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/setup-nas-ssh-key" ]] && ln -sf "$DOTFILES/shell/setup-nas-ssh-key" "$HOME/.local/bin/setup-nas-ssh-key"
   [[ -f "$DOTFILES/shell/setup-nas-ca-certificates" ]] && ln -sf "$DOTFILES/shell/setup-nas-ca-certificates" "$HOME/.local/bin/setup-nas-ca-certificates"
   [[ -f "$DOTFILES/shell/setup-nas-git-repo" ]] && ln -sf "$DOTFILES/shell/setup-nas-git-repo" "$HOME/.local/bin/setup-nas-git-repo"
+  [[ -f "$DOTFILES/shell/setup-1password-ssh-agent" ]] && ln -sf "$DOTFILES/shell/setup-1password-ssh-agent" "$HOME/.local/bin/setup-1password-ssh-agent"
   [[ -f "$DOTFILES/shell/yocto/llp_init_build.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_init_build.sh" "$HOME/.local/bin/llp_init_build.sh"
   [[ -f "$DOTFILES/shell/yocto/setup-yocto-project" ]] && ln -sf "$DOTFILES/shell/yocto/setup-yocto-project" "$HOME/.local/bin/setup-yocto-project"
   [[ -f "$DOTFILES/shell/yocto/llp_yocto_wrapper.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_yocto_wrapper.sh" "$HOME/.local/bin/llp-yocto-build"
@@ -671,6 +674,20 @@ EOF
   else
     echo "INFO: SSH profile install skipped (opt-in)."
     echo "      Re-run with --with-ssh-secrets to install from .secrets/ssh/dev-pc/.ssh"
+  fi
+
+  echo ""
+  echo "── Phase 3g1: 1Password SSH agent integration ───────────────────────────"
+  if [[ "$WITH_1PASSWORD_SSH_AGENT" == true ]]; then
+    if [[ -x "$DOTFILES/shell/setup-1password-ssh-agent" ]]; then
+      "$DOTFILES/shell/setup-1password-ssh-agent"
+    else
+      echo "WARN: missing executable $DOTFILES/shell/setup-1password-ssh-agent"
+      echo "      Ensure dotfiles are up to date and executable bit is set."
+    fi
+  else
+    echo "INFO: 1Password SSH agent setup skipped (opt-in)."
+    echo "      Re-run with --with-1password-ssh-agent to configure ~/.ssh/config"
   fi
 
   echo ""
