@@ -22,7 +22,15 @@ Options:
                                      fallback to meta-liebherr-lpo-display or poky)
   --docker-build-dir <path>         Host build dir target for /opt/yocto/build/<project> symlink
                                     (default: <workdir>/build-docker)
+  --keep-conf                       Keep existing <docker-build-dir>/conf (skip template reset)
   --no-build-symlink                Do not manage /opt/yocto/build/<project> symlink
+  --local-conf-append-file <path>   Host file appended to conf/local.conf after oe-init-build-env
+                                    (default: <workdir>/.local-conf/local.conf.append)
+  --no-local-conf-append            Disable local.conf append injection
+  --llpnetboot                      Enable netboot_support local.conf injection (separate from general append)
+  --netboot-append-file <path>      Host file appended for netboot_support
+                                    (default: <workdir>/.local-conf/local.conf.netboot.append)
+  --no-netboot-append               Disable netboot_support injection
   --netrc-file <path>               Host .netrc to mount as /home/yocto/.netrc (default: ~/.netrc)
   --no-netrc                        Do not mount .netrc into container
   --service <name>                  Compose service (default: liebherr-linux-build-container)
@@ -68,6 +76,12 @@ SOTA_AUTH_TOKEN="${SOTA_AUTH_TOKEN:-}"
 TEMPLATECONF="${TEMPLATECONF:-}"
 DOCKER_BUILD_DIR=""
 MANAGE_BUILD_SYMLINK=1
+RESET_CONF=1
+LOCAL_CONF_APPEND_FILE=""
+ENABLE_LOCAL_CONF_APPEND=1
+NETBOOT_SUPPORT=0
+NETBOOT_APPEND_FILE=""
+ENABLE_NETBOOT_APPEND=1
 NETRC_FILE="${NETRC_FILE:-$HOME/.netrc}"
 ENABLE_NETRC=1
 SERVICE="liebherr-linux-build-container"
@@ -108,8 +122,32 @@ while [[ $# -gt 0 ]]; do
       DOCKER_BUILD_DIR="${2:-}"
       shift 2
       ;;
+    --keep-conf)
+      RESET_CONF=0
+      shift
+      ;;
     --no-build-symlink)
       MANAGE_BUILD_SYMLINK=0
+      shift
+      ;;
+    --local-conf-append-file)
+      LOCAL_CONF_APPEND_FILE="${2:-}"
+      shift 2
+      ;;
+    --no-local-conf-append)
+      ENABLE_LOCAL_CONF_APPEND=0
+      shift
+      ;;
+    --llpnetboot)
+      NETBOOT_SUPPORT=1
+      shift
+      ;;
+    --netboot-append-file)
+      NETBOOT_APPEND_FILE="${2:-}"
+      shift 2
+      ;;
+    --no-netboot-append)
+      ENABLE_NETBOOT_APPEND=0
       shift
       ;;
     --netrc-file)
@@ -166,6 +204,14 @@ fi
 
 if [[ -z "${DOCKER_BUILD_DIR}" ]]; then
   DOCKER_BUILD_DIR="${WORKDIR}/build-docker"
+fi
+
+if [[ -z "${LOCAL_CONF_APPEND_FILE}" ]]; then
+  LOCAL_CONF_APPEND_FILE="${WORKDIR}/.local-conf/local.conf.append"
+fi
+
+if [[ -z "${NETBOOT_APPEND_FILE}" ]]; then
+  NETBOOT_APPEND_FILE="${WORKDIR}/.local-conf/local.conf.netboot.append"
 fi
 
  # Auto-detect TEMPLATECONF based on project and available meta layers
@@ -255,65 +301,82 @@ if [[ ${ENABLE_NETRC} -eq 1 ]]; then
   fi
 fi
 
-# Preflight: ensure host-side /opt/yocto/build directory has correct ownership/permissions
-# so container user (yocto, uid 1000) can write to mounted volumes.
-if [[ -d "/opt/yocto/build" ]]; then
-  build_owner=$(stat -c '%U:%G' /opt/yocto/build 2>/dev/null || echo "unknown")
-  build_perms=$(stat -c '%a' /opt/yocto/build 2>/dev/null || echo "unknown")
-  if [[ "$build_owner" != "$USER:$USER" ]] || [[ "$build_perms" != "775" ]]; then
-    echo "Preflight: fixing host /opt/yocto/build ownership and permissions..."
-    sudo chown -R "$USER:$USER" /opt/yocto/build 2>/dev/null || true
-    sudo chmod -R 775 /opt/yocto/build 2>/dev/null || true
-  fi
-fi
-
-if [[ ${MANAGE_BUILD_SYMLINK} -eq 1 ]]; then
-  build_link="/opt/yocto/build/${PROJECT}"
-  mkdir -p "$(dirname "${DOCKER_BUILD_DIR}")"
-  mkdir -p "${DOCKER_BUILD_DIR}"
-
-  # Normalize legacy migration layout:
-  # /opt/yocto/build/<project> -> <workdir>/build-docker/
-  # with all artifacts accidentally under <workdir>/build-docker/<project>/...
-  nested_project_dir="${DOCKER_BUILD_DIR}/${PROJECT}"
-  if [[ -d "${nested_project_dir}" ]] && [[ ! -e "${DOCKER_BUILD_DIR}/conf" ]] && [[ ! -e "${DOCKER_BUILD_DIR}/tmp" ]]; then
-    # Flatten only if the docker build dir contains no other entries besides the nested project dir.
-    if [[ -z "$(find "${DOCKER_BUILD_DIR}" -mindepth 1 -maxdepth 1 ! -name "${PROJECT}" -print -quit 2>/dev/null)" ]]; then
-      shopt -s dotglob nullglob
-      mv "${nested_project_dir}"/* "${DOCKER_BUILD_DIR}/" 2>/dev/null || true
-      shopt -u dotglob nullglob
-      rmdir "${nested_project_dir}" 2>/dev/null || true
-      echo "Preflight: flattened legacy ${nested_project_dir} into ${DOCKER_BUILD_DIR}"
+# Skip all mutating preflight operations in print-only mode.
+if [[ ${PRINT_ONLY} -ne 1 ]]; then
+  # Preflight: ensure host-side /opt/yocto/build directory has correct ownership/permissions
+  # so container user (yocto, uid 1000) can write to mounted volumes.
+  if [[ -d "/opt/yocto/build" ]]; then
+    build_owner=$(stat -c '%U:%G' /opt/yocto/build 2>/dev/null || echo "unknown")
+    build_perms=$(stat -c '%a' /opt/yocto/build 2>/dev/null || echo "unknown")
+    if [[ "$build_owner" != "$USER:$USER" ]] || [[ "$build_perms" != "775" ]]; then
+      echo "Preflight: fixing host /opt/yocto/build ownership and permissions..."
+      sudo chown -R "$USER:$USER" /opt/yocto/build 2>/dev/null || true
+      sudo chmod -R 775 /opt/yocto/build 2>/dev/null || true
     fi
   fi
 
-  if [[ -L "${build_link}" ]]; then
-    current_target="$(readlink -f "${build_link}" 2>/dev/null || true)"
-    wanted_target="$(readlink -f "${DOCKER_BUILD_DIR}" 2>/dev/null || true)"
-    if [[ -n "${wanted_target}" ]] && [[ "${current_target}" != "${wanted_target}" ]]; then
+  if [[ ${MANAGE_BUILD_SYMLINK} -eq 1 ]]; then
+    build_link="/opt/yocto/build/${PROJECT}"
+    mkdir -p "$(dirname "${DOCKER_BUILD_DIR}")"
+    mkdir -p "${DOCKER_BUILD_DIR}"
+
+    # Normalize legacy migration layout:
+    # /opt/yocto/build/<project> -> <workdir>/build-docker/
+    # with all artifacts accidentally under <workdir>/build-docker/<project>/...
+    nested_project_dir="${DOCKER_BUILD_DIR}/${PROJECT}"
+    if [[ -d "${nested_project_dir}" ]] && [[ ! -e "${DOCKER_BUILD_DIR}/conf" ]] && [[ ! -e "${DOCKER_BUILD_DIR}/tmp" ]]; then
+      # Flatten only if the docker build dir contains no other entries besides the nested project dir.
+      if [[ -z "$(find "${DOCKER_BUILD_DIR}" -mindepth 1 -maxdepth 1 ! -name "${PROJECT}" -print -quit 2>/dev/null)" ]]; then
+        shopt -s dotglob nullglob
+        mv "${nested_project_dir}"/* "${DOCKER_BUILD_DIR}/" 2>/dev/null || true
+        shopt -u dotglob nullglob
+        rmdir "${nested_project_dir}" 2>/dev/null || true
+        echo "Preflight: flattened legacy ${nested_project_dir} into ${DOCKER_BUILD_DIR}"
+      fi
+    fi
+
+    if [[ -L "${build_link}" ]]; then
+      current_target="$(readlink -f "${build_link}" 2>/dev/null || true)"
+      wanted_target="$(readlink -f "${DOCKER_BUILD_DIR}" 2>/dev/null || true)"
+      if [[ -n "${wanted_target}" ]] && [[ "${current_target}" != "${wanted_target}" ]]; then
+        ln -sfn "${DOCKER_BUILD_DIR}" "${build_link}"
+        echo "Preflight: switched ${build_link} -> ${DOCKER_BUILD_DIR}"
+      fi
+    elif [[ -e "${build_link}" ]]; then
+      # Existing non-symlink path: preserve data before converting to symlink.
+      if [[ ! -e "${DOCKER_BUILD_DIR}" ]] || [[ -z "$(ls -A "${DOCKER_BUILD_DIR}" 2>/dev/null)" ]]; then
+        # Move build contents into target directory (not the directory itself),
+        # so DOCKER_BUILD_DIR does not end up with an extra nested <project>/ folder.
+        mkdir -p "${DOCKER_BUILD_DIR}"
+        shopt -s dotglob nullglob
+        mv "${build_link}"/* "${DOCKER_BUILD_DIR}/" 2>/dev/null || true
+        shopt -u dotglob nullglob
+        rmdir "${build_link}" 2>/dev/null || true
+      else
+        backup_path="${build_link}.backup.$(date +%Y%m%d-%H%M%S)"
+        mv "${build_link}" "${backup_path}" 2>/dev/null || true
+        echo "Preflight: moved existing ${build_link} to ${backup_path}"
+      fi
       ln -sfn "${DOCKER_BUILD_DIR}" "${build_link}"
-      echo "Preflight: switched ${build_link} -> ${DOCKER_BUILD_DIR}"
-    fi
-  elif [[ -e "${build_link}" ]]; then
-    # Existing non-symlink path: preserve data before converting to symlink.
-    if [[ ! -e "${DOCKER_BUILD_DIR}" ]] || [[ -z "$(ls -A "${DOCKER_BUILD_DIR}" 2>/dev/null)" ]]; then
-      # Move build contents into target directory (not the directory itself),
-      # so DOCKER_BUILD_DIR does not end up with an extra nested <project>/ folder.
-      mkdir -p "${DOCKER_BUILD_DIR}"
-      shopt -s dotglob nullglob
-      mv "${build_link}"/* "${DOCKER_BUILD_DIR}/" 2>/dev/null || true
-      shopt -u dotglob nullglob
-      rmdir "${build_link}" 2>/dev/null || true
+      echo "Preflight: created ${build_link} -> ${DOCKER_BUILD_DIR}"
     else
-      backup_path="${build_link}.backup.$(date +%Y%m%d-%H%M%S)"
-      mv "${build_link}" "${backup_path}" 2>/dev/null || true
-      echo "Preflight: moved existing ${build_link} to ${backup_path}"
+      ln -sfn "${DOCKER_BUILD_DIR}" "${build_link}"
+      echo "Preflight: created ${build_link} -> ${DOCKER_BUILD_DIR}"
     fi
-    ln -sfn "${DOCKER_BUILD_DIR}" "${build_link}"
-    echo "Preflight: created ${build_link} -> ${DOCKER_BUILD_DIR}"
-  else
-    ln -sfn "${DOCKER_BUILD_DIR}" "${build_link}"
-    echo "Preflight: created ${build_link} -> ${DOCKER_BUILD_DIR}"
+  fi
+
+  # Match llp_init_build behavior: clear existing conf so oe-init-build-env recreates
+  # local.conf and bblayers.conf from TEMPLATECONF on each run.
+  if [[ ${INIT_BUILD_ENV} -eq 1 ]]; then
+    if [[ ${RESET_CONF} -eq 1 ]]; then
+      if [[ -d "${DOCKER_BUILD_DIR}/conf" ]]; then
+        echo "Preflight: removing existing ${DOCKER_BUILD_DIR}/conf to regenerate from TEMPLATECONF"
+        rm -rf "${DOCKER_BUILD_DIR}/conf"
+      fi
+    else
+      echo "Preflight: keeping existing ${DOCKER_BUILD_DIR}/conf (--keep-conf)"
+    fi
+    mkdir -p "${DOCKER_BUILD_DIR}"
   fi
 fi
 
@@ -358,6 +421,28 @@ if [[ ${ENABLE_NETRC} -eq 1 ]] && [[ -f "${NETRC_FILE}" ]]; then
   )
 fi
 
+container_localconf_append_file="/tmp/llp-local-conf-append.conf"
+if [[ ${ENABLE_LOCAL_CONF_APPEND} -eq 1 ]]; then
+  if [[ -f "${LOCAL_CONF_APPEND_FILE}" ]]; then
+    cmd+=(
+      -v "${LOCAL_CONF_APPEND_FILE}:${container_localconf_append_file}:ro"
+    )
+  else
+    echo "Info: local.conf append file not found, skipping: ${LOCAL_CONF_APPEND_FILE}"
+  fi
+fi
+
+container_netboot_append_file="/tmp/llp-netboot-local-conf-append.conf"
+if [[ ${NETBOOT_SUPPORT} -eq 1 ]] && [[ ${ENABLE_NETBOOT_APPEND} -eq 1 ]]; then
+  if [[ -f "${NETBOOT_APPEND_FILE}" ]]; then
+    cmd+=(
+      -v "${NETBOOT_APPEND_FILE}:${container_netboot_append_file}:ro"
+    )
+  else
+    echo "Info: netboot append file not found; using built-in netboot snippet: ${NETBOOT_APPEND_FILE}"
+  fi
+fi
+
 cmd+=(
   --user "$(id -u):$(id -g)"
   "${SERVICE}"
@@ -366,7 +451,7 @@ cmd+=(
 if [[ ${INIT_BUILD_ENV} -eq 1 ]]; then
   cmd+=(
     bash -lc
-    "cd /opt/yocto/workspace && source layers/poky/oe-init-build-env /opt/yocto/build/${PROJECT} && exec bash -i"
+    "cd /opt/yocto/workspace && source layers/poky/oe-init-build-env /opt/yocto/build/${PROJECT} && if [[ -f ${container_localconf_append_file} ]]; then printf '\n# llp_docker_shell local.conf.append injection\n' >> /opt/yocto/build/${PROJECT}/conf/local.conf && cat ${container_localconf_append_file} >> /opt/yocto/build/${PROJECT}/conf/local.conf; fi && if [[ ${NETBOOT_SUPPORT} -eq 1 ]]; then if [[ -f ${container_netboot_append_file} ]]; then printf '\n# llp_docker_shell netboot_support injection (file)\n' >> /opt/yocto/build/${PROJECT}/conf/local.conf && cat ${container_netboot_append_file} >> /opt/yocto/build/${PROJECT}/conf/local.conf; else printf '\n# llp_docker_shell netboot_support injection (builtin)\nIMAGE_INSTALL:append = \" nfs-utils-client\"\n' >> /opt/yocto/build/${PROJECT}/conf/local.conf; fi; fi && exec bash -i"
   )
 fi
 
@@ -382,6 +467,12 @@ if [[ ${ENABLE_NETRC} -eq 1 ]]; then
 fi
 if [[ ${INIT_BUILD_ENV} -eq 1 ]]; then
   echo "==> Container init: cd /opt/yocto/workspace + source oe-init-build-env /opt/yocto/build/${PROJECT}"
+  if [[ ${ENABLE_LOCAL_CONF_APPEND} -eq 1 ]]; then
+    echo "==> local.conf append: ${LOCAL_CONF_APPEND_FILE}"
+  fi
+  if [[ ${NETBOOT_SUPPORT} -eq 1 ]] && [[ ${ENABLE_NETBOOT_APPEND} -eq 1 ]]; then
+    echo "==> netboot append: ${NETBOOT_APPEND_FILE}"
+  fi
 fi
 
 if [[ ${PRINT_ONLY} -eq 1 ]]; then
