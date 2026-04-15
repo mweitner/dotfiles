@@ -7,6 +7,15 @@ window_exists() {
   swaymsg -t get_marks | grep -q "${MARK}"
 }
 
+app_window_exists() {
+  swaymsg -t get_tree | jq -e '.. | objects | select(.app_id? == "1password" or .window_properties?.class? == "1Password")' >/dev/null
+}
+
+tag_existing_window() {
+  swaymsg '[app_id="1password"] mark --add scratchpad-1password' >/dev/null
+  swaymsg '[class="1Password"] mark --add scratchpad-1password' >/dev/null
+}
+
 window_is_focused() {
   swaymsg -t get_tree | jq -e ".. | objects | select(.focused? == true) | (.marks? // []) | index(\"${MARK}\")" >/dev/null
 }
@@ -29,12 +38,23 @@ if window_exists; then
   exit 0
 fi
 
+# Recover if 1Password exists but does not have the expected mark.
+if app_window_exists; then
+  tag_existing_window
+  if window_exists; then
+    swaymsg "[con_mark=\"${MARK}\"] scratchpad show"
+    swaymsg "[con_mark=\"${MARK}\"] move position center"
+    exit 0
+  fi
+fi
+
 # Launch 1Password; for_window rules in sway/config will mark and move it.
 swaymsg 'exec 1password' >/dev/null
 swaymsg "[con_mark=\"${MARK}\"] resize set 1000 760"
 
 for _ in $(seq 1 30); do
   apply_fallback_window_rules
+  tag_existing_window
 
   if window_exists; then
     swaymsg "[con_mark=\"${MARK}\"] scratchpad show"
