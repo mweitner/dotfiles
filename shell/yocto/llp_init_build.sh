@@ -23,6 +23,10 @@ function print_usage() {
   printf "\t-llpsotatest     := enable sota test where sota distro variables are changed\n"
   printf "\t-llpmixed        := enable mixed build support inside docker and outside\n"
   printf "\t-llpdocker       := activate docker build\n"
+  echo ""
+  echo "Environment overrides (optional):"
+  printf "\tLLP_DL_DIR       := override DL_DIR in generated build/conf/local.conf\n"
+  printf "\tLLP_SSTATE_DIR   := override SSTATE_DIR in generated build/conf/local.conf\n"
 }
 
 function filter_arguments() {
@@ -181,6 +185,8 @@ project_root=$(pwd)
 project_name=$(basename "${project_root}")
 project_build_root="${project_root}/build"
 yp_build_mixed_project_name="${project_name}"
+llp_dl_dir_override="${LLP_DL_DIR:-}"
+llp_sstate_dir_override="${LLP_SSTATE_DIR:-}"
 
 if [[ -h "${project_root}" ]]; then
   # as project root is a symlink, read the target file name
@@ -464,6 +470,24 @@ SOURCE_MIRROR_URL = "https://downloads.yoctoproject.org/mirror/sources/"
 CONNECTIVITY_CHECK_URIS = ""
 
 EOT
+
+if [[ -n "${llp_dl_dir_override}" ]] || [[ -n "${llp_sstate_dir_override}" ]]; then
+cat <<EOT >> "${project_root}/build/conf/local.conf"
+
+# llp_init_build cache path override injection
+EOT
+  if [[ -n "${llp_dl_dir_override}" ]]; then
+cat <<EOT >> "${project_root}/build/conf/local.conf"
+DL_DIR = "${llp_dl_dir_override}"
+EOT
+  fi
+  if [[ -n "${llp_sstate_dir_override}" ]]; then
+cat <<EOT >> "${project_root}/build/conf/local.conf"
+SSTATE_DIR = "${llp_sstate_dir_override}"
+EOT
+  fi
+  echo "[llp_init_build] Applied cache override: DL_DIR='${llp_dl_dir_override:-<default>}' SSTATE_DIR='${llp_sstate_dir_override:-<default>}'"
+fi
 
 if [[ "${disable_hashserve_compat}" = "1" ]]; then
 cat <<EOT >> "${project_root}/build/conf/local.conf"

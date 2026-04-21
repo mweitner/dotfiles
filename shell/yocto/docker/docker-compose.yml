@@ -1,0 +1,37 @@
+services:
+  liebherr-linux-build-container:
+    build:
+      context: ..
+      dockerfile: ci/Dockerfile.build
+    image: ldc-amd64/yocto-build
+    environment:
+      - PROJECT=${PROJECT:-liebherr-linux-platform}
+    stdin_open: true
+    tty: true
+    volumes:
+      - type: bind
+        source: ../../../
+        target: /opt/yocto/workspace
+      - type: bind
+        source: /opt/yocto/shared
+        target: /opt/yocto/shared
+      - type: bind
+        source: /opt/yocto/keys/${PROJECT_KEYS:-llp}
+        target: /opt/yocto/keys/${PROJECT_KEYS:-llp}
+      - type: bind
+        source: /opt/yocto/build/${PROJECT:-liebherr-linux-platform}
+        target: /opt/yocto/build/${PROJECT:-liebherr-linux-platform}
+  liebherr-sphinx-build-container:
+    build:
+      context: ..
+      dockerfile: ci/Dockerfile.sphinx
+    image: ldc-amd64/sphinx-build
+    stdin_open: true
+    tty: true
+    volumes:
+      - type: bind
+        source: ../../../
+        target: /home/yocto/
+      - type: bind
+        source: /opt/yocto/shared
+        target: /opt/yocto/shared
