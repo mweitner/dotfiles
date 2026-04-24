@@ -213,9 +213,11 @@ install_netrc_secrets() {
 }
 
 # Link Yocto key folders from dotfiles secrets into /opt/yocto/keys.
-# This keeps llp_init_build.sh project_keys_path defaults reproducible.
+# Projects with profile subdirs (for example llp/dev and llp/prod) default to
+# the dev profile so /opt/yocto/keys/<project> remains a flat path for build
+# scripts while still allowing prod switching later.
 setup_yocto_key_links() {
-  local src_root dst_root src_dir name dst
+  local src_root dst_root src_dir name dst link_target
   local linked_any=false
 
   src_root="$DOTFILES/.secrets/yocto/keys"
@@ -233,14 +235,19 @@ setup_yocto_key_links() {
     [[ -d "$src_dir" ]] || continue
     name="$(basename "$src_dir")"
     dst="$dst_root/$name"
+    link_target="$src_dir"
+
+    if [[ -d "$src_dir/dev" ]]; then
+      link_target="$src_dir/dev"
+    fi
 
     if [[ -e "$dst" && ! -L "$dst" ]]; then
       echo "WARN: $dst exists and is not a symlink; leaving it unchanged."
       continue
     fi
 
-    sudo ln -sfn "$src_dir" "$dst"
-    echo "==> Yocto key link: $dst -> $src_dir"
+    sudo ln -sfn "$link_target" "$dst"
+    echo "==> Yocto key link: $dst -> $link_target"
     linked_any=true
   done
   shopt -u nullglob
@@ -449,8 +456,11 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/yocto/llp_init_build.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_init_build.sh" "$HOME/.local/bin/llp_init_build.sh"
   [[ -f "$DOTFILES/shell/yocto/setup-yocto-project" ]] && ln -sf "$DOTFILES/shell/yocto/setup-yocto-project" "$HOME/.local/bin/setup-yocto-project"
   [[ -f "$DOTFILES/shell/yocto/llp_yocto_wrapper.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_yocto_wrapper.sh" "$HOME/.local/bin/llp-yocto-build"
+  [[ -f "$DOTFILES/shell/yocto/llp_doc_local.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_doc_local.sh" "$HOME/.local/bin/llp-doc-local"
   [[ -f "$DOTFILES/shell/yocto/yocto-prefetch-source" ]] && ln -sf "$DOTFILES/shell/yocto/yocto-prefetch-source" "$HOME/.local/bin/yocto-prefetch-source"
   [[ -f "$DOTFILES/shell/yocto/yocto-prefetch-recipe-source" ]] && ln -sf "$DOTFILES/shell/yocto/yocto-prefetch-recipe-source" "$HOME/.local/bin/yocto-prefetch-recipe-source"
+  [[ -f "$DOTFILES/shell/yocto/switch-yocto-keys-profile.sh" ]] && ln -sf "$DOTFILES/shell/yocto/switch-yocto-keys-profile.sh" "$HOME/.local/bin/switch-yocto-keys-profile"
+  [[ -f "$DOTFILES/shell/yocto/switch-llp-keys-profile.sh" ]] && ln -sf "$DOTFILES/shell/yocto/switch-llp-keys-profile.sh" "$HOME/.local/bin/switch-llp-keys-profile"
   [[ -f "$DOTFILES/shell/yocto/lpo-build" ]] && ln -sf "$DOTFILES/shell/yocto/lpo-build" "$HOME/.local/bin/lpo-build"
   [[ -f "$DOTFILES/shell/yocto/llp_docker_shell.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_docker_shell.sh" "$HOME/.local/bin/llp_docker_shell.sh"
   # Backward compatibility symlink
@@ -708,7 +718,10 @@ EOF
   echo "INFO: lpo-build is linked to ~/.local/bin/lpo-build"
   echo "INFO: yocto-prefetch-source is linked to ~/.local/bin/yocto-prefetch-source"
   echo "INFO: yocto-prefetch-recipe-source is linked to ~/.local/bin/yocto-prefetch-recipe-source"
+  echo "INFO: switch-yocto-keys-profile is linked to ~/.local/bin/switch-yocto-keys-profile"
   echo "      Example bootstrap: setup-yocto-project --project linux-dps"
+  echo "      Default /opt/yocto/keys/<project> links prefer <project>/dev when present"
+  echo "      Example key switch: switch-yocto-keys-profile llp prod"
   echo "      Fish/tmux-safe build example (llp-yocto-build):"
   echo "      llp-yocto-build --workdir ~/lpo-dev/linux-lpo --distro-layer meta-liebherr-lpo-display lpo-display-image"
   echo "      Quick LPO build from fish (lpo-build, tmux-compatible):"

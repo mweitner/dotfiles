@@ -514,6 +514,11 @@ fi
      TEMPLATECONF="/opt/yocto/workspace/layers/meta-liebherr-lpo-display/conf/templates/default"
    elif [[ -f "${WORKDIR}/layers/meta-liebherr-lpo-display/conf/bblayers.conf.sample" ]]; then
      TEMPLATECONF="/opt/yocto/workspace/layers/meta-liebherr-lpo-display/conf"
+   elif [[ -d "${WORKDIR}/layers/liebherr/meta-liebherr-distro/conf/templates/default" ]]; then
+     # llp distro: meta-liebherr-distro lives inside layers/liebherr/
+     TEMPLATECONF="/opt/yocto/workspace/layers/liebherr/meta-liebherr-distro/conf/templates/default"
+   elif [[ -f "${WORKDIR}/layers/liebherr/meta-liebherr-distro/conf/bblayers.conf.sample" ]]; then
+     TEMPLATECONF="/opt/yocto/workspace/layers/liebherr/meta-liebherr-distro/conf"
    elif [[ -d "${WORKDIR}/layers/poky/conf/templates/default" ]]; then
      TEMPLATECONF="/opt/yocto/workspace/layers/poky/conf/templates/default"
    elif [[ -d "${WORKDIR}/layers/poky/meta-poky/conf/templates/default" ]]; then
@@ -573,6 +578,58 @@ fi
 # mirroring llp_init_build.sh logic. Prefer env-provided values over defaults.
 _keys_root="/opt/yocto/keys/${PROJECT_KEYS}"
 
+# Secure boot secrets are mandatory for LLP distro builds.
+secure_boot_required=0
+if [[ "${PROJECT_KEYS}" == "llp" ]] || [[ "${PROJECT}" == *"llp"* ]]; then
+  secure_boot_required=1
+fi
+
+resolve_secret_from_keys_root() {
+  local var_name="$1"
+  shift
+  local candidate
+
+  # Respect explicit environment overrides.
+  if [[ -n "${!var_name:-}" ]]; then
+    return 0
+  fi
+
+  for candidate in "$@"; do
+    if [[ -f "${_keys_root}/${candidate}" ]]; then
+      printf -v "${var_name}" '%s' "${_keys_root}/${candidate}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+# SWUpdate local secret compatibility: support both legacy underscore names and
+# expected dashed names by creating missing aliases in the active key directory.
+if [[ -f "${_keys_root}/swupdate_key_password" ]] && [[ ! -e "${_keys_root}/swupdate-password.txt" ]]; then
+  ln -snf "${_keys_root}/swupdate_key_password" "${_keys_root}/swupdate-password.txt"
+fi
+if [[ -f "${_keys_root}/swupdate_private_key" ]] && [[ ! -e "${_keys_root}/swupdate-private.pem" ]]; then
+  ln -snf "${_keys_root}/swupdate_private_key" "${_keys_root}/swupdate-private.pem"
+fi
+if [[ -f "${_keys_root}/swupdate_public_key" ]] && [[ ! -e "${_keys_root}/swupdate-public.pem" ]]; then
+  ln -snf "${_keys_root}/swupdate_public_key" "${_keys_root}/swupdate-public.pem"
+fi
+if [[ -f "${_keys_root}/swupdate-password.txt" ]] && [[ ! -e "${_keys_root}/swupdate_key_password" ]]; then
+  ln -snf "${_keys_root}/swupdate-password.txt" "${_keys_root}/swupdate_key_password"
+fi
+if [[ -f "${_keys_root}/swupdate-private.pem" ]] && [[ ! -e "${_keys_root}/swupdate_private_key" ]]; then
+  ln -snf "${_keys_root}/swupdate-private.pem" "${_keys_root}/swupdate_private_key"
+fi
+if [[ -f "${_keys_root}/swupdate-public.pem" ]] && [[ ! -e "${_keys_root}/swupdate_public_key" ]]; then
+  ln -snf "${_keys_root}/swupdate-public.pem" "${_keys_root}/swupdate_public_key"
+fi
+
+if [[ -z "${SWUPDATE_PASSWORD_FILE:-}" ]] || [[ ! -f "${SWUPDATE_PASSWORD_FILE:-}" ]]; then
+  resolve_secret_from_keys_root SWUPDATE_PASSWORD_FILE \
+    "swupdate-password.txt" "swupdate_key_password" || true
+fi
+
 if [[ -z "${MOSQUITTO_PSK_FILE:-}" ]]; then
   if [[ -f "${_keys_root}/mosquitto-psk.txt" ]]; then
     MOSQUITTO_PSK_FILE="${_keys_root}/mosquitto-psk.txt"
@@ -591,14 +648,127 @@ if [[ -z "${LPO_DATASTATION_PRIVATEKEY:-}" ]]; then
   echo "Warning: LPO_DATASTATION_PRIVATEKEY not found (expected ${_keys_root}/id_rsa_lpo_datastation)." >&2
 fi
 
-if [[ -z "${SWUPDATE_PRIVATE_KEY:-}" ]]; then
-  if [[ -f "${_keys_root}/swupdate-private.pem" ]]; then
-    SWUPDATE_PRIVATE_KEY="${_keys_root}/swupdate-private.pem"
+if [[ -z "${SWUPDATE_PRIVATE_KEY:-}" ]] || [[ ! -f "${SWUPDATE_PRIVATE_KEY:-}" ]]; then
+  resolve_secret_from_keys_root SWUPDATE_PRIVATE_KEY \
+    "swupdate-private.pem" "swupdate_private_key" || true
+fi
+if [[ -z "${SWUPDATE_PUBLIC_KEY:-}" ]] || [[ ! -f "${SWUPDATE_PUBLIC_KEY:-}" ]]; then
+  resolve_secret_from_keys_root SWUPDATE_PUBLIC_KEY \
+    "swupdate-public.pem" "swupdate_public_key" || true
+fi
+
+# Safety warning: detect accidental dev->prod secret reuse for LLP SWUpdate
+# credentials. This is informational only and does not block local builds.
+if [[ "${PROJECT_KEYS}" == "llp" ]]; then
+  active_keys_root_real="$(realpath -m "${_keys_root}")"
+  dev_keys_root_real="$(realpath -m "/opt/yocto/keys/llp/dev")"
+
+  if [[ "${active_keys_root_real}" != "${dev_keys_root_real}" ]] && [[ -d "${dev_keys_root_real}" ]]; then
+    swupdate_identical_count=0
+
+    if [[ -f "${active_keys_root_real}/swupdate-password.txt" ]] && [[ -f "${dev_keys_root_real}/swupdate-password.txt" ]] \
+       && cmp -s "${active_keys_root_real}/swupdate-password.txt" "${dev_keys_root_real}/swupdate-password.txt"; then
+      swupdate_identical_count=$((swupdate_identical_count + 1))
+      echo "Warning: LLP SWUpdate password in ${active_keys_root_real} is identical to dev profile." >&2
+    fi
+
+    if [[ -f "${active_keys_root_real}/swupdate-private.pem" ]] && [[ -f "${dev_keys_root_real}/swupdate-private.pem" ]] \
+       && cmp -s "${active_keys_root_real}/swupdate-private.pem" "${dev_keys_root_real}/swupdate-private.pem"; then
+      swupdate_identical_count=$((swupdate_identical_count + 1))
+      echo "Warning: LLP SWUpdate private key in ${active_keys_root_real} is identical to dev profile." >&2
+    fi
+
+    if [[ -f "${active_keys_root_real}/swupdate-public.pem" ]] && [[ -f "${dev_keys_root_real}/swupdate-public.pem" ]] \
+       && cmp -s "${active_keys_root_real}/swupdate-public.pem" "${dev_keys_root_real}/swupdate-public.pem"; then
+      swupdate_identical_count=$((swupdate_identical_count + 1))
+      echo "Warning: LLP SWUpdate public key in ${active_keys_root_real} is identical to dev profile." >&2
+    fi
+
+    if [[ ${swupdate_identical_count} -gt 0 ]]; then
+      echo "Warning: ${swupdate_identical_count}/3 LLP SWUpdate secret files match dev. Verify intended profile usage." >&2
+    fi
   fi
 fi
-if [[ -z "${SWUPDATE_PUBLIC_KEY:-}" ]]; then
-  if [[ -f "${_keys_root}/swupdate-public.pem" ]]; then
-    SWUPDATE_PUBLIC_KEY="${_keys_root}/swupdate-public.pem"
+
+# Secure boot secret file defaults: accept both yoctose-style secret names and
+# explicit file names used by CI/Jenkins.
+resolve_secret_from_keys_root ROOT_OF_TRUST_SECRET_FILE \
+  "scr_boot_rot_private_key" "ROOT_OF_TRUST_SECRET.pem" || true
+resolve_secret_from_keys_root TRUSTED_WORLD_SECRET_FILE \
+  "scr_boot_trusted_world_private_key" "TRUSTED_WORLD_SECRET.pem" || true
+resolve_secret_from_keys_root NON_TRUSTED_WORLD_SECRET_FILE \
+  "scr_boot_non_trusted_world_private_key" "NON_TRUSTED_WORLD_SECRET.pem" || true
+resolve_secret_from_keys_root BL31_SECRET_FILE \
+  "scr_boot_bl31_private_key" "BL31_SECRET.pem" || true
+resolve_secret_from_keys_root BL32_SECRET_FILE \
+  "scr_boot_bl32_private_key" "BL32_SECRET.pem" || true
+resolve_secret_from_keys_root BL33_SECRET_FILE \
+  "scr_boot_bl33_private_key" "BL33_SECRET.pem" || true
+resolve_secret_from_keys_root SCP_BL2_SECRET_FILE \
+  "scr_boot_scp_bl2_private_key" "SCP_BL2_SECRET.pem" || true
+resolve_secret_from_keys_root OPTEE_TA_SECRET_FILE \
+  "optee_ta_private_key" "OPTEE_TA_SECRET.pem" || true
+resolve_secret_from_keys_root UBOOT_FIT_KEY_FILE \
+  "scr_boot_uboot_fit_key" "UBOOT_FIT.key" || true
+resolve_secret_from_keys_root UBOOT_FIT_CERT_FILE \
+  "scr_boot_uboot_fit_cert" "UBOOT_FIT.crt" || true
+
+# U-Boot FIT signing via uboot-mkimage -k expects a basename with sibling
+# <name>.key and <name>.crt files. Keep the canonical LLP secret names, but
+# create compatibility symlinks in the active keys directory for local builds.
+if [[ -n "${UBOOT_FIT_KEY_FILE:-}" ]] && [[ -f "${UBOOT_FIT_KEY_FILE}" ]] \
+   && [[ -n "${UBOOT_FIT_CERT_FILE:-}" ]] && [[ -f "${UBOOT_FIT_CERT_FILE}" ]]; then
+  if [[ ! -e "${_keys_root}/scr_boot_uboot_fit_key.key" ]]; then
+    ln -snf "${UBOOT_FIT_KEY_FILE}" "${_keys_root}/scr_boot_uboot_fit_key.key"
+  fi
+  if [[ ! -e "${_keys_root}/scr_boot_uboot_fit_key.crt" ]]; then
+    ln -snf "${UBOOT_FIT_CERT_FILE}" "${_keys_root}/scr_boot_uboot_fit_key.crt"
+  fi
+fi
+
+if [[ ${secure_boot_required} -eq 1 ]]; then
+  secure_boot_missing=()
+
+  if [[ -z "${ROOT_OF_TRUST_SECRET_FILE:-}" ]] || [[ ! -f "${ROOT_OF_TRUST_SECRET_FILE:-}" ]]; then
+    secure_boot_missing+=("ROOT_OF_TRUST_SECRET_FILE (expected ${_keys_root}/scr_boot_rot_private_key)")
+  fi
+  if [[ -z "${TRUSTED_WORLD_SECRET_FILE:-}" ]] || [[ ! -f "${TRUSTED_WORLD_SECRET_FILE:-}" ]]; then
+    secure_boot_missing+=("TRUSTED_WORLD_SECRET_FILE (expected ${_keys_root}/scr_boot_trusted_world_private_key)")
+  fi
+  if [[ -z "${NON_TRUSTED_WORLD_SECRET_FILE:-}" ]] || [[ ! -f "${NON_TRUSTED_WORLD_SECRET_FILE:-}" ]]; then
+    secure_boot_missing+=("NON_TRUSTED_WORLD_SECRET_FILE (expected ${_keys_root}/scr_boot_non_trusted_world_private_key)")
+  fi
+  if [[ -z "${BL31_SECRET_FILE:-}" ]] || [[ ! -f "${BL31_SECRET_FILE:-}" ]]; then
+    secure_boot_missing+=("BL31_SECRET_FILE (expected ${_keys_root}/scr_boot_bl31_private_key)")
+  fi
+  if [[ -z "${BL32_SECRET_FILE:-}" ]] || [[ ! -f "${BL32_SECRET_FILE:-}" ]]; then
+    secure_boot_missing+=("BL32_SECRET_FILE (expected ${_keys_root}/scr_boot_bl32_private_key)")
+  fi
+  if [[ -z "${BL33_SECRET_FILE:-}" ]] || [[ ! -f "${BL33_SECRET_FILE:-}" ]]; then
+    secure_boot_missing+=("BL33_SECRET_FILE (expected ${_keys_root}/scr_boot_bl33_private_key)")
+  fi
+  if [[ -z "${SCP_BL2_SECRET_FILE:-}" ]] || [[ ! -f "${SCP_BL2_SECRET_FILE:-}" ]]; then
+    secure_boot_missing+=("SCP_BL2_SECRET_FILE (expected ${_keys_root}/scr_boot_scp_bl2_private_key)")
+  fi
+  if [[ -z "${OPTEE_TA_SECRET_FILE:-}" ]] || [[ ! -f "${OPTEE_TA_SECRET_FILE:-}" ]]; then
+    secure_boot_missing+=("OPTEE_TA_SECRET_FILE (expected ${_keys_root}/optee_ta_private_key)")
+  fi
+  if [[ -z "${UBOOT_FIT_KEY_FILE:-}" ]] || [[ ! -f "${UBOOT_FIT_KEY_FILE:-}" ]]; then
+    secure_boot_missing+=("UBOOT_FIT_KEY_FILE (expected ${_keys_root}/scr_boot_uboot_fit_key)")
+  fi
+  if [[ -z "${UBOOT_FIT_CERT_FILE:-}" ]] || [[ ! -f "${UBOOT_FIT_CERT_FILE:-}" ]]; then
+    secure_boot_missing+=("UBOOT_FIT_CERT_FILE (expected ${_keys_root}/scr_boot_uboot_fit_cert)")
+  fi
+
+  if [[ ${#secure_boot_missing[@]} -gt 0 ]]; then
+    echo "Error: missing LLP secure boot secrets for project '${PROJECT}' (keys: ${PROJECT_KEYS})." >&2
+    echo "       Checked under: ${_keys_root}" >&2
+    for missing in "${secure_boot_missing[@]}"; do
+      echo "  - ${missing}" >&2
+    done
+    echo "Hint: sync available keys with: /home/ldcwem0/dotfiles/shell/yocto/sync-llp-yoctose-secrets.sh --force" >&2
+    echo "Hint: obtain the missing secure boot key material from CI credential owners." >&2
+    exit 2
   fi
 fi
 
@@ -611,7 +781,11 @@ unset _keys_root
 bb_env_passthrough="${BB_ENV_PASSTHROUGH_ADDITIONS:-}"
 for var in SWUPDATE_PASSWORD_FILE SWUPDATE_PRIVATE_KEY SWUPDATE_PUBLIC_KEY \
            SOTA_AUTH_TOKEN MOSQUITTO_PSK_FILE LPO_DATASTATION_PRIVATEKEY \
-           LH_IOT_CLOUD_MQTT_PASSWORD; do
+           LH_IOT_CLOUD_MQTT_PASSWORD ROOT_OF_TRUST_SECRET_FILE \
+           TRUSTED_WORLD_SECRET_FILE NON_TRUSTED_WORLD_SECRET_FILE \
+           BL31_SECRET_FILE BL32_SECRET_FILE BL33_SECRET_FILE \
+           SCP_BL2_SECRET_FILE OPTEE_TA_SECRET_FILE UBOOT_FIT_KEY_FILE \
+           UBOOT_FIT_CERT_FILE; do
   case " ${bb_env_passthrough} " in
     *" ${var} "*) ;;
     *) bb_env_passthrough="${bb_env_passthrough} ${var}" ;;
@@ -741,6 +915,16 @@ cmd+=(
   -e "MOSQUITTO_PSK_FILE=${MOSQUITTO_PSK_FILE:-}"
   -e "LPO_DATASTATION_PRIVATEKEY=${LPO_DATASTATION_PRIVATEKEY:-}"
   -e "LH_IOT_CLOUD_MQTT_PASSWORD=${LH_IOT_CLOUD_MQTT_PASSWORD:-}"
+  -e "ROOT_OF_TRUST_SECRET_FILE=${ROOT_OF_TRUST_SECRET_FILE:-}"
+  -e "TRUSTED_WORLD_SECRET_FILE=${TRUSTED_WORLD_SECRET_FILE:-}"
+  -e "NON_TRUSTED_WORLD_SECRET_FILE=${NON_TRUSTED_WORLD_SECRET_FILE:-}"
+  -e "BL31_SECRET_FILE=${BL31_SECRET_FILE:-}"
+  -e "BL32_SECRET_FILE=${BL32_SECRET_FILE:-}"
+  -e "BL33_SECRET_FILE=${BL33_SECRET_FILE:-}"
+  -e "SCP_BL2_SECRET_FILE=${SCP_BL2_SECRET_FILE:-}"
+  -e "OPTEE_TA_SECRET_FILE=${OPTEE_TA_SECRET_FILE:-}"
+  -e "UBOOT_FIT_KEY_FILE=${UBOOT_FIT_KEY_FILE:-}"
+  -e "UBOOT_FIT_CERT_FILE=${UBOOT_FIT_CERT_FILE:-}"
   -e "BB_ENV_PASSTHROUGH_ADDITIONS=${bb_env_passthrough}"
   -e "TEMPLATECONF=${TEMPLATECONF}"
 )
