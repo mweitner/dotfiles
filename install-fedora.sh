@@ -237,7 +237,9 @@ setup_yocto_key_links() {
     dst="$dst_root/$name"
     link_target="$src_dir"
 
-    if [[ -d "$src_dir/dev" ]]; then
+    if [[ -d "$src_dir/prod" ]]; then
+      link_target="$src_dir/prod"
+    elif [[ -d "$src_dir/dev" ]]; then
       link_target="$src_dir/dev"
     fi
 
