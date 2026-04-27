@@ -11,6 +11,11 @@ Launch a Yocto build container via docker-compose.yml in the workspace.
 Supports any Liebherr Yocto project (linux-lpo, linux-dps, etc.) via --project and --project-keys flags.
 
 Options:
+  --ssh-agent                       Forward host SSH agent into container (for devtool workflows)
+  --ssh-dir <path>                  Mount host SSH directory (default: ~/.ssh)
+  --no-ssh-dir                      Do not mount SSH directory
+  --ssh-known-hosts <path>          Mount known_hosts file (default: ~/.ssh/known_hosts)
+  --no-ssh-known-hosts              Do not mount known_hosts
   --workdir <path>                  Yocto project root (default: auto-detect from pwd,
                                     fallback to ~/lpo-dev/linux-lpo)
   --project <name>                  PROJECT env value (default: linux-lpo)
@@ -55,6 +60,7 @@ Options:
   -h, --help                        Show help
 
 Environment:
+  SSH_AUTH_SOCK is forwarded if --ssh-agent is set and agent is running.
   SOTA_AUTH_TOKEN can be provided via environment instead of CLI.
   PROJECT_SHARED_ROOT can be provided via environment (default: /opt/yocto/shared).
 
@@ -268,6 +274,8 @@ SEED_FROM=""
 LIST_YOCTO_RELEASES=0
 NETRC_FILE="${NETRC_FILE:-$HOME/.netrc}"
 ENABLE_NETRC=1
+WGETRC_FILE="${WGETRC_FILE:-$HOME/.config/wgetrc}" # default to XDG config, will be symlinked
+ENABLE_WGETRC=1
 SERVICE="liebherr-linux-build-container"
 ENABLE_X11=1
 X11_SELINUX_Z=0
@@ -276,8 +284,44 @@ DO_RM=1
 INIT_BUILD_ENV=1
 PRINT_ONLY=0
 
+# SSH/devtool support
+ENABLE_SSH_AGENT=0
+SSH_DIR="${HOME}/.ssh"
+ENABLE_SSH_DIR=1
+SSH_KNOWN_HOSTS="${HOME}/.ssh/known_hosts"
+ENABLE_SSH_KNOWN_HOSTS=1
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --wgetrc-file)
+      WGETRC_FILE="$2"; shift 2 ;;
+    --no-wgetrc)
+      ENABLE_WGETRC=0; shift ;;
+    *)
+      # ...existing code...
+      ;;
+  esac
+  case "$1" in
+    --ssh-agent)
+      ENABLE_SSH_AGENT=1
+      shift
+      ;;
+    --ssh-dir)
+      SSH_DIR="${2:-}"
+      shift 2
+      ;;
+    --no-ssh-dir)
+      ENABLE_SSH_DIR=0
+      shift
+      ;;
+    --ssh-known-hosts)
+      SSH_KNOWN_HOSTS="${2:-}"
+      shift 2
+      ;;
+    --no-ssh-known-hosts)
+      ENABLE_SSH_KNOWN_HOSTS=0
+      shift
+      ;;
     --workdir)
       WORKDIR="${2:-}"
       shift 2
@@ -936,6 +980,13 @@ if [[ ${ENABLE_X11} -eq 1 ]]; then
   )
 fi
 
+if [[ ${ENABLE_WGETRC} -eq 1 ]] && [[ -f "${WGETRC_FILE}" ]]; then
+  cmd+=(
+    -v "${WGETRC_FILE}:/home/yocto/.wgetrc:ro"
+    -e "WGETRC=/home/yocto/.wgetrc"
+  )
+  echo "==> Wgetrc mount: ${WGETRC_FILE} -> /home/yocto/.wgetrc"
+fi
 if [[ ${ENABLE_NETRC} -eq 1 ]] && [[ -f "${NETRC_FILE}" ]]; then
   cmd+=(
     -v "${NETRC_FILE}:/home/yocto/.netrc${netrc_mount_opts}"
@@ -962,6 +1013,33 @@ if [[ ${NETBOOT_SUPPORT} -eq 1 ]] && [[ ${ENABLE_NETBOOT_APPEND} -eq 1 ]]; then
   else
     echo "Info: netboot append file not found; using built-in netboot snippet: ${NETBOOT_APPEND_FILE}"
   fi
+fi
+
+# SSH agent and ~/.ssh support for devtool workflows
+if [[ ${ENABLE_SSH_AGENT} -eq 1 ]]; then
+  if [[ -n "${SSH_AUTH_SOCK:-}" ]] && [[ -S "${SSH_AUTH_SOCK}" ]]; then
+    cmd+=(
+      -e "SSH_AUTH_SOCK=/ssh-agent"
+      -v "${SSH_AUTH_SOCK}:/ssh-agent"
+    )
+    echo "==> SSH agent forwarding: ${SSH_AUTH_SOCK} -> /ssh-agent"
+  else
+    echo "Warning: SSH agent forwarding requested but SSH_AUTH_SOCK not set or not a socket." >&2
+  fi
+fi
+
+if [[ ${ENABLE_SSH_DIR} -eq 1 ]] && [[ -d "${SSH_DIR}" ]]; then
+  cmd+=(
+    -v "${SSH_DIR}:/home/yocto/.ssh:ro"
+  )
+  echo "==> SSH directory mount: ${SSH_DIR} -> /home/yocto/.ssh"
+fi
+
+if [[ ${ENABLE_SSH_KNOWN_HOSTS} -eq 1 ]] && [[ -f "${SSH_KNOWN_HOSTS}" ]]; then
+  cmd+=(
+    -v "${SSH_KNOWN_HOSTS}:/home/yocto/.ssh/known_hosts:ro"
+  )
+  echo "==> SSH known_hosts mount: ${SSH_KNOWN_HOSTS} -> /home/yocto/.ssh/known_hosts"
 fi
 
 cmd+=(

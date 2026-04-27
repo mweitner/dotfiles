@@ -511,6 +511,9 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   mkdir -p "$XDG_DATA_HOME"
   cp -rf "$DOTFILES/fonts" "$XDG_DATA_HOME"
 
+  # Wget config (XDG)
+  mkdir -p "$XDG_CONFIG_HOME"
+  ln -sf "$DOTFILES/shell/wget/.wgetrc" "$XDG_CONFIG_HOME/wgetrc"
   echo "==> Symlinks created."
 fi
 
