@@ -314,7 +314,12 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   sudo dnf install -y tio
 
   # Modern CLI tools
+
+  # Modern CLI tools
   sudo dnf install -y ripgrep fd-find fzf zoxide htop btop repo
+
+  # Office suite for Word/Office compatibility (LibreOffice Writer, Calc, Impress, etc.)
+  sudo dnf install -y libreoffice-writer libreoffice-calc libreoffice-impress libreoffice-draw libreoffice-gtk3
 
   # Cross-platform archive tooling (Windows-compatible .zip exchange)
   sudo dnf install -y zip unzip
