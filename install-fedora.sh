@@ -275,7 +275,13 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   echo "── Phase 1: Installing packages ─────────────────────────────────────────"
   sudo dnf install -y \
     bash-completion curl wget git git-filter-repo pciutils usbutils xdg-utils \
-    NetworkManager NetworkManager-tui iwd
+    NetworkManager NetworkManager-tui iwd \
+    poppler-utils # for pdftotext
+
+  # install rclone as general sync tooling e.g. syn with Google Drive
+  # details see:
+  # - /home/ldcwem0/document/embedded-target/google-drive-hardware/readme.md
+  sudo dnf install rclone
 
   # NM GUI tools naming differs by Fedora release. Prefer legacy meta package,
   # then fallback to split packages used on newer Fedora versions.

@@ -79,6 +79,11 @@ What it does:
 - writes `/etc/systemd/system/mnt-data.automount`
 - enables/restarts `mnt-data.automount`
 
+Implementation note:
+
+- The `.automount` unit should stay independent from `network-online.target` to avoid boot ordering cycles.
+- Only the actual `.mount` unit should wait for the network when the share is accessed.
+
 Test:
 
 ```bash

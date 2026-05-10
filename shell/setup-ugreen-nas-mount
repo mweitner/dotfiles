@@ -149,8 +149,6 @@ EOF
   sudo tee /etc/systemd/system/mnt-data.automount >/dev/null <<EOF
 [Unit]
 Description=Automount UGREEN NAS at /mnt/data
-After=network-online.target
-Wants=network-online.target
 
 [Automount]
 Where=$MOUNT_POINT
