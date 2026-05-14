@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Recover delayed KVM HID devices after dock/KVM replug.
+#
+# Observed case on ZBook + WD19TB + KVM:
+# - CHERRY keyboard (046a:0076) returns in ~3s
+# - Logitech mouse (046d:c069) can lag for 30-60s
+#
+# If keyboard is present but mouse is still missing, reset the shared parent USB
+# hub of the keyboard to force sibling port re-enumeration.
+# This is a best-effort workaround; some KVM chains still recover only by waiting.
+
+KEYBOARD_VID="046a"
+KEYBOARD_PID="0076"
+MOUSE_VID="046d"
+MOUSE_PID="c069"
+WAIT_SECS="${WAIT_SECS:-8}"
+
+usb_present() {
+  local vendor="$1"
+  local product="$2"
+  lsusb | grep -qi "ID ${vendor}:${product}"
+}
+
+find_usb_device_path() {
+  local vendor="$1"
+  local product="$2"
+  local dev
+
+  for dev in /sys/bus/usb/devices/*; do
+    [[ -f "$dev/idVendor" && -f "$dev/idProduct" ]] || continue
+    [[ "$(<"$dev/idVendor")" == "$vendor" ]] || continue
+    [[ "$(<"$dev/idProduct")" == "$product" ]] || continue
+    basename "$dev"
+    return 0
+  done
+
+  return 1
+}
+
+wait_for_keyboard() {
+  local i
+  for ((i=0; i<WAIT_SECS; i++)); do
+    if usb_present "$KEYBOARD_VID" "$KEYBOARD_PID"; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+if usb_present "$MOUSE_VID" "$MOUSE_PID"; then
+  echo "KVM mouse already present; no recovery needed."
+  exit 0
+fi
+
+if ! wait_for_keyboard; then
+  echo "Keyboard not present yet; dock/KVM path is not ready enough for recovery." >&2
+  exit 1
+fi
+
+if usb_present "$MOUSE_VID" "$MOUSE_PID"; then
+  echo "KVM mouse appeared during wait; no recovery needed."
+  exit 0
+fi
+
+keyboard_path="$(find_usb_device_path "$KEYBOARD_VID" "$KEYBOARD_PID")" || {
+  echo "Could not locate keyboard sysfs path." >&2
+  exit 1
+}
+
+parent_hub="${keyboard_path%.*}"
+auth_file="/sys/bus/usb/devices/${parent_hub}/authorized"
+
+if [[ "$parent_hub" == "$keyboard_path" || ! -f "$auth_file" ]]; then
+  echo "Could not identify a resettable parent hub for ${keyboard_path}." >&2
+  exit 1
+fi
+
+echo "Keyboard present, mouse missing; resetting parent hub ${parent_hub}."
+sudo sh -c "echo 0 > '$auth_file'; sleep 1; echo 1 > '$auth_file'"
+
+for ((i=0; i<10; i++)); do
+  if usb_present "$MOUSE_VID" "$MOUSE_PID"; then
+    echo "KVM mouse recovered after hub reset."
+    exit 0
+  fi
+  sleep 1
+done
+
+echo "Mouse still missing after hub reset. KVM/hub firmware delay likely persists; wait up to ~60s." >&2
+exit 1

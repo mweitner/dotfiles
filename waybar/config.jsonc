@@ -8,7 +8,7 @@
     "modules-center": ["sway/window"],
     "modules-right": [
         "pulseaudio",
-        "network",
+        "custom/network_status",
         "custom/monitor_profile",
         "cpu",
         "memory",
@@ -53,13 +53,12 @@
         },
         "on-click": "~/.config/sway/scripts/toggle-scratchpad-pavucontrol.sh"
     },
-    "network": {
+    "custom/network_status": {
+        "exec": "~/.local/bin/network-status-waybar",
         "interval": 5,
-        "format-wifi": "\uf1eb  {essid}  {ipaddr}/{cidr}",
-        "format-ethernet": "\uf796  {ipaddr}/{cidr}",
-        "format-linked": "\uf796  {ifname} (no IP)",
-        "format-disconnected": "\uf127  Disconnected",
-        "tooltip-format": "{ifname}: {ipaddr}\nGateway: {gwaddr}\nUp: {bandwidthUpBits}  Down: {bandwidthDownBits}",
+        "return-type": "json",
+        "format": "{}",
+        "tooltip": true,
         "on-click": "sh -c 'if command -v nm-connection-editor >/dev/null 2>&1; then nm-connection-editor; else ~/.config/sway/scripts/toggle-scratchpad-nmtui.sh; fi'",
         "on-click-right": "~/.config/sway/scripts/toggle-scratchpad-nmtui.sh"
     },

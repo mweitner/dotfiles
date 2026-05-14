@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# network-status-waybar: Display primary network connection with fallback to active alternatives
+# Emits JSON for Waybar custom module
+# Priority: Dock Ethernet (enx98e74328ea7a) > Active WiFi > Other connections > Disconnected
+
+PRIMARY_IFACE="enx98e74328ea7a"
+
+# Check primary Ethernet interface first
+if [[ -e "/sys/class/net/$PRIMARY_IFACE" ]]; then
+    ADDR=$(ip -4 addr show "$PRIMARY_IFACE" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}/\d+' | head -1)
+    if [[ -n "$ADDR" ]]; then
+        # Primary Ethernet is up with IP
+        echo "{\"text\":\"\uf796  $ADDR\",\"tooltip\":\"Ethernet: $PRIMARY_IFACE\n$ADDR\",\"class\":\"ethernet\"}"
+        exit 0
+    fi
+fi
+
+# Primary interface down, check active connections from NetworkManager.
+# Priority after primary dock NIC: other Ethernet > WiFi > other > Disconnected.
+ACTIVE_CONNS=$(nmcli -t connection show --active 2>/dev/null)
+
+# First, prefer any active non-primary Ethernet connection (e.g., laptop NIC eno1).
+ALT_ETH=$(echo "$ACTIVE_CONNS" | awk -F':' -v primary="$PRIMARY_IFACE" '$3 ~ /802-3-ethernet/ && $4 != primary {print; exit}')
+
+if [[ -n "$ALT_ETH" ]]; then
+    ALT_ETH_DEV=$(echo "$ALT_ETH" | cut -d: -f4)
+    ALT_ETH_IP=$(ip -4 addr show "$ALT_ETH_DEV" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}/\d+' | head -1)
+    if [[ -n "$ALT_ETH_IP" ]]; then
+        echo "{\"text\":\"\uf796  $ALT_ETH_IP\",\"tooltip\":\"Ethernet: $ALT_ETH_DEV\n$ALT_ETH_IP\",\"class\":\"ethernet\"}"
+        exit 0
+    fi
+fi
+
+# Next, try WiFi fallback.
+WIFI_CONN=$(echo "$ACTIVE_CONNS" | awk -F':' '$3 ~ /802-11-wireless/ {print $1; exit}')
+
+if [[ -n "$WIFI_CONN" ]]; then
+    WIFI_DEV=$(echo "$ACTIVE_CONNS" | awk -F':' -v name="$WIFI_CONN" '$1 == name {print $4; exit}')
+
+    if [[ -n "$WIFI_DEV" ]]; then
+        IP_ADDR=$(ip -4 addr show "$WIFI_DEV" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}/\d+' | head -1)
+        if [[ -n "$IP_ADDR" ]]; then
+            echo "{\"text\":\"\uf1eb  $WIFI_CONN  $IP_ADDR\",\"tooltip\":\"WiFi: $WIFI_CONN\n$IP_ADDR\",\"class\":\"wifi\"}"
+            exit 0
+        fi
+    fi
+fi
+
+# No Ethernet/WiFi fallback hit, check for other active connections (skip loopback and bridges).
+ACTIVE=$(echo "$ACTIVE_CONNS" | grep -v loopback | grep -v docker0 | grep -v '^br-' | head -1)
+
+if [[ -n "$ACTIVE" ]]; then
+    # Get connection type and details
+    CONN_NAME=$(echo "$ACTIVE" | cut -d: -f1)
+    CONN_TYPE=$(echo "$ACTIVE" | cut -d: -f3)
+    ACTIVE_DEV=$(echo "$ACTIVE" | cut -d: -f4)
+    
+    # Get IP address for the active connection
+    if [[ -z "$ACTIVE_DEV" ]]; then
+        ACTIVE_DEV=$(nmcli -t -f DEVICE connection show "$CONN_NAME" 2>/dev/null | head -1)
+    fi
+    
+    if [[ -n "$ACTIVE_DEV" ]]; then
+        IP_ADDR=$(ip -4 addr show "$ACTIVE_DEV" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}/\d+' | head -1)
+        
+        if [[ -n "$IP_ADDR" ]]; then
+            case "$CONN_TYPE" in
+                ethernet|802-3-ethernet)
+                    echo "{\"text\":\"\uf796  $IP_ADDR\",\"tooltip\":\"Ethernet: $ACTIVE_DEV\n$IP_ADDR\",\"class\":\"ethernet\"}"
+                    exit 0
+                    ;;
+                vpn)
+                    echo "{\"text\":\"\uf023  $CONN_NAME  $IP_ADDR\",\"tooltip\":\"VPN: $CONN_NAME\n$IP_ADDR\",\"class\":\"vpn\"}"
+                    exit 0
+                    ;;
+                *)
+                    echo "{\"text\":\"\uf796  $CONN_NAME  $IP_ADDR\",\"tooltip\":\"$CONN_TYPE: $CONN_NAME\n$IP_ADDR\",\"class\":\"other\"}"
+                    exit 0
+                    ;;
+            esac
+        fi
+    fi
+fi
+
+# No active connection found
+echo "{\"text\":\"\uf127  Disconnected\",\"tooltip\":\"No active network connection\",\"class\":\"disconnected\"}"

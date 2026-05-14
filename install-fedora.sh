@@ -490,6 +490,8 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/monitor-ulm-office"      ]] && ln -sf "$DOTFILES/shell/monitor-ulm-office"      "$HOME/.local/bin/monitor-ulm-office"
   [[ -f "$DOTFILES/shell/monitor-layout-ui"       ]] && ln -sf "$DOTFILES/shell/monitor-layout-ui"       "$HOME/.local/bin/monitor-layout-ui"
   [[ -f "$DOTFILES/shell/monitor-profile-waybar"  ]] && ln -sf "$DOTFILES/shell/monitor-profile-waybar"  "$HOME/.local/bin/monitor-profile-waybar"
+  [[ -f "$DOTFILES/shell/recover-dock-kvm-input"  ]] && ln -sf "$DOTFILES/shell/recover-dock-kvm-input"  "$HOME/.local/bin/recover-dock-kvm-input"
+  [[ -f "$DOTFILES/shell/network-status-waybar"   ]] && ln -sf "$DOTFILES/shell/network-status-waybar"   "$HOME/.local/bin/network-status-waybar"
 
   # Pre-commit helpers (for managing Git hooks + SSL certificate issues with go.dev)
   [[ -f "$DOTFILES/shell/pre-commit/setup-pre-commit.sh" ]] && ln -sf "$DOTFILES/shell/pre-commit/setup-pre-commit.sh" "$HOME/.local/bin/setup-pre-commit"
@@ -628,6 +630,19 @@ EOF
   sudo systemctl enable --now tlp      2>/dev/null || true
   sudo systemctl enable --now thermald 2>/dev/null || true
   echo "==> tlp + thermald enabled."
+
+  echo ""
+  echo "── Phase 3c0: Dock/KVM USB autosuspend tuning ──────────────────────────"
+  if [[ -f "$DOTFILES/tlp/99-dock-kvm.conf" ]]; then
+    sudo mkdir -p /etc/tlp.d
+    sudo ln -sfn "$DOTFILES/tlp/99-dock-kvm.conf" /etc/tlp.d/99-dock-kvm.conf
+    sudo tlp start 2>/dev/null || true
+    echo "==> Installed TLP dock/KVM USB denylist (/etc/tlp.d/99-dock-kvm.conf)."
+    echo "    This reduces autosuspend-related delay; some KVM chains can still take up to ~60s."
+    echo "    Optional best-effort helper: recover-dock-kvm-input"
+  else
+    echo "WARN: missing $DOTFILES/tlp/99-dock-kvm.conf; skipping dock/KVM TLP tuning."
+  fi
 
   echo ""
   echo "── Phase 3c1: Serial console permissions (tio) ──────────────────────────"
