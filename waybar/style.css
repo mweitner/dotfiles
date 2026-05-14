@@ -51,6 +51,7 @@ window#waybar {
 /* ── Right modules shared style ─────────────────────────────────────────────── */
 #pulseaudio,
 #network,
+#custom-monitor_profile,
 #cpu,
 #memory,
 #temperature,
@@ -79,6 +80,28 @@ window#waybar {
 }
 
 #network.disconnected {
+    color: #d75f5f;
+}
+
+#custom-monitor_profile {
+    color: #afd7ff;
+    font-weight: bold;
+}
+
+#custom-monitor_profile.laptop {
+    color: #87afd7;
+}
+
+#custom-monitor_profile.home-office {
+    color: #87AF87;
+}
+
+#custom-monitor_profile.ulm-office {
+    color: #ffd75f;
+}
+
+#custom-monitor_profile.mixed,
+#custom-monitor_profile.unknown {
     color: #d75f5f;
 }
 

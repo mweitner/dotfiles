@@ -481,6 +481,13 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/yocto/llp_apply_hostfixes.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_apply_hostfixes.sh" "$HOME/.local/bin/llp_apply_hostfixes.sh"
   [[ -f "$DOTFILES/shell/setup-docker-fedora-native.sh" ]] && ln -sf "$DOTFILES/shell/setup-docker-fedora-native.sh" "$HOME/.local/bin/setup-docker-fedora-native"
 
+  # Monitor layout scripts (sway display mode bindings + waybar status module)
+  [[ -f "$DOTFILES/shell/monitor-home-office"     ]] && ln -sf "$DOTFILES/shell/monitor-home-office"     "$HOME/.local/bin/monitor-home-office"
+  [[ -f "$DOTFILES/shell/monitor-laptop-only"     ]] && ln -sf "$DOTFILES/shell/monitor-laptop-only"     "$HOME/.local/bin/monitor-laptop-only"
+  [[ -f "$DOTFILES/shell/monitor-ulm-office"      ]] && ln -sf "$DOTFILES/shell/monitor-ulm-office"      "$HOME/.local/bin/monitor-ulm-office"
+  [[ -f "$DOTFILES/shell/monitor-layout-ui"       ]] && ln -sf "$DOTFILES/shell/monitor-layout-ui"       "$HOME/.local/bin/monitor-layout-ui"
+  [[ -f "$DOTFILES/shell/monitor-profile-waybar"  ]] && ln -sf "$DOTFILES/shell/monitor-profile-waybar"  "$HOME/.local/bin/monitor-profile-waybar"
+
   # Pre-commit helpers (for managing Git hooks + SSL certificate issues with go.dev)
   [[ -f "$DOTFILES/shell/pre-commit/setup-pre-commit.sh" ]] && ln -sf "$DOTFILES/shell/pre-commit/setup-pre-commit.sh" "$HOME/.local/bin/setup-pre-commit"
   [[ -f "$DOTFILES/shell/pre-commit/pre-commit-helper.sh" ]] && ln -sf "$DOTFILES/shell/pre-commit/pre-commit-helper.sh" "$HOME/.local/bin/pre-commit-helper"

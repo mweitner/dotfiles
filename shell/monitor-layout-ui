@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Launch a graphical display layout tool on Sway.
+# Prefers nwg-displays, then wdisplays.
+if command -v nwg-displays >/dev/null 2>&1; then
+  exec nwg-displays
+fi
+
+if command -v wdisplays >/dev/null 2>&1; then
+  exec wdisplays
+fi
+
+echo "No graphical display tool found." >&2
+echo "Install one of: nwg-displays or wdisplays" >&2
+if command -v notify-send >/dev/null 2>&1; then
+  notify-send "Display UI not found" "Install nwg-displays or wdisplays"
+fi
+exit 1

@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Waybar custom module output for current monitor profile under Sway.
+# Emits JSON for waybar: text, tooltip, class.
+
+HOME_LEFT_SERIAL="${HOME_OFFICE_LEFT_SERIAL:-H4ZN300119}"
+HOME_MIDDLE_SERIAL="${HOME_OFFICE_MIDDLE_SERIAL:-H4ZN200425}"
+
+if ! command -v swaymsg >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
+  echo '{"text":"MON ?","tooltip":"swaymsg/jq missing","class":"unknown"}'
+  exit 0
+fi
+
+outputs_json="$(swaymsg -t get_outputs -r 2>/dev/null || true)"
+if [ -z "$outputs_json" ]; then
+  echo '{"text":"MON ?","tooltip":"No sway outputs data","class":"unknown"}'
+  exit 0
+fi
+
+active_count="$(echo "$outputs_json" | jq '[.[] | select(.active == true)] | length')"
+has_edp="$(echo "$outputs_json" | jq '[.[] | select(.active == true and (.name | test("^eDP")))] | length')"
+
+has_home_left="$(echo "$outputs_json" | jq --arg s "$HOME_LEFT_SERIAL" '[.[] | select(.active == true and .serial == $s)] | length')"
+has_home_middle="$(echo "$outputs_json" | jq --arg s "$HOME_MIDDLE_SERIAL" '[.[] | select(.active == true and .serial == $s)] | length')"
+
+ulm_ext_count="$(echo "$outputs_json" | jq '[.[] | select(.active == true and (.name | test("^eDP") | not) and .current_mode.width == 1920 and .current_mode.height == 1200)] | length')"
+
+profile="mixed"
+text="MON MIX"
+tooltip="Mixed/Custom monitor layout"
+class="mixed"
+
+if [ "$active_count" -eq 1 ] && [ "$has_edp" -eq 1 ]; then
+  profile="laptop"
+  text="MON LAP"
+  tooltip="Laptop-only (eDP)"
+  class="laptop"
+elif [ "$active_count" -ge 3 ] && [ "$has_edp" -ge 1 ] && [ "$has_home_left" -ge 1 ] && [ "$has_home_middle" -ge 1 ]; then
+  profile="home-office"
+  text="MON HOME"
+  tooltip="Home office profile active"
+  class="home-office"
+elif [ "$active_count" -ge 3 ] && [ "$has_edp" -ge 1 ] && [ "$ulm_ext_count" -ge 2 ]; then
+  profile="ulm-office"
+  text="MON ULM"
+  tooltip="Ulm office profile active"
+  class="ulm-office"
+fi
+
+active_summary="$(echo "$outputs_json" | jq -r '[.[] | select(.active == true) | "\(.name) \(.current_mode.width)x\(.current_mode.height)@\((.current_mode.refresh/1000)|floor)Hz"] | join("\\n")')"
+
+printf '{"text":"%s","tooltip":"%s\\n\\n%s","class":"%s"}\n' "$text" "$tooltip" "$active_summary" "$class"

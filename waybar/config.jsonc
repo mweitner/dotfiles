@@ -9,6 +9,7 @@
     "modules-right": [
         "pulseaudio",
         "network",
+        "custom/monitor_profile",
         "cpu",
         "memory",
         "temperature",
@@ -61,6 +62,15 @@
         "tooltip-format": "{ifname}: {ipaddr}\nGateway: {gwaddr}\nUp: {bandwidthUpBits}  Down: {bandwidthDownBits}",
         "on-click": "sh -c 'if command -v nm-connection-editor >/dev/null 2>&1; then nm-connection-editor; else ~/.config/sway/scripts/toggle-scratchpad-nmtui.sh; fi'",
         "on-click-right": "~/.config/sway/scripts/toggle-scratchpad-nmtui.sh"
+    },
+    "custom/monitor_profile": {
+        "exec": "~/.local/bin/monitor-profile-waybar",
+        "interval": 2,
+        "return-type": "json",
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "~/.local/bin/monitor-layout-ui",
+        "on-click-right": "~/.local/bin/monitor-home-office"
     },
     "cpu": {
         "interval": 3,

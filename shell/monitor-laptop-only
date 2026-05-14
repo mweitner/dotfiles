@@ -2,10 +2,18 @@
 set -euo pipefail
 
 # Wayland-native monitor configuration for laptop-only setup
-# Uses swaymsg to configure display outputs
+# Uses swaymsg to configure display outputs.
+# Disable all active external outputs, regardless of their current names.
 
-swaymsg output eDP-1 mode 2560x1600@120Hz position 0 0 scale 1.25
-swaymsg output DP-6 disable
-swaymsg output DP-7 disable
+if ! command -v jq >/dev/null 2>&1; then
+	echo "ERROR: jq is required for monitor-laptop-only" >&2
+	exit 1
+fi
+
+swaymsg output eDP-1 mode 2560x1600 position 0 0 scale 1.25
+
+while IFS= read -r output_name; do
+	swaymsg output "$output_name" disable
+done < <(swaymsg -t get_outputs -r | jq -r '.[] | select(.active == true and (.name | test("^eDP") | not)) | .name')
 
 echo "✓ Laptop-only display profile applied"

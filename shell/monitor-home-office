@@ -2,12 +2,63 @@
 set -euo pipefail
 
 # Wayland-native monitor configuration for home office docking
-# Dell WD19TB Thunderbolt Dock + 2× Samsung U28E850 4K 28"
-# Layout: DP-7 (left) | DP-6 (center) | eDP-1 (right)
-# Logical positions: 0 | 1920 | 3840  (scale 2 on 4K = 1920 logical px wide each)
+# Auto-detect external outputs so this still works if DP names change
+# (common with docks/KVMs: DP-6/DP-7 can become DP-1/DP-2, etc.)
 
-swaymsg output DP-7  mode 3840x2160@30Hz  position 0    0 scale 2
-swaymsg output DP-6  mode 3840x2160@60Hz  position 1920 0 scale 2
-swaymsg output eDP-1 mode 2560x1600@120Hz position 3840 14 scale 1.5
+# Stable monitor mapping for home office.
+# Override via environment if needed:
+#   HOME_OFFICE_LEFT_SERIAL=... HOME_OFFICE_MIDDLE_SERIAL=... monitor-home-office
+HOME_OFFICE_LEFT_SERIAL="${HOME_OFFICE_LEFT_SERIAL:-H4ZN300119}"
+HOME_OFFICE_MIDDLE_SERIAL="${HOME_OFFICE_MIDDLE_SERIAL:-H4ZN200425}"
+
+get_known_outputs() {
+	swaymsg -t get_outputs -r | jq -r '.[] | .name'
+}
+
+get_output_by_serial() {
+	local serial="$1"
+	swaymsg -t get_outputs -r | jq -r --arg s "$serial" '.[] | select(.serial == $s) | .name' | head -n1
+}
+
+if ! command -v jq >/dev/null 2>&1; then
+	echo "ERROR: jq is required for monitor-home-office" >&2
+	exit 1
+fi
+
+mapfile -t ALL_OUTPUTS < <(get_known_outputs)
+mapfile -t EXTERNAL_OUTPUTS < <(printf '%s\n' "${ALL_OUTPUTS[@]}" | grep -Ev '^eDP' || true)
+
+if [[ ${#EXTERNAL_OUTPUTS[@]} -lt 2 ]]; then
+	echo "ERROR: expected at least 2 external outputs, found ${#EXTERNAL_OUTPUTS[@]}" >&2
+	echo "Known outputs: ${ALL_OUTPUTS[*]:-none}" >&2
+	exit 1
+fi
+
+# Prefer serial-based mapping for deterministic physical placement.
+LEFT_OUT="$(get_output_by_serial "$HOME_OFFICE_LEFT_SERIAL")"
+CENTER_OUT="$(get_output_by_serial "$HOME_OFFICE_MIDDLE_SERIAL")"
+
+# Fallback if serials are unavailable (new monitor, EDID change, etc.).
+if [[ -z "$LEFT_OUT" || -z "$CENTER_OUT" || "$LEFT_OUT" == "$CENTER_OUT" ]]; then
+	IFS=$'\n' EXTERNAL_OUTPUTS=($(printf '%s\n' "${EXTERNAL_OUTPUTS[@]}" | sort))
+	LEFT_OUT="${EXTERNAL_OUTPUTS[0]}"
+	CENTER_OUT="${EXTERNAL_OUTPUTS[1]}"
+fi
+
+# 4K external screens at scale 2; laptop stays on the right.
+swaymsg output "$LEFT_OUT"   enable mode 3840x2160 position 0    0 scale 2
+swaymsg output "$CENTER_OUT" enable mode 3840x2160 position 1920 0 scale 2
+swaymsg output eDP-1          enable mode 2560x1600 position 3840 14 scale 1.5
 
 echo "✓ Home office docking display profile applied"
+echo "  left=${LEFT_OUT} center=${CENTER_OUT} laptop=eDP-1"
+echo "  expected-left-serial=${HOME_OFFICE_LEFT_SERIAL} expected-middle-serial=${HOME_OFFICE_MIDDLE_SERIAL}"
+
+if command -v notify-send >/dev/null 2>&1; then
+	(
+		sleep 1
+		notify-send "Home office display profile applied" \
+			"left=${LEFT_OUT} center=${CENTER_OUT} laptop=eDP-1\nleft-serial=${HOME_OFFICE_LEFT_SERIAL} middle-serial=${HOME_OFFICE_MIDDLE_SERIAL}" \
+			--icon=video-display
+	) >/dev/null 2>&1 &
+fi
