@@ -32,7 +32,9 @@ sudo dnf install -y golang
 
 echo ""
 echo "── Dev: Documentation tools ─────────────────────────────────────────────"
-sudo dnf install -y plantuml
+sudo dnf install -y \
+  plantuml \
+  pandoc
 
 echo ""
 echo "── Dev: Git hooks ───────────────────────────────────────────────────────"
