@@ -1,19 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Launch a graphical display layout tool on Sway.
-# Prefers nwg-displays, then wdisplays.
+# Launch a graphical display layout tool on Sway/wlroots.
+#
+# Tool preference order:
+#   1. nwg-displays  — best: Sway-native, workspace assignment, drag-and-drop
+#                      Not in Fedora repos; build from source if needed.
+#   2. wdisplays     — good: drag-and-drop monitor arrangement, apply-live
+#                      Available: sudo dnf install -y wdisplays
+#                      Gap: does not persist changes to kanshi/scripts.
+#
+# After wdisplays closes this script prints the current output layout so
+# coordinates can be copied back into kanshi config or monitor-* scripts.
+
+print_layout() {
+  if ! command -v swaymsg >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
+    return
+  fi
+  echo ""
+  echo "Current output layout (copy coordinates to update scripts/kanshi if needed):"
+  swaymsg -t get_outputs -r \
+    | jq -r '.[] | select(.active) | "  " + .name + "  serial=" + .serial + "  pos=" + (.rect.x|tostring) + "," + (.rect.y|tostring) + "  scale=" + (.scale|tostring) + "  " + (.current_mode.width|tostring) + "x" + (.current_mode.height|tostring) + "@" + ((.current_mode.refresh/1000)|floor|tostring) + "Hz"' \
+    | sort -k3,3n 2>/dev/null || true
+  echo ""
+  echo "  Files to update:"
+  echo "    dotfiles/shell/monitor-home-office   (HOME_OFFICE_LEFT/MIDDLE_SERIAL + positions)"
+  echo "    dotfiles/.config/kanshi/config        (profile output positions)"
+}
+
 if command -v nwg-displays >/dev/null 2>&1; then
   exec nwg-displays
 fi
 
 if command -v wdisplays >/dev/null 2>&1; then
-  exec wdisplays
+  wdisplays
+  print_layout
+  exit 0
 fi
 
 echo "No graphical display tool found." >&2
-echo "Install one of: nwg-displays or wdisplays" >&2
+echo "Install wdisplays:  sudo dnf install -y wdisplays" >&2
 if command -v notify-send >/dev/null 2>&1; then
-  notify-send "Display UI not found" "Install nwg-displays or wdisplays"
+  notify-send "Display UI not found" "Install: sudo dnf install -y wdisplays"
 fi
 exit 1

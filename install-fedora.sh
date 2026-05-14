@@ -299,7 +299,10 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
     libnotify mako \
     brightnessctl \
     udiskie \
-    kanshi
+    kanshi \
+    wdisplays    # graphical display layout UI — drag-and-drop monitor arrangement
+               # (used by monitor-layout-ui / Super+x m; nwg-displays is better
+               #  but not in Fedora repos — build from source if desired)
 
   # Screenshot tooling
   # requires sway stack packages wl-clipboard libnotify
