@@ -1,0 +1,319 @@
+javascript:(function(){
+  try {
+
+  const ALLOWED_HOSTS = ['teams.microsoft.com', 'teams.cloud.microsoft'];
+  if (!ALLOWED_HOSTS.includes(window.location.host)) {
+    alert('Error: This bookmarklet only works on teams.microsoft.com or teams.cloud.microsoft');
+    return;
+  }
+
+  const dlgId = "teams-chat-md-export-dialog";
+  const old = document.getElementById(dlgId);
+  if (old) old.remove();
+
+  function extractTeamsChat() {
+    function formatTimestamp(s) {
+      const d = new Date(s);
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day   = String(d.getDate()).padStart(2, "0");
+      const year  = d.getFullYear();
+      let hours   = d.getHours();
+      const mins  = String(d.getMinutes()).padStart(2, "0");
+      const ampm  = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12 || 12;
+      return `${month}/${day}/${year} ${hours}:${mins} ${ampm}  `;
+    }
+
+    function getMinuteKey(s) {
+      return Math.floor(new Date(s).getTime() / 60000) * 60000;
+    }
+
+    function decodeEntities(t) {
+      return t
+        .replace(/&nbsp;/g, " ")
+        .replace(/&gt;/g, ">")
+        .replace(/&lt;/g, "<")
+        .replace(/&amp;/g, "&")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+    }
+
+    function safeReplace(el, text) {
+      try {
+        el.replaceWith(document.createTextNode(text));
+      } catch(e) {
+        try { if (el.parentNode) el.parentNode.replaceChild(document.createTextNode(text), el); } catch(e2) {}
+      }
+    }
+
+    function extractPre(preEl) {
+      const cls = preEl.getAttribute("class") || "";
+      const lang = (cls.match(/language-([a-z0-9\-_]+)/i) || [])[1] || "";
+      let raw = (preEl.querySelector("code") || preEl).innerHTML;
+      raw = raw
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/div>\s*<div>/gi, "\n")
+        .replace(/<div>|<\/div>/gi, "\n")
+        .replace(/<[^>]+>/g, "");
+      raw = decodeEntities(raw).trim();
+      return "\n```" + lang + "\n" + raw + "\n```\n";
+    }
+
+    function extractEmojis(container) {
+      let out = "";
+      container.querySelectorAll("img").forEach(function(img) {
+        var alt = (img.alt || "").trim();
+        var custom = (img.getAttribute("itemtype") || "").includes("CustomEmoji")
+                  || (img.getAttribute("data-tid") || "").startsWith("custom-emoji-");
+        if (!alt) return;
+        out += custom ? "[" + alt + "] " : alt + " ";
+      });
+      return out.trim();
+    }
+
+    function extractInlineText(el) {
+      var html = el.innerHTML || "";
+      html = html.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, function(_, inner) {
+        return "`" + decodeEntities(inner.replace(/<[^>]+>/g, "")).trim() + "`";
+      });
+      html = html.replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, function(_, inner) {
+        return "**" + inner.replace(/<[^>]+>/g, "") + "**";
+      });
+      html = html.replace(/<b[^>]*>([\s\S]*?)<\/b>/gi, function(_, inner) {
+        return "**" + inner.replace(/<[^>]+>/g, "") + "**";
+      });
+      html = html.replace(/<em[^>]*>([\s\S]*?)<\/em>/gi, function(_, inner) {
+        return "_" + inner.replace(/<[^>]+>/g, "") + "_";
+      });
+      html = html.replace(/<i[^>]*>([\s\S]*?)<\/i>/gi, function(_, inner) {
+        return "_" + inner.replace(/<[^>]+>/g, "") + "_";
+      });
+      html = html.replace(/<br\s*\/?>/gi, " ");
+      html = html.replace(/<[^>]+>/g, "");
+      return decodeEntities(html).trim();
+    }
+
+    function extractTable(tableEl) {
+      var rows = Array.from(tableEl.querySelectorAll("tr"));
+      if (!rows.length) return "";
+      var grid = rows.map(function(row) {
+        return Array.from(row.querySelectorAll("td, th")).map(function(cell) {
+          var pEls = cell.querySelectorAll("p");
+          var cellText;
+          if (pEls.length) {
+            var lines = [];
+            pEls.forEach(function(p) { var t = extractInlineText(p); if (t) lines.push(t); });
+            cellText = lines.join(" / ");
+          } else {
+            cellText = extractInlineText(cell);
+          }
+          return cellText.replace(/\|/g, "\\|").replace(/\n/g, " ").trim();
+        });
+      });
+      var colCount = Math.max.apply(null, grid.map(function(r) { return r.length; }));
+      var normalized = grid.map(function(r) {
+        while (r.length < colCount) r.push("");
+        return r;
+      });
+      var header    = "| " + normalized[0].join(" | ") + " |";
+      var separator = "| " + normalized[0].map(function() { return "---"; }).join(" | ") + " |";
+      var body      = normalized.slice(1).map(function(r) { return "| " + r.join(" | ") + " |"; }).join("\n");
+      return "\n" + header + "\n" + separator + (body ? "\n" + body : "") + "\n";
+    }
+
+    function extractList(listEl, depth) {
+      depth = depth || 0;
+      var indent = "  ".repeat(depth);
+      var isOrdered = listEl.tagName.toLowerCase() === "ol";
+      var out = "";
+      var idx = 1;
+      Array.from(listEl.children).forEach(function(child) {
+        if (child.tagName.toLowerCase() !== "li") return;
+        var liClone = child.cloneNode(true);
+        Array.from(liClone.querySelectorAll("ul, ol")).forEach(function(n) {
+          try { n.parentNode.removeChild(n); } catch(e) {}
+        });
+        var itemText = extractInlineText(liClone) || "";
+        var bullet = isOrdered ? (idx + ".") : "-";
+        out += indent + bullet + " " + itemText + "\n";
+        if (isOrdered) idx++;
+        Array.from(child.children).forEach(function(sub) {
+          var tag = sub.tagName.toLowerCase();
+          if (tag === "ul" || tag === "ol") out += extractList(sub, depth + 1);
+        });
+      });
+      return out;
+    }
+
+    function processContent(el) {
+      var clone = el.cloneNode(true);
+
+      clone.querySelectorAll('[data-testid="lazy-image-wrapper"]').forEach(function(span) {
+        var img = span.querySelector("img");
+        if (!img) return;
+        var src = img.getAttribute("data-gallery-src") || img.getAttribute("data-orig-src") || img.src;
+        var alt = img.getAttribute("aria-label") || img.alt || "";
+        safeReplace(span, "![" + alt + "](" + src + ")");
+      });
+
+      var quoteBuf = [];
+      clone.querySelectorAll('[data-tid="quoted-reply-card"]').forEach(function(card, i) {
+        var author = (card.querySelector("span:not([data-tid])") || {}).textContent || "";
+        var when   = (card.querySelector('[data-tid="quoted-reply-timestamp"]') || {}).textContent || "";
+        var prev   = (card.querySelector('[data-tid="quoted-reply-preview-content"]') || {}).textContent || "";
+        quoteBuf[i] = "> " + author.trim() + when.trim() + "  \n> " + prev.trim() + "\n\n";
+        var parent = card.parentElement;
+        if (parent) safeReplace(parent, "__QUOTE_" + i + "__");
+      });
+
+      clone.querySelectorAll('[data-tid="code-block-editor-deserialized-language"]').forEach(function(x) {
+        try { if (x.parentNode) x.parentNode.removeChild(x); } catch(e) {}
+      });
+
+      var tableBuf = [], tableTokens = [];
+      Array.from(clone.querySelectorAll("table")).forEach(function(tbl) {
+        var anc = tbl.parentElement;
+        while (anc && anc !== clone) {
+          if (anc.tagName.toLowerCase() === "table") return;
+          anc = anc.parentElement;
+        }
+        var token = "__TABLE_" + tableBuf.length + "__";
+        tableBuf.push(extractTable(tbl));
+        tableTokens.push(token);
+        safeReplace(tbl, token);
+      });
+
+      var listBuf = [], listTokens = [];
+      Array.from(clone.querySelectorAll("ul, ol")).forEach(function(lst) {
+        var anc = lst.parentElement;
+        while (anc && anc !== clone) {
+          if (anc.tagName.toLowerCase() === "li") return;
+          anc = anc.parentElement;
+        }
+        if (!clone.contains(lst)) return;
+        var token = "__LIST_" + listBuf.length + "__";
+        listBuf.push("\n" + extractList(lst, 0));
+        listTokens.push(token);
+        safeReplace(lst, token);
+      });
+
+      var preBuf = [];
+      Array.from(clone.querySelectorAll("pre")).forEach(function(pre, i) {
+        preBuf[i] = extractPre(pre);
+        safeReplace(pre, "__PRE_" + i + "__");
+      });
+
+      var codeBuf = [];
+      Array.from(clone.querySelectorAll("code")).forEach(function(codeEl, i) {
+        if (codeEl.closest("pre")) return;
+        codeBuf[i] = "`" + decodeEntities(codeEl.textContent.trim()) + "`";
+        safeReplace(codeEl, "__CODE_" + i + "__");
+      });
+
+      var bqBuf = [];
+      Array.from(clone.querySelectorAll("blockquote")).forEach(function(bq, i) {
+        var text = "";
+        var pEls = bq.querySelectorAll("p");
+        pEls.forEach(function(p, pi) {
+          var r = p.innerHTML.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "");
+          r = decodeEntities(r);
+          r.split("\n").forEach(function(line) { text += "> " + line.trim() + "\n"; });
+          if (pi < pEls.length - 1) text += ">\n";
+        });
+        bqBuf[i] = text.trimEnd() + "\n\n";
+        safeReplace(bq, "__BQ_" + i + "__");
+      });
+
+      var html = clone.innerHTML
+        .replace(/__QUOTE_(\d+)__/g, function(_, n) { return quoteBuf[n] || ""; })
+        .replace(/__BQ_(\d+)__/g,    function(_, n) { return "\n" + (bqBuf[n] || ""); })
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>\s*<p>/gi, "\n")
+        .replace(/<p>|<\/p>/gi, "")
+        .replace(/<[^>]+>/g, "");
+      html = decodeEntities(html).trim();
+
+      preBuf.forEach(function(r, i)  { if (r !== undefined) html = html.replace("__PRE_"  + i + "__", r); });
+      codeBuf.forEach(function(r, i) { if (r !== undefined) html = html.replace("__CODE_" + i + "__", r); });
+      tableBuf.forEach(function(r, i) { html = html.replace(tableTokens[i], r); });
+      listBuf.forEach(function(r, i)  { html = html.replace(listTokens[i],  r); });
+
+      html = html.replace(/\n{3,}/g, "\n\n").trim();
+
+      var emojis = extractEmojis(clone);
+      if (!html && emojis) return emojis;
+      if (emojis) return (html + " " + emojis).trim();
+      return html;
+    }
+
+    var msgs = document.querySelectorAll('[data-tid="chat-pane-message"]');
+    var out = "", lastAuthor = "", lastKey = 0;
+    msgs.forEach(function(node) {
+      var mid = node.getAttribute("data-mid");
+      if (!mid) return;
+      var auEl = document.querySelector("#author-" + mid);
+      var au = auEl ? auEl.textContent.trim() : "Unknown";
+      var tsEl = document.querySelector("#timestamp-" + mid);
+      var ts = "", key = 0;
+      if (tsEl) {
+        var dt = tsEl.getAttribute("datetime");
+        if (dt) { ts = formatTimestamp(dt); key = getMinuteKey(dt); }
+      }
+      var contentEl = node.querySelector('[id^="content-"]');
+      var txt = contentEl ? processContent(contentEl) : "";
+      if (!txt) return;
+      var sameGroup = (au === lastAuthor && key === lastKey && lastAuthor);
+      if (sameGroup) {
+        out += txt + "\n";
+      } else {
+        if (out) out += "\n";
+        out += ts ? ("**" + au + "** - " + ts + "\n" + txt + "\n") : ("**" + au + "**\n" + txt + "\n");
+      }
+      lastAuthor = au;
+      lastKey    = key;
+    });
+    return out.trim();
+  }
+
+  var chatMarkdown = extractTeamsChat();
+
+  var dlg = document.createElement("div");
+  dlg.id = dlgId;
+  dlg.style.cssText = "all:unset;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;z-index:9999999";
+
+  var box = document.createElement("div");
+  box.style.cssText = "background:#fff;border-radius:10px;box-shadow:0 6px 32px rgba(0,0,0,0.25);max-width:90vw;max-height:90vh;padding:20px;display:flex;flex-direction:column";
+
+  var ta = document.createElement("textarea");
+  ta.readOnly = true;
+  ta.value = chatMarkdown;
+  ta.style.cssText = "width:60vw;max-width:800px;height:60vh;font-family:monospace;font-size:14px;line-height:1.3;margin-bottom:12px;resize:vertical";
+  box.appendChild(ta);
+
+  var btnBar = document.createElement("div");
+  btnBar.style.cssText = "display:flex;justify-content:flex-end;gap:8px";
+
+  var copyBtn = document.createElement("button");
+  copyBtn.textContent = "Copy";
+  copyBtn.onclick = function() {
+    ta.select();
+    try { document.execCommand("copy"); } catch(e) { navigator.clipboard.writeText(ta.value); }
+    copyBtn.textContent = "Copied!";
+    setTimeout(function() { copyBtn.textContent = "Copy"; }, 1200);
+  };
+  btnBar.appendChild(copyBtn);
+
+  var closeBtn = document.createElement("button");
+  closeBtn.textContent = "Close";
+  closeBtn.onclick = function() { dlg.remove(); };
+  btnBar.appendChild(closeBtn);
+
+  box.appendChild(btnBar);
+  dlg.appendChild(box);
+  document.body.appendChild(dlg);
+  ta.focus();
+
+  } catch(err) {
+    alert("Teams Exporter error:\n\n" + (err && err.message ? err.message : String(err)) + "\n\nStack:\n" + (err && err.stack ? err.stack.slice(0,500) : "n/a"));
+  }
+})();

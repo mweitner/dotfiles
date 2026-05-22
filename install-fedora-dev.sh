@@ -11,6 +11,7 @@ set -euo pipefail
 #
 #   VSCODE_VERSION=1.116 bash install-fedora-dev.sh    # bump VS Code pin
 #   VSCODE_VERSION=""    bash install-fedora-dev.sh    # install latest (no pin)
+#   bash install-fedora-dev.sh --skip-mqtt-tools        # skip MQTT tools setup
 #
 # Idempotent: safe to re-run.
 #
@@ -18,6 +19,16 @@ set -euo pipefail
 # ── Version pins (override via environment) ────────────────────────────────────
 # Set VSCODE_VERSION to empty string to always track the latest stable release.
 VSCODE_VERSION="${VSCODE_VERSION:-1.115}"
+SKIP_MQTT_TOOLS=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --skip-mqtt-tools) SKIP_MQTT_TOOLS=true ;;
+    *)
+      echo "WARN: unknown argument '$arg' (supported: --skip-mqtt-tools); ignoring."
+      ;;
+  esac
+done
 
 echo ""
 echo "── Dev: Editors & diff tooling ─────────────────────────────────────────"
@@ -43,6 +54,52 @@ sudo dnf install -y pre-commit
 echo ""
 echo "── Dev: SCM CLI tooling ────────────────────────────────────────────────"
 sudo dnf install -y gh
+
+if [[ "$SKIP_MQTT_TOOLS" == false ]]; then
+  echo ""
+  echo "── Dev: MQTT tooling ───────────────────────────────────────────────────"
+
+  if ! sudo dnf install -y mosquitto mosquitto-clients flatpak; then
+    echo "WARN: Could not install mosquitto-clients (package name differs on some Fedora releases)."
+    echo "      Retrying with mosquitto + flatpak only."
+    if ! sudo dnf install -y mosquitto flatpak; then
+      echo "WARN: MQTT base packages could not be installed; skipping MQTT Explorer installation."
+      echo "      Please verify repo/network access and install manually later."
+    fi
+  fi
+
+  if ! command -v mosquitto_pub >/dev/null 2>&1 || ! command -v mosquitto_sub >/dev/null 2>&1; then
+    echo "WARN: mosquitto_pub/mosquitto_sub not found in PATH after install."
+    echo "      On this Fedora release they may come from a differently named package."
+    echo "      Try: sudo dnf search mosquitto"
+  fi
+
+  if command -v flatpak >/dev/null 2>&1; then
+    if ! flatpak remotes --columns=name | grep -qx flathub; then
+      if flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo; then
+        echo "==> Flathub remote added."
+      else
+        echo "WARN: Could not add Flathub remote; skipping MQTT Explorer installation."
+      fi
+    fi
+
+    if flatpak remote-info flathub com.github.thomasnordquist.MQTTExplorer >/dev/null 2>&1; then
+      if flatpak install -y flathub com.github.thomasnordquist.MQTTExplorer; then
+        echo "==> MQTT Explorer installed via Flatpak (Flathub)."
+      else
+        echo "WARN: MQTT Explorer installation failed. Install manually later with:"
+        echo "      flatpak install flathub com.github.thomasnordquist.MQTTExplorer"
+      fi
+    else
+      echo "WARN: MQTT Explorer app id not found on Flathub metadata."
+      echo "      Run 'flatpak search mqtt explorer' and install the matching id manually."
+    fi
+  fi
+else
+  echo ""
+  echo "── Dev: MQTT tooling (skipped) ─────────────────────────────────────────"
+  echo "INFO: Skipping mosquitto/mosquitto-clients/MQTT Explorer (--skip-mqtt-tools)."
+fi
 
 echo ""
 echo "── Dev: 1Password app + CLI ────────────────────────────────────────────"
@@ -122,6 +179,29 @@ if [[ -n "${VSCODE_VERSION}" ]]; then
 else
   sudo dnf install -y code
   echo "==> VS Code latest installed (no version pin)."
+fi
+
+echo ""
+echo "── Dev: Azure CLI ───────────────────────────────────────────────────────"
+# Microsoft GPG key was already imported above for VS Code — rpm --import is idempotent.
+sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+
+sudo tee /etc/yum.repos.d/azure-cli.repo >/dev/null <<'REPOEOF'
+[azure-cli]
+name=Azure CLI
+baseurl=https://packages.microsoft.com/yumrepos/azure-cli
+enabled=1
+gpgcheck=1
+gpgkey=https://packages.microsoft.com/keys/microsoft.asc
+REPOEOF
+
+if sudo dnf install -y azure-cli; then
+  echo "==> Azure CLI installed."
+  echo "    Login:        az login"
+  echo "    Device flow:  az login --use-device-code"
+  echo "    Graph token:  az account get-access-token --resource-type ms-graph --query accessToken -o tsv"
+else
+  echo "WARN: Azure CLI install failed. Check network/CA access and rerun."
 fi
 
 echo ""

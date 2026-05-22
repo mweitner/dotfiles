@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 # Setup and manage git repositories on UGREEN NAS
-# Creates bare git repos at /volume1/data/repos/ with SSH access
+# Creates bare git repos below /volume1/data/repos/ with SSH access
+# Supports nested names (example: embedded-target/argo-hytos)
 # Usage: setup-nas-git-repo REPO_NAME [--host ugreen-nas|ugreen-nas-home] [--clone PATH] [--delete]
 
 set -euo pipefail
@@ -39,8 +40,19 @@ if [[ -z "$REPO_NAME" ]]; then
   echo ""
   echo "Examples:"
   echo "  setup-nas-git-repo my-project"
+  echo "  setup-nas-git-repo embedded-target/argo-hytos"
   echo "  setup-nas-git-repo mining-fw --clone ~/src/"
   echo "  setup-nas-git-repo old-project --delete"
+  exit 1
+fi
+
+if [[ "$REPO_NAME" == /* ]]; then
+  echo "Repository name must be a relative path (no leading '/'): $REPO_NAME" >&2
+  exit 1
+fi
+
+if [[ "$REPO_NAME" == *".."* ]]; then
+  echo "Repository name must not contain '..': $REPO_NAME" >&2
   exit 1
 fi
 
@@ -90,6 +102,7 @@ REPO_PATH="$2"
 HINT_HOST="$3"
 
 mkdir -p "$REPO_BASE"
+mkdir -p "$(dirname "$REPO_PATH")"
 if ! command -v git >/dev/null 2>&1; then
   echo "ERROR: git is not installed on NAS. Install it with an interactive SSH session (sudo needs a TTY):" >&2
   echo "  ssh -t $HINT_HOST \"sudo apt-get update && sudo apt-get install -y git && git --version\"" >&2
