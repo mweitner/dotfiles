@@ -457,6 +457,7 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   mkdir -p "$HOME/.local/bin"
   [[ -f "$DOTFILES/shell/nmtui" ]] && ln -sf "$DOTFILES/shell/nmtui" "$HOME/.local/bin/nmtui"
   [[ -f "$DOTFILES/shell/vpn-on" ]] && ln -sf "$DOTFILES/shell/vpn-on" "$HOME/.local/bin/vpn-on"
+  [[ -f "$DOTFILES/shell/fix-vpn-dns-browser" ]] && ln -sf "$DOTFILES/shell/fix-vpn-dns-browser" "$HOME/.local/bin/fix-vpn-dns-browser"
   [[ -f "$DOTFILES/shell/rdp-hop" ]] && ln -sf "$DOTFILES/shell/rdp-hop" "$HOME/.local/bin/rdp-hop"
   [[ -f "$DOTFILES/shell/setup-ugreen-nas-mount" ]] && ln -sf "$DOTFILES/shell/setup-ugreen-nas-mount" "$HOME/.local/bin/setup-ugreen-nas-mount"
   [[ -f "$DOTFILES/shell/nas-status" ]] && ln -sf "$DOTFILES/shell/nas-status" "$HOME/.local/bin/nas-status"
@@ -819,6 +820,30 @@ if findmnt -n -o FSTYPE / | grep -q btrfs; then
   sudo chattr +C /opt/yocto/shared/sstate-cache 2>/dev/null || true
 fi
 echo "==> Yocto directories ready."
+
+# ── VPN & DNS ──────────────────────────────────────────────────────────────────
+echo ""
+echo "── Home Office VPN DNS fix (GitHub Controller access) ──────────────────"
+echo ""
+echo "When using Liebherr VPN from home office, browser DNS may bypass system"
+echo "DNS and resolve corporate IPs incorrectly (Firefox DoH, Chrome socket cache)."
+echo ""
+echo "Solution: fix-vpn-dns-browser script is now installed:"
+echo "  After connecting to VPN, run: fix-vpn-dns-browser"
+echo ""
+echo "This will:"
+echo "  1. Configure systemd-resolved domain routing for liebherr.com"
+echo "  2. Disable Firefox DNS-over-HTTPS (DoH)"
+echo "  3. Clear browser DNS/socket caches"
+echo "  4. Verify resolution to corporate IP (10.243.65.137)"
+echo ""
+echo "Test resolution:"
+echo "  test-vpn-dns        # Test OS-level DNS"
+echo "  test-browser-dns    # Test HTTPS connectivity"
+echo ""
+echo "Documentation:"
+echo "  ~/document/wiki/doc-engine/source/analysis/homeoffice-github-controller-access/"
+echo ""
 
 # ── Done ───────────────────────────────────────────────────────────────────────
 echo ""

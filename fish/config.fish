@@ -109,3 +109,9 @@ function setupwifi --description 'Rename wlan device to wlan0 for legacy scripts
     sudo ip link set "$wifi_device_name" name wlan0
     sudo ip link set up wlan0
 end
+
+# VPN DNS management functions (GitHub Controller access from home office)
+# See: ~/document/wiki/doc-engine/source/analysis/homeoffice-github-controller-access/
+if test -f "$HOME/dotfiles/fish/functions/vpn-dns-fix.fish"
+    source "$HOME/dotfiles/fish/functions/vpn-dns-fix.fish"
+end

@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+# Fix DNS resolution and browser cache after VPN connect
+# Resolves issue where browsers still query wrong IP for corporate domains
+# despite OS-level DNS being correct.
+#
+# Usage:
+#   fix-vpn-dns-browser                    # Auto-detect VPN interface
+#   fix-vpn-dns-browser tun0               # Specify VPN interface
+#   fix-vpn-dns-browser tun0 --no-restart  # Don't restart browsers
+
+set -euo pipefail
+
+VPN_INTERFACE="${1:-}"
+RESTART_BROWSERS="${2:-}"
+
+# Auto-detect VPN interface if not provided
+if [[ -z "$VPN_INTERFACE" ]]; then
+    # Look for tun0, ppp0, cscotun0, etc.
+    VPN_INTERFACE=$(ip link show | grep -E 'tun[0-9]+|ppp[0-9]+|cscotun' | head -1 | awk '{print $2}' | tr -d ':')
+    if [[ -z "$VPN_INTERFACE" ]]; then
+        echo "Error: could not auto-detect VPN interface. Provide it explicitly: fix-vpn-dns-browser <interface>" >&2
+        exit 1
+    fi
+fi
+
+echo "==> VPN Interface: $VPN_INTERFACE"
+
+# Verify interface exists
+if ! ip link show "$VPN_INTERFACE" >/dev/null 2>&1; then
+    echo "Error: VPN interface '$VPN_INTERFACE' does not exist" >&2
+    exit 1
+fi
+
+# ==============================================================================
+# STEP 1: Fix OS-level DNS routing (system-wide)
+# ==============================================================================
+echo ""
+echo "==> Step 1: configuring system-level DNS routing for liebherr domains..."
+
+# Before making changes, verify current state
+echo "    Checking current DNS state..."
+if ! resolvectl query controller.lis-github.liebherr.com &>/dev/null; then
+    echo "    ⚠️  Currently cannot resolve controller.lis-github.liebherr.com"
+else
+    echo "    ✓ OS-level DNS already resolves controller.lis-github.liebherr.com"
+fi
+
+# Set domain routing to VPN interface
+echo "    Configuring liebherr.com domain routing via $VPN_INTERFACE..."
+if sudo resolvectl domain "$VPN_INTERFACE" liebherr.com; then
+    echo "    ✓ Domain routing configured"
+else
+    echo "    ⚠️  Domain routing configuration returned non-zero; continuing..." >&2
+fi
+
+# Flush DNS cache
+echo "    Flushing system DNS cache..."
+sudo resolvectl flush-caches || true
+
+# Wait a moment for changes to settle
+sleep 1
+
+# Verify resolution
+echo "    Verifying DNS resolution..."
+if RESOLVED_IP=$(resolvectl query controller.lis-github.liebherr.com 2>&1 | grep -oP '(?<=: )[0-9.]+' | head -1); then
+    if [[ "$RESOLVED_IP" == "10.243.65.137" ]]; then
+        echo "    ✓ Corporate IP resolved: $RESOLVED_IP"
+    else
+        echo "    ⚠️  Wrong IP resolved: $RESOLVED_IP (expected 10.243.65.137)" >&2
+    fi
+else
+    echo "    ⚠️  No IP resolved; VPN DNS may not be ready yet" >&2
+fi
+
+# ==============================================================================
+# STEP 2: Configure Firefox to disable DoH and trust system DNS
+# ==============================================================================
+echo ""
+echo "==> Step 2: configuring Firefox DNS settings..."
+
+FIREFOX_CONFIG_DIR="$HOME/.mozilla/firefox"
+
+if [[ ! -d "$FIREFOX_CONFIG_DIR" ]]; then
+    echo "    ⚠️  Firefox config directory not found; skipping Firefox config"
+else
+    # Find the default profile(s)
+    FIREFOX_PROFILES=$(find "$FIREFOX_CONFIG_DIR" -name "prefs.js" 2>/dev/null)
+    
+    if [[ -z "$FIREFOX_PROFILES" ]]; then
+        echo "    ⚠️  No Firefox profiles found; skipping"
+    else
+        while IFS= read -r prefs_file; do
+            profile_dir=$(dirname "$prefs_file")
+            echo "    Updating profile: $profile_dir"
+            
+            # Disable DNS-over-HTTPS (DoH)
+            # This forces Firefox to use system DNS instead of Cloudflare/NextDNS/etc.
+            sed -i '/user_pref.*network\.trr.*enabled/d' "$prefs_file" 2>/dev/null || true
+            echo 'user_pref("network.trr.mode", 5);' >> "$prefs_file"
+            echo 'user_pref("network.trr.uri", "");' >> "$prefs_file"
+            
+            echo "    ✓ Firefox DoH disabled; will use system DNS"
+        done <<< "$FIREFOX_PROFILES"
+    fi
+fi
+
+# ==============================================================================
+# STEP 3: Clear browser caches
+# ==============================================================================
+echo ""
+echo "==> Step 3: clearing browser caches..."
+
+# Chrome/Chromium cache
+CHROME_CACHE_DIRS=(
+    "$HOME/.config/google-chrome/Default/Cache"
+    "$HOME/.config/chromium/Default/Cache"
+    "$HOME/.cache/google-chrome"
+    "$HOME/.cache/chromium"
+)
+
+for cache_dir in "${CHROME_CACHE_DIRS[@]}"; do
+    if [[ -d "$cache_dir" ]]; then
+        echo "    Clearing Chrome cache: $cache_dir"
+        rm -rf "$cache_dir" 2>/dev/null || true
+    fi
+done
+
+# Firefox cache
+FIREFOX_CACHE_DIRS=$(find "$FIREFOX_CONFIG_DIR" -type d -name "cache2" 2>/dev/null)
+if [[ -n "$FIREFOX_CACHE_DIRS" ]]; then
+    while IFS= read -r cache_dir; do
+        echo "    Clearing Firefox cache: $cache_dir"
+        rm -rf "$cache_dir" 2>/dev/null || true
+    done <<< "$FIREFOX_CACHE_DIRS"
+fi
+
+echo "    ✓ Browser caches cleared"
+
+# ==============================================================================
+# STEP 4: Optionally restart browsers
+# ==============================================================================
+if [[ "$RESTART_BROWSERS" != "--no-restart" ]]; then
+    echo ""
+    echo "==> Step 4: restarting browsers to apply DNS changes..."
+    
+    # Kill Firefox
+    if pgrep -u "$UID" -x firefox >/dev/null 2>&1; then
+        echo "    Closing Firefox..."
+        killall -TERM firefox 2>/dev/null || true
+        sleep 2
+        # Ensure it's dead
+        killall -KILL firefox 2>/dev/null || true
+    fi
+    
+    # Kill Chrome
+    for browser_cmd in google-chrome google-chrome-stable chromium chromium-browser; do
+        if pgrep -u "$UID" -f "$browser_cmd" >/dev/null 2>&1; then
+            echo "    Closing $browser_cmd..."
+            killall -TERM "$browser_cmd" 2>/dev/null || true
+        fi
+    done
+    
+    sleep 2
+    
+    echo "    ✓ Browsers closed; restart them manually or with: firefox &"
+else
+    echo ""
+    echo "    Skipping browser restart (use --no-restart to skip by default)"
+fi
+
+# ==============================================================================
+# SUMMARY
+# ==============================================================================
+echo ""
+echo "==> ✓ VPN DNS fix complete!"
+echo ""
+echo "    Summary:"
+echo "    - System DNS now routes liebherr.com via $VPN_INTERFACE (10.243.65.137)"
+echo "    - Firefox DoH disabled; will use system DNS"
+echo "    - Browser caches cleared"
+echo ""
+echo "    Test resolution:"
+echo "      resolvectl query controller.lis-github.liebherr.com"
+echo ""
+echo "    Test in browser:"
+echo "      https://controller.lis-github.liebherr.com/dashboard"
+echo ""
