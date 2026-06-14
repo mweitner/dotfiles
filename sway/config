@@ -54,8 +54,9 @@ exec foot
 # Start udiskie (your automounter)
 exec udiskie -A
 
-# Secret service for Remmina/libsecret (avoids libsecret critical warnings)
-exec --no-startup-id sh -c 'if command -v gnome-keyring-daemon >/dev/null; then mkdir -p "$XDG_RUNTIME_DIR/keyring"; gnome-keyring-daemon --daemonize --components=secrets --control-directory "$XDG_RUNTIME_DIR/keyring" >/dev/null; fi'
+# Secret service for Remmina/libsecret (opt-in to avoid unsolicited keyring prompts).
+# Enable only when needed: ENABLE_GNOME_KEYRING_SECRETS=1 sway
+exec --no-startup-id sh -c 'if [ "${ENABLE_GNOME_KEYRING_SECRETS:-0}" = "1" ] && command -v gnome-keyring-daemon >/dev/null; then mkdir -p "$XDG_RUNTIME_DIR/keyring"; gnome-keyring-daemon --daemonize --components=secrets --control-directory "$XDG_RUNTIME_DIR/keyring" >/dev/null; fi'
 
 # NetworkManager tray applet (provides quick GUI controls)
 exec_always --no-startup-id sh -c 'pkill -x nm-applet; command -v nm-applet >/dev/null && nm-applet --indicator'

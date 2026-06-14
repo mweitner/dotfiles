@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# bluetooth-devices — small helper for quick bluetoothctl connect aliases
+# Install to ~/.local/bin and optionally symlink to connect-* convenience names.
+
+# Default MACs (override by exporting env vars before running)
+MAC_AIRPODS="${MAC_AIRPODS:-F8:73:DF:21:7F:7A}"
+MAC_MOUSE="${MAC_MOUSE:-DB:C3:31:3F:76:9A}"
+MAC_KB="${MAC_KB:-DD:79:06:40:03:15}"
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") <command>
+Commands:
+  connect-airpods     Connect AirPod Max
+  connect-mouse       Connect MX Master 3S
+  connect-keyboard    Connect MX Mechanical keyboard
+  bt-set-alias <mac> <alias>  Set device alias via bluetoothctl
+  bt-show             Show configured MACs
+  help                Show this help
+EOF
+}
+
+run_bluetoothctl() {
+  # Run bluetoothctl with provided args; keep compatibility with interactive TTY
+  bluetoothctl "$@"
+}
+
+case "${1:-}" in
+  connect-airpods)
+    echo "Connecting AirPod Max ($MAC_AIRPODS) ..."
+    run_bluetoothctl connect "$MAC_AIRPODS"
+    ;;
+  connect-mouse)
+    echo "Connecting Mouse ($MAC_MOUSE) ..."
+    run_bluetoothctl connect "$MAC_MOUSE"
+    ;;
+  connect-keyboard)
+    echo "Connecting Keyboard ($MAC_KB) ..."
+    run_bluetoothctl connect "$MAC_KB"
+    ;;
+  bt-set-alias)
+    if [[ -z "${2:-}" || -z "${3:-}" ]]; then
+      echo "Usage: $0 bt-set-alias <mac> <alias>" >&2
+      exit 2
+    fi
+    run_bluetoothctl set-alias "$2" "$3"
+    ;;
+  bt-show)
+    echo "Configured MACs (override by exporting env vars):"
+    echo "  MAC_AIRPODS=$MAC_AIRPODS"
+    echo "  MAC_MOUSE=$MAC_MOUSE"
+    echo "  MAC_KB=$MAC_KB"
+    ;;
+  -h|--help|help|"")
+    usage
+    ;;
+  *)
+    echo "Unknown command: ${1:-}<none>" >&2
+    usage
+    exit 2
+    ;;
+esac

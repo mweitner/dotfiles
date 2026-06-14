@@ -111,6 +111,41 @@ set_default_browser() {
   echo "WARN: no known browser desktop file found; leaving default browser unchanged."
 }
 
+# Route every Chrome launch through one repo-owned wrapper so desktop launch,
+# workspace scripts, and shell commands all use the same backend behavior.
+configure_google_chrome_launcher() {
+  local system_desktop local_desktop wrapper_src wrapper_bin wrapper_legacy wrapper_exec_escaped
+
+  system_desktop="/usr/share/applications/google-chrome.desktop"
+  local_desktop="$HOME/.local/share/applications/google-chrome.desktop"
+  wrapper_src="$DOTFILES/shell/google-chrome-wrapper"
+  wrapper_bin="$HOME/.local/bin/google-chrome-stable"
+  wrapper_legacy="$HOME/.local/bin/google-chrome"
+
+  if [[ ! -f "$wrapper_src" ]]; then
+    echo "WARN: Chrome wrapper script missing at $wrapper_src; skipping Chrome launcher setup."
+    return 0
+  fi
+
+  mkdir -p "$HOME/.local/bin"
+  ln -sfn "$wrapper_src" "$wrapper_bin"
+  ln -sfn "$wrapper_src" "$wrapper_legacy"
+
+  if [[ ! -f "$system_desktop" ]]; then
+    echo "INFO: google-chrome.desktop not found; installed shell wrappers only."
+    return 0
+  fi
+
+  mkdir -p "$HOME/.local/share/applications"
+  cp "$system_desktop" "$local_desktop"
+  wrapper_exec_escaped="${wrapper_bin//\//\\/}"
+  sed -i -E "s#^Exec=[^ ]+#Exec=$wrapper_exec_escaped#" "$local_desktop"
+  command -v update-desktop-database >/dev/null 2>&1 && \
+    update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
+
+  echo "==> Chrome launches unified via $wrapper_bin."
+}
+
 # Install optional company CA certs from a private secrets directory.
 # Expected filenames:
 # - LiebherrEnterpriseCA02.crt
@@ -392,6 +427,17 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   echo ""
   echo "── Phase 2: Creating config symlinks ────────────────────────────────────"
 
+  # Ensure every Chrome launch path uses the same repo-owned wrapper.
+  configure_google_chrome_launcher
+
+  # Disable DBus auto-activation of GNOME Secret Service in this profile.
+  # This prevents recurring keyring prompts in greetd + Sway sessions.
+  mkdir -p "$HOME/.local/share/dbus-1/services"
+  if [[ -f "$DOTFILES/dbus/services/org.freedesktop.secrets.service" ]]; then
+    ln -sfn "$DOTFILES/dbus/services/org.freedesktop.secrets.service" \
+      "$HOME/.local/share/dbus-1/services/org.freedesktop.secrets.service"
+  fi
+
   # Sway
   mkdir -p "$XDG_CONFIG_HOME/sway"
   ln -sf "$DOTFILES/sway/config"   "$XDG_CONFIG_HOME/sway/config"
@@ -590,6 +636,14 @@ EOF
 
   echo ""
   echo "── Phase 3b: Configuring greetd ──────────────────────────────────────────"
+  echo "==> Disabling pam_gnome_keyring in /etc/pam.d/greetd to avoid keyring popups in Sway sessions."
+  if [[ -f /etc/pam.d/greetd ]]; then
+    sudo sed -i -E \
+      -e 's/^-auth[[:space:]]+optional[[:space:]]+pam_gnome_keyring\.so/# auth optional pam_gnome_keyring.so (disabled by install-fedora.sh)/' \
+      -e 's/^-session[[:space:]]+optional[[:space:]]+pam_gnome_keyring\.so[[:space:]]+auto_start/# session optional pam_gnome_keyring.so auto_start (disabled by install-fedora.sh)/' \
+      /etc/pam.d/greetd
+  fi
+
   if command -v tuigreet &>/dev/null; then
     GREETD_DOTFILE="$DOTFILES/greetd/config.toml"
     sudo mkdir -p /etc/greetd
@@ -697,6 +751,14 @@ EOF
       fi
     fi
     echo "==> fish default shell check done."
+
+    echo ""
+    echo "── Phase 3e: Disable user keyring autospawn (Sway default) ──────────────"
+    # In greetd + Sway sessions, gnome-keyring can be DBus/PAM auto-started and
+    # trigger recurring "Default Keyring" prompts when apps probe Secret Service.
+    # Keep it disabled by default; start explicitly only when needed.
+    systemctl --user mask --now gnome-keyring-daemon.service gnome-keyring-daemon.socket 2>/dev/null || true
+    echo "==> gnome-keyring user service/socket masked (opt-in mode)."
 
     # Bootstrap fish plugin manager + plugins declared in fish_plugins.
     if [[ -f "$XDG_CONFIG_HOME/fish/fish_plugins" ]]; then

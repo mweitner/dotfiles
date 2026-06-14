@@ -64,7 +64,9 @@ if ! pgrep -u "$UID" -f '(^|/)(google-chrome(-stable)?|chromium(-browser)?)( |$)
   cleanup_browser_singleton_lock "${XDG_CONFIG_HOME:-$HOME/.config}/google-chrome"
   cleanup_browser_singleton_lock "${XDG_CONFIG_HOME:-$HOME/.config}/chromium"
 
-  if command -v google-chrome-stable >/dev/null 2>&1; then
+  if [[ -x "$HOME/.local/bin/google-chrome-stable" ]]; then
+    ws_exec 6 web2 "$HOME/.local/bin/google-chrome-stable"
+  elif command -v google-chrome-stable >/dev/null 2>&1; then
     ws_exec 6 web2 google-chrome-stable
   elif command -v google-chrome >/dev/null 2>&1; then
     ws_exec 6 web2 google-chrome

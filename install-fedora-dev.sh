@@ -11,6 +11,7 @@ set -euo pipefail
 #
 #   VSCODE_VERSION=1.116 bash install-fedora-dev.sh    # bump VS Code pin
 #   VSCODE_VERSION=""    bash install-fedora-dev.sh    # install latest (no pin)
+#   bash install-fedora-dev.sh --latest                 # install latest (no pin)
 #   bash install-fedora-dev.sh --skip-mqtt-tools        # skip MQTT tools setup
 #
 # Idempotent: safe to re-run.
@@ -18,14 +19,15 @@ set -euo pipefail
 
 # ── Version pins (override via environment) ────────────────────────────────────
 # Set VSCODE_VERSION to empty string to always track the latest stable release.
-VSCODE_VERSION="${VSCODE_VERSION:-1.115}"
+VSCODE_VERSION="${VSCODE_VERSION:-1.124.0}"
 SKIP_MQTT_TOOLS=false
 
 for arg in "$@"; do
   case "$arg" in
     --skip-mqtt-tools) SKIP_MQTT_TOOLS=true ;;
+    --latest) VSCODE_VERSION="" ;;
     *)
-      echo "WARN: unknown argument '$arg' (supported: --skip-mqtt-tools); ignoring."
+      echo "WARN: unknown argument '$arg' (supported: --skip-mqtt-tools, --latest); ignoring."
       ;;
   esac
 done
@@ -288,6 +290,26 @@ REPOEOF
 sudo dnf check-update || true
 
 if [[ -n "${VSCODE_VERSION}" ]]; then
+
+echo ""
+echo "── Dev: Bluetooth helper scripts ───────────────────────────────────────"
+# Install bluetooth helper script from this repo if present
+bluetooth_src="$script_dir/shell/bluetooth-devices"
+install_dir="$HOME/.local/bin"
+if [[ -f "$bluetooth_src" ]]; then
+  mkdir -p "$install_dir"
+  ln -sfn "$bluetooth_src" "$install_dir/bluetooth-devices"
+  chmod +x "$install_dir/bluetooth-devices" 2>/dev/null || true
+  # Create convenience command names that point to the single helper
+  for cmd in connect-airpods connect-mouse connect-keyboard bt-show; do
+    ln -sfn "$install_dir/bluetooth-devices" "$install_dir/$cmd"
+  done
+  echo "==> Bluetooth helper installed to $install_dir (connect-airpods, connect-mouse, connect-keyboard)"
+else
+  echo "INFO: $bluetooth_src not found; skipping bluetooth helper installation."
+  echo "      To install: place the helper at $bluetooth_src and rerun this script."
+fi
+
   # Clear any existing versionlock so the new pin can be applied cleanly on re-run.
   sudo dnf versionlock delete code 2>/dev/null || true
 
@@ -312,8 +334,12 @@ if [[ -n "${VSCODE_VERSION}" ]]; then
     echo "INFO: versionlock unavailable — track VS Code upgrades manually."
   fi
 else
-  sudo dnf install -y code
-  echo "==> VS Code latest installed (no version pin)."
+  # Remove version lock if it exists (from previous pinned installs)
+  sudo dnf versionlock delete code 2>/dev/null || true
+  
+  # Upgrade to latest (dnf upgrade installs if not present, upgrades if already installed)
+  sudo dnf upgrade -y code
+  echo "==> VS Code upgraded to latest (no version pin)."
 fi
 
 echo ""

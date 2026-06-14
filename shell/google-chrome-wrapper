@@ -1,0 +1,25 @@
+#!/bin/bash
+set -euo pipefail
+
+chrome_bin=""
+log_file="${XDG_CACHE_HOME:-$HOME/.cache}/google-chrome-wrapper.log"
+
+for candidate in /usr/bin/google-chrome-stable /usr/bin/google-chrome /opt/google/chrome/google-chrome; do
+  if [[ -x "$candidate" ]]; then
+    chrome_bin="$candidate"
+    break
+  fi
+done
+
+if [[ -z "$chrome_bin" ]]; then
+  echo "ERROR: Google Chrome binary not found." >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$log_file")"
+printf '%s %s %s\n' "$(date -Iseconds)" "$chrome_bin" "$*" >>"$log_file"
+
+exec "$chrome_bin" \
+  --password-store=basic \
+  --use-mock-keychain \
+  "$@"
