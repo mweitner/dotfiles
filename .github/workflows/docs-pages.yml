@@ -1,0 +1,82 @@
+# Repository: https://github.com/mweitner/dotfiles
+# Docs URL: https://mweitner.github.io/dotfiles/
+name: Docs Pages
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - doc-engine/**
+      - doc-engine.md
+      - README.md
+      - CHANGELOG.md
+      - CONTRIBUTING.md
+      - .github/workflows/docs-pages.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - doc-engine/**
+      - doc-engine.md
+      - README.md
+      - CHANGELOG.md
+      - CONTRIBUTING.md
+      - .github/workflows/docs-pages.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Setup Java (PlantUML)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install PlantUML
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y plantuml
+      - name: Install docs dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install \
+            sphinx \
+            myst-parser \
+            sphinxcontrib-plantuml \
+            sphinxcontrib-mermaid \
+            furo
+      - name: Build Sphinx HTML
+        run: |
+          sphinx-build -b html doc-engine/source doc-engine/build/html -E -W --keep-going
+          touch doc-engine/build/html/.nojekyll
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: doc-engine/build/html
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

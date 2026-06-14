@@ -97,6 +97,19 @@ maintenance is Fedora with fish and Sway.
 
 The repository includes a local Sphinx documentation workspace in [doc-engine](doc-engine).
 
+## Docs Publishing
+
+[![Docs Pages](https://github.com/mweitner/dotfiles/actions/workflows/docs-pages.yml/badge.svg)](https://github.com/mweitner/dotfiles/actions/workflows/docs-pages.yml)
+
+- Workflow file: [.github/workflows/docs-pages.yml](.github/workflows/docs-pages.yml)
+- Published site URL: <https://mweitner.github.io/dotfiles/>
+
+Activation notes:
+
+1. Ensure GitHub Pages is configured to deploy from GitHub Actions.
+2. Push changes to main, or trigger the workflow manually from the Actions tab.
+3. Check the deploy job output for the final page URL.
+
 Common validation commands:
 
 ```bash
