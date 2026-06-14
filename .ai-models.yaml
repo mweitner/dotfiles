@@ -2,9 +2,25 @@
 models:
   gpt-5-mini:
     purpose: "Default assistant for small edits and doc suggestions"
+  auto:
+    purpose: "Auto-select best available model per repo/global config"
 accounts:
   personal_github:
-    preferred: gpt-5-mini
+    preferred: auto
 defaults:
   temperature: 0.0
   max_tokens: 1024
+# Selection policies tell `auto` which models to prefer for certain task types.
+# The agent or runner should consult these when `auto` is selected.
+selection_policies:
+  task_priorities:
+    complex_markdown_fix:
+      - claude_opus_4_6
+      - claude_haiku_4_5
+      - gpt-5-mini
+    large_document_processing:
+      - claude_opus_4_6
+      - claude_haiku_4_5
+    interactive_code_or_snippets:
+      - gpt-5-mini
+      - claude_haiku_4_5

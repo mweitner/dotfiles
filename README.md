@@ -18,30 +18,28 @@ bash ~/dotfiles/install-fedora-dev.sh
 reboot
 # or:
 sway
-```
-
+```text
 ## Installation Scripts
 
 ### `install-fedora.sh`
 
 Base system setup for Fedora Workstation (41+). Idempotent — safe to re-run.
 
-**Phases:**
+## 
 
 1. **Phase 1**: Package installation (Sway, tools, VPN, Docker, fonts, etc.)
 2. **Phase 2**: Config symlinks (sway, waybar, fish, git, etc.)
 3. **Phase 3**: Services & daemon config (NetworkManager, greetd, tlp, TLP dock tuning, etc.)
 4. **Phase 4**: Yocto shared directories (/opt/yocto/shared)
 
-**Options:**
+## 
 
 ```bash
 install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--skip-docker] \
                   [--skip-docker-daemon-config] [--skip-dev] \
                   [--with-ssh-secrets] [--with-netrc-secrets] [--with-1password-ssh-agent]
-```
-
-**Key Features:**
+```text
+## 
 
 - Wayland/Sway + Waybar, wofi, foot terminal
 - Modern CLI tools (ripgrep, fd-find, fzf, zoxide, htop)
@@ -55,7 +53,7 @@ install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--skip-
 
 Development tools & environment integration. Can be run independently.
 
-**Includes:**
+## 
 
 - Neovim + git-delta + meld
 - Go, pre-commit, GitHub CLI, plantuml, pandoc
@@ -65,13 +63,12 @@ Development tools & environment integration. Can be run independently.
 - VS Code (version-pinnable)
 - Azure CLI
 
-**Version pins (override via environment):**
+## 
 
 ```bash
 VSCODE_VERSION=1.115 bash install-fedora-dev.sh    # Pin VS Code to 1.115.x
 VSCODE_VERSION=""    bash install-fedora-dev.sh    # Track latest
-```
-
+```text
 ### `install-ubuntu-bash.sh` & `install.sh`
 
 Legacy Ubuntu/Bash setups. For reference only; primary target is Fedora + fish.
@@ -90,8 +87,7 @@ After connecting to VPN, run:
 fix-vpn-dns-browser       # Auto-detects VPN interface, fixes all layers
 test-vpn-dns              # Verify OS DNS resolution → 10.243.65.137
 test-browser-dns          # Verify HTTPS connectivity
-```
-
+```text
 The script:
 
 1. Configures systemd-resolved domain routing for `liebherr.com`
@@ -112,7 +108,7 @@ Includes:
 
 ## Directory Structure
 
-```
+```text
 ~/dotfiles/
 ├── install-fedora.sh               # Base Fedora setup
 ├── install-fedora-dev.sh           # Dev tools (independently runnable)
@@ -150,8 +146,7 @@ Includes:
     ├── ssh/                        # SSH keys & profiles
     ├── yocto/keys/                 # Yocto keys (prod/dev)
     └── ...
-```
-
+```text
 ## Fish Shell Functions
 
 Auto-sourced from `~/.config/fish/functions/`. Key additions:
@@ -160,8 +155,7 @@ Auto-sourced from `~/.config/fish/functions/`. Key additions:
 fix-vpn-dns-browser [interface]    # Fix VPN DNS + browser cache
 test-vpn-dns                       # Test OS DNS resolution
 test-browser-dns                   # Test HTTPS connectivity
-```
-
+```text
 Other available:
 
 - `compress <dir>` – Create tar.gz
@@ -173,7 +167,7 @@ Other available:
 
 ### `.secrets/` Directory Structure
 
-```
+```text
 .secrets/
 ├── .gitignore              # Exclude all from git
 ├── ssh/                    # SSH keys
@@ -189,16 +183,14 @@ Other available:
 ├── microsoft/              # Azure/Teams credentials
 ├── ci/                     # GitHub Actions secrets
 └── iot-gateways/           # Device provisioning
-```
-
+```text
 Install secrets selectively:
 
 ```bash
 install-fedora.sh --with-ssh-secrets         # Copy ~/.ssh from .secrets
 install-fedora.sh --with-netrc-secrets       # Copy ~/.netrc
 install-fedora.sh --with-1password-ssh-agent # Set up 1Password SSH agent
-```
-
+```text
 ## Common Tasks
 
 ### Update Fedora packages
@@ -206,37 +198,32 @@ install-fedora.sh --with-1password-ssh-agent # Set up 1Password SSH agent
 ```bash
 sudo dnf upgrade
 bash install-fedora.sh --skip-symlinks   # Refresh config symlinks after major update
-```
-
+```text
 ### Switch Yocto key profile
 
 ```bash
 switch-yocto-keys-profile llp prod       # Switch llp from dev → prod keys
 switch-yocto-keys-profile lpo dev        # Switch lpo from prod → dev keys
-```
-
+```text
 ### Set up Yocto build
 
 ```bash
 setup-yocto-project --project linux-lpo  # Initialize LPO Yocto
 cd ~/lpo-dev/linux-lpo
 lpo-build bitbake -u knotty -v lpo-display-image
-```
-
+```text
 ### Connect to Liebherr VPN (home office)
 
 ```bash
 vpn-on                                   # Interactive SAML browser flow
 fix-vpn-dns-browser                      # Fix DNS + browser cache
 test-vpn-dns && test-browser-dns         # Verify connectivity
-```
-
+```text
 ### Remote desktop (Windows/hop-PC)
 
 ```bash
 remmina                                  # Open GUI; profiles stored in ~/.config/remmina/
-```
-
+```text
 ## Troubleshooting
 
 ### VPN DNS still resolves wrong IP?
@@ -248,8 +235,7 @@ See [RUNBOOK-vpn-dns-browser-fix.md](../document/wiki/doc-engine/source/analysis
 ```bash
 pre-commit-helper --fix-config                # Patch node/golang to system
 setup-pre-commit                              # Re-run setup + pre-cache
-```
-
+```text
 See `~/document/wiki/...` for details.
 
 ### Yocto build fails?
@@ -257,8 +243,7 @@ See `~/document/wiki/...` for details.
 ```bash
 setup-yocto-project --help                    # Project initialization
 yocto-prefetch-source --help                  # Manual source fetch
-```
-
+```text
 ## References
 
 - [Sway Documentation](https://swaywm.org/)

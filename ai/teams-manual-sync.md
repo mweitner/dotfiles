@@ -21,17 +21,15 @@ This workflow captures chat content from Teams Web with a bookmarklet and saves 
 bash /home/ldcwem0/dotfiles/ai/save-teams-chat-md.sh \
   /home/ldcwem0/dps-dev \
   absprache-kommunikationsschnittstelle-lpo
-```
-
-5. If you capture more chunks the same day, append to the same file:
+```text
+1. If you capture more chunks the same day, append to the same file:
 
 ```bash
 bash /home/ldcwem0/dotfiles/ai/save-teams-chat-md.sh \
   /home/ldcwem0/dps-dev \
   absprache-kommunikationsschnittstelle-lpo \
   --append
-```
-
+```text
 ## Output Location
 
 - Folder: `/home/ldcwem0/dps-dev/docs/ai-context`
@@ -43,10 +41,9 @@ bash /home/ldcwem0/dotfiles/ai/save-teams-chat-md.sh \
 
 ```bash
 ls -lah /home/ldcwem0/dps-dev/docs/ai-context
-```
-
-2. Preview first lines:
+```text
+1. Preview first lines:
 
 ```bash
 sed -n '1,40p' /home/ldcwem0/dps-dev/docs/ai-context/teams-sync-$(date +%Y-%m-%d)-absprache-kommunikationsschnittstelle-lpo.md
-```
+```text
