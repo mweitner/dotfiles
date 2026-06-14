@@ -26,23 +26,19 @@ has_home_middle="$(echo "$outputs_json" | jq --arg s "$HOME_MIDDLE_SERIAL" '[.[]
 
 ulm_ext_count="$(echo "$outputs_json" | jq '[.[] | select(.active == true and (.name | test("^eDP") | not) and .current_mode.width == 1920 and .current_mode.height == 1200)] | length')"
 
-profile="mixed"
 text="MON MIX"
 tooltip="Mixed/Custom monitor layout"
 class="mixed"
 
 if [ "$active_count" -eq 1 ] && [ "$has_edp" -eq 1 ]; then
-  profile="laptop"
   text="MON LAP"
   tooltip="Laptop-only (eDP)"
   class="laptop"
 elif [ "$active_count" -ge 3 ] && [ "$has_edp" -ge 1 ] && [ "$has_home_left" -ge 1 ] && [ "$has_home_middle" -ge 1 ]; then
-  profile="home-office"
   text="MON HOME"
   tooltip="Home office profile active"
   class="home-office"
 elif [ "$active_count" -ge 3 ] && [ "$has_edp" -ge 1 ] && [ "$ulm_ext_count" -ge 2 ]; then
-  profile="ulm-office"
   text="MON ULM"
   tooltip="Ulm office profile active"
   class="ulm-office"

@@ -64,5 +64,5 @@ echo "mnt-data.mount:        $mount_state"
 if [[ "$mounted" == "yes" ]]; then
   echo ""
   echo "Directory preview ($MOUNT_POINT):"
-  ls -1 "$MOUNT_POINT" 2>/dev/null | head -n 10 || true
+  find "$MOUNT_POINT" -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null | head -n 10 || true
 fi

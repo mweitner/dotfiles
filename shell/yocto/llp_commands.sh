@@ -12,7 +12,7 @@
 # - llp_upload_swu
 #
 
-if [ "${BASH_SOURCE}" = "${0}" ]; then
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
 	printf "\\n[llp_commands] Error: This script must to be sourced\\n\\n"
   return 254
 fi
@@ -60,11 +60,11 @@ bb_machine="$MACHINE"
 if [[ -z "$bb_machine" ]]; then
   echo "[llp_commands] Error bb_machine not set"
   print_usage
-  return 259
+  return 159
 fi
 
 build_root=${BBPATH}
-echo "args:$# $0 $1 $2 $3(all: $@)"
+echo "args:$# $0 $1 $2 $3(all: $*)"
 
 project_distro_layer="meta-liebherr-distro"
 if [[ $# -gt 0 ]] && [[ $# -lt 3 ]]; then
@@ -84,12 +84,12 @@ if [[ $# -gt 0 ]] && [[ $# -lt 3 ]]; then
   else
     echo "[llp_commands] Error illegal number of params"
     print_usage
-    return 258
+    return 158
   fi
 else
   echo "[llp_commands] Error illegal number of params. Must be 3"
   print_usage
-  return 257
+  return 157
 fi
 
 # replaced old project_root var setting using cdn 1 by pwd
@@ -103,7 +103,7 @@ if [[ -h "${project_root}" ]]; then
   # same time.
   # Its important to have specific project name instead of a generic name like
   # workspace. See project_name usage at keys folder etc.
-  project_name=$(basename $(readlink -f "${project_root}"))
+  project_name=$(basename "$(readlink -f "${project_root}")")
 fi
 project_source_root="${project_root}/layers"
 project_distro_layer_path=$(find "${project_source_root}" -iname "${project_distro_layer}"| head -n 1)
@@ -187,26 +187,26 @@ function llp_print_kpis() {
 
   echo "[llp_commands] kpi: "
 
-  echo $kpi_distro_features
-  echo $kpi_image_rootfs_size |awk '{print "IMAGE_ROOTFS_SIZE: " $1 }'
-  echo $kpi_image_rootfs_extra_space |awk '{print "IMAGE_ROOTFS_EXTRA_SPACE: " $1 }'
-  echo $kpi_image_rootfs_alignment |awk '{print "IMAGE_ROOTFS_ALIGNMENT: " $1 }'
-  echo $kpi_image_overhead_factor |awk '{print "IMAGE_OVERHEAD_FACTOR: " $1 }'
-  echo $kpi_size_kernel |awk '{print "kernel: " $1 }'
-  echo $kpi_size_dtb |awk '{ print "dtb: " $1 }'
-  echo $kpi_size_rootfs_targz |awk '{ print "rootfs.tar.gz: " $1 }'
-  echo $kpi_size_rootfs |awk '{ print "rootfs (bytes decimal): " $1 }'
-  echo $kpi_size_image |awk '{ print "wic: " $1 }'
-  echo $kpi_size_image_compressed |awk '{ print "wic.gz: " $1 }'
-  echo $kpi_size_uboot |awk '{ print "uboot: " $1 }'
-  echo $kpi_swu_image |awk '{ print "swu: " $1 }'
+  echo "$kpi_distro_features"
+  echo "$kpi_image_rootfs_size" |awk '{print "IMAGE_ROOTFS_SIZE: " $1 }'
+  echo "$kpi_image_rootfs_extra_space" |awk '{print "IMAGE_ROOTFS_EXTRA_SPACE: " $1 }'
+  echo "$kpi_image_rootfs_alignment" |awk '{print "IMAGE_ROOTFS_ALIGNMENT: " $1 }'
+  echo "$kpi_image_overhead_factor" |awk '{print "IMAGE_OVERHEAD_FACTOR: " $1 }'
+  echo "$kpi_size_kernel" |awk '{print "kernel: " $1 }'
+  echo "$kpi_size_dtb" |awk '{ print "dtb: " $1 }'
+  echo "$kpi_size_rootfs_targz" |awk '{ print "rootfs.tar.gz: " $1 }'
+  echo "$kpi_size_rootfs" |awk '{ print "rootfs (bytes decimal): " $1 }'
+  echo "$kpi_size_image" |awk '{ print "wic: " $1 }'
+  echo "$kpi_size_image_compressed" |awk '{ print "wic.gz: " $1 }'
+  echo "$kpi_size_uboot" |awk '{ print "uboot: " $1 }'
+  echo "$kpi_swu_image" |awk '{ print "swu: " $1 }'
 }
 
 yp_projects_source_root="/opt/yocto/project"
 yp_projects_build_root="/opt/yocto/build"
 yp_active_project_path="/opt/yocto/workspace"
 yp_active_project_build_path="${yp_active_project_path}/build"
-yp_active_project_source_path="${yp_active_project_path}/layers"
+export yp_active_project_source_path="${yp_active_project_path}/layers"
 
 function llp_list_projects() {
   echo "[llp_list_projects] todo"
@@ -231,7 +231,7 @@ function llp_get_active_project() {
     # same time.
     # Its important to have specific project name instead of a generic name like
     # workspace. See project_name usage at keys folder etc.
-    local_project_name=$(basename $(readlink -f "${yp_active_project_path}"))
+    local_project_name=$(basename "$(readlink -f "${yp_active_project_path}")")
   fi
   echo "[llp_get_active_project] active project is=${local_project_name}"
 }
@@ -261,15 +261,13 @@ function llp_activate_project() {
   echo "[llp_activate_project] Using local_yp_project_build=${local_yp_project_build}"
   echo "[llp_activate_project] activating project: $1"
 
-  ln -fns "${local_yp_project_source}" "${yp_active_project_path}"
-  if [[ $? != 0 ]];then
+  if ! ln -fns "${local_yp_project_source}" "${yp_active_project_path}"; then
     echo "[llp_activate_project] Error failed to symlink ${local_yp_project_source}"
     return 227
   fi
 
   if [[ ! -d "${local_yp_project_source_external}" ]];then
-    ln -fns "${local_yp_project_build}" "${yp_active_project_build_path}"
-    if [[ $? != 0 ]];then
+    if ! ln -fns "${local_yp_project_build}" "${yp_active_project_build_path}"; then
       echo "[llp_activate_project] Error failed to symlink ${local_yp_project_build}"
       return 226
     fi
@@ -279,7 +277,7 @@ function llp_activate_project() {
 }
 
 function llp_upload_swu() {
-  if ! pushd ${project_distro_layer_path};then
+  if ! pushd "${project_distro_layer_path}"; then
     echo "llp_upload_swu] Error could not switch to project_distro_layer_path"
     return 219
   fi
@@ -287,7 +285,7 @@ function llp_upload_swu() {
   project_version="${USERNAME}-$(git describe --tags --dirty)"
   echo "[llp_upload_swu] project_version=${project_version}"
 
-  popd
+  popd || return 218
   return 0
 }
 

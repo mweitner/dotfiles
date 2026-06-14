@@ -1,10 +1,8 @@
 #!/bin/sh
 
 echo "Starting i3 on $(tty)"
-pgrep i3 || exec startx "$XDG_CONFIG_HOME/X11/.xinitrc"
-if [ $? -ne 0 ]; then
-    echo "Failed to start i3. Please check your configuration."
-    exit 1
+if ! pgrep i3 >/dev/null 2>&1; then
+    exec startx "$XDG_CONFIG_HOME/X11/.xinitrc"
 fi
 echo "i3 started successfully on $(tty)"
 

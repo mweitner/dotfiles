@@ -68,7 +68,7 @@ if [[ ! -d "${build_root}" ]];then
   printf "\\n[llp_hawkbit_upload] Error: build_root does not exist\\n\\n"
   return 251
 fi
-echo "args:$#, arg[0]=$0, arg[1]=$1, arg[*]=$@"
+echo "args:$#, arg[0]=$0, arg[1]=$1, arg[*]=$*"
 if [[ $# -gt 0 ]] && [[ $# -lt 3 ]];then
   if [[ "$1" = "-h" ]]; then
     print_usage

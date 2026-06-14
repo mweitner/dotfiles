@@ -3,6 +3,15 @@ default_language_version:
   node: 20.19.0
   golang: 1.25.4
 repos:
+  - repo: local
+    hooks:
+      - id: ai-model-select
+        name: ai-model-select
+        entry: tools/ai/hooks/pre-ai-model-select.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -27,6 +36,15 @@ repos:
     rev: v0.11.0
     hooks:
       - id: shellcheck
+        args: [--severity=error]
+        exclude: |
+          (?x)
+          ^(?:
+            zsh/.*|
+            bash/\.bashrc|
+            bash/\.bash_profile|
+            shell/ubuntu-todo/cms_nas_chunk_analysis\.sh
+          )
   - repo: https://github.com/google/yamlfmt
     rev: v0.21.0
     hooks:
@@ -39,4 +57,4 @@ repos:
         stages: [pre-commit]
 exclude: |
   (?x)
-  ^(?:\.devcontainer/.*|\.vscode/launch.json|\.vscode/.*|\.tmp/.*|\.secrets/.*)
+  ^(?:\.devcontainer/.*|\.vscode/launch.json|\.vscode/.*|\.tmp/.*|\.secrets/.*|qutebrowser/.*)

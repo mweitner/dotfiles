@@ -1,17 +1,19 @@
 #!/bin/bash
 
+# shellcheck disable=SC1091
+
 #
 # llp_init_build.sh - Init the llp yp build environment
 #
 
-if [ "${BASH_SOURCE}" = "${0}" ]; then
-  echo "[llp_init_build] BASH_SOURCE: ${BASH_SOURCE}"
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  echo "[llp_init_build] BASH_SOURCE: ${BASH_SOURCE[0]}"
 	printf "\\n[llp_init_build] Error: This script must to be sourced\\n\\n"
   return 254
 fi
 
 project_root=$(pwd)
-project_name=$(basename ${project_root})
+project_name=$(basename "${project_root}")
 llp_distro_root="${project_root}/layers/liebherr/meta-liebherr-distro"
 smd_distro_root="${project_root}/layers/meta-lmt-smd"
 
@@ -126,7 +128,9 @@ CORE_IMAGE_EXTRA_INSTALL:append = " strace"
 
 EOT
 #quick solution enable/disable pip3 based python3 development on target
-return 0
+if [[ "${ENABLE_PIP3_DEV_BLOCK:-1}" -eq 1 ]]; then
+  return 0
+else
 cat <<EOT2 >> "${project_root}/build/conf/local.conf"
 # python on target improved development support
 # - first install native gcc tooling and python3-distribution package
@@ -162,3 +166,4 @@ IMAGE_INSTALL:append = " libnsl2 libcrypto openssl"
 
 IMAGE_EXTRA_FEATURES += "tools-sdk"
 EOT2
+fi

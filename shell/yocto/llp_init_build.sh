@@ -162,13 +162,13 @@ function create_feature_summary() {
   print_feature_summary
 }
 
-if [ "${BASH_SOURCE}" = "${0}" ]; then
-  echo "[llp_init_build] BASH_SOURCE: ${BASH_SOURCE}"
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  echo "[llp_init_build] BASH_SOURCE: ${BASH_SOURCE[0]}"
 	printf "\\n[llp_init_build] Error: This script must to be sourced\\n\\n"
   return 254
 fi
 
-echo "args:$#, arg[0]=$0, arg[1]=$1, arg[*]=$@"
+echo "args:$#, arg[0]=$0, arg[1]=$1, arg[*]=$*"
 if [[ $# -gt 0 ]]; then
     if [[ "$1" = "-h" ]]; then
       print_usage
@@ -195,7 +195,7 @@ if [[ -h "${project_root}" ]]; then
   # same time.
   # Its important to have specific project name instead of a generic name like
   # workspace. See project_name usage at keys folder etc.
-  project_name=$(basename $(readlink -f "${project_root}"))
+  project_name=$(basename "$(readlink -f "${project_root}")")
 fi
 
 function is_build_mixed_project_supported() {
@@ -204,7 +204,7 @@ function is_build_mixed_project_supported() {
   if [[ -d "${yp_build_mixed_project_root}" ]] && [[ -d "${yp_build_mixed_project_build_root}" ]] && [[ -d "${yp_build_mixed_project_root_sources}" ]];then
     # all mixed build root folders exist
     # check project name
-    local_yp_build_mixed_project_name=$(basename $(readlink -f "${yp_build_mixed_project_build_root}"))
+    local_yp_build_mixed_project_name=$(basename "$(readlink -f "${yp_build_mixed_project_build_root}")")
     if [[ "${project_name}" != "${local_yp_build_mixed_project_name}" ]];then
       echo "Mixed build not supported as project name is not same as current active project"
       return 1
@@ -215,27 +215,27 @@ function is_build_mixed_project_supported() {
   return 2
 }
 
-contains_arg "-llpdev" $@
+contains_arg "-llpdev" "$@"
 dev_support="$?"
-contains_arg "-llpnetboot" $@
+contains_arg "-llpnetboot" "$@"
 netboot_support="$?"
-contains_arg "-llpnodistroboot" $@
+contains_arg "-llpnodistroboot" "$@"
 nodistroboot_support="$?"
-contains_arg "-llpnetwork" $@
+contains_arg "-llpnetwork" "$@"
 network_support="$?"
-contains_arg "-llpscfwdev" $@
+contains_arg "-llpscfwdev" "$@"
 scfwdev_support="$?"
-contains_arg "-llpbus" $@
+contains_arg "-llpbus" "$@"
 bus_support="$?"
-contains_arg "-llppythontest" $@
+contains_arg "-llppythontest" "$@"
 pythontest_support="$?"
-contains_arg "-llpsotatest" $@
+contains_arg "-llpsotatest" "$@"
 sotatest_support="$?"
-contains_arg "-llpsign" $@
+contains_arg "-llpsign" "$@"
 sign_support="$?"
-contains_arg "-llpmixed" $@
+contains_arg "-llpmixed" "$@"
 mixed_build_support="$?"
-contains_arg "-llpdocker" $@
+contains_arg "-llpdocker" "$@"
 docker_build_support="$?"
 if [[ "${docker_build_support}" = "1" ]];then
   mixed_build_support=1
@@ -251,7 +251,7 @@ fi
 echo "[llp_init_build] project_distro_layer: ${project_source_root}"
 project_distro_layer_path=$(find "${project_source_root}" -iname "${project_distro_layer}"| head -n 1)
 if [[ "${mixed_build_support}" = "1" ]];then
-  if [[ is_build_mixed_project_supported ]];then
+  if is_build_mixed_project_supported; then
     # mixed build supported
     # important to change path to /opt/yocto/workspace/...
     #echo "[llp_init_build] Info: mixed build support enabled"
@@ -336,9 +336,9 @@ echo "devtool_workspace_active=${devtool_workspace_active}"
 
 create_feature_summary
 
-filter_arguments $@
+filter_arguments "$@"
 set -- "${llp_filter_result}"
-echo "[llp_init_build] Filtered arguments: $@"
+echo "[llp_init_build] Filtered arguments: $*"
 
 if [[ "${docker_build_support}" = "1" ]];then
   pushd "${yp_build_mixed_project_root}"

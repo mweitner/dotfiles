@@ -57,7 +57,7 @@ if [[ -h "${project_root}" ]]; then
   project_name=$(basename $(readlink -f "${project_root}"))
 fi
 build_root=${BBPATH}
-echo "args:$# $0 $1 $@"
+echo "args:$# $0 $1 $*"
 if [[ $# -gt 0 ]]; then
     if [[ "$1" = "-h" ]]; then
       print_usage

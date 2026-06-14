@@ -7,6 +7,6 @@
 #
 name=$1
 
-if [[ ! $(tmux list-sessions -F \#S |grep $name) ]]; then
-  alacritty --title $name -e tmuxp load $name &
+if ! tmux list-sessions -F \#S | grep -q -- "$name"; then
+  alacritty --title "$name" -e tmuxp load "$name" &
 fi

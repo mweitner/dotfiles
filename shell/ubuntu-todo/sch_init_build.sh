@@ -15,7 +15,7 @@ echo "[sch_init_build] Project root: ${project_root}"
 # export LIS_PASSWORD="example"
 # export LIS_USER="example"
 
-export WORKSPACE=${project_root}
+export WORKSPACE="${project_root}"
 echo "[sch_init_build] build prepared simply call ./scripts/build.sh <type>"
 echo "[sch_init_build] <type> := [debug, testimage prod]"
-cd ${WORKSPACE}/sources
+cd "${WORKSPACE}/sources" || exit 1

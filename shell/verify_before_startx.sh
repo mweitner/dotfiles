@@ -7,4 +7,7 @@ echo "XDG_SESSION_TYPE=$XDG_SESSION_TYPE"
 echo "XDG_SESSION_DESKTOP=$XDG_SESSION_DESKTOP"
 
 # It is ok to see Type=tty for tty session.
-loginctl show-session $(loginctl | grep $(whoami) | awk '{print $1}' | head -n 1) -p Type -p LbEnabled -p LbCloned
+session_id=$(loginctl | awk -v user="$(whoami)" '$3 == user { print $1; exit }')
+if [ -n "${session_id}" ]; then
+	loginctl show-session "${session_id}" -p Type -p LbEnabled -p LbCloned
+fi

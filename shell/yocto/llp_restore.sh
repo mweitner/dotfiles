@@ -32,13 +32,13 @@ bb_image_recipe=liebherr-image-base
 bb_machine="$MACHINE"
 if [[ -z "$bb_machine" ]]; then
   echo "[llp_backup] Error bb_machine not set"
-  print_usage()
+  print_usage
   return 250
 fi
 project_name=dev-llp
 project_root=$(cdn 1)
 build_root=${BBPATH}
-echo "args:$# $0 $1 $@"
+echo "args:$# $0 $1 $*"
 if [[ $# -gt 1 ]]; then
     if [[ "$1" = "-h" ]]; then
       print_usage

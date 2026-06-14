@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [ "${BASH_SOURCE}" = "${0}" ]; then
-  echo "[leg_run_docker] BASH_SOURCE: ${BASH_SOURCE}"
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  echo "[leg_run_docker] BASH_SOURCE: ${BASH_SOURCE[0]}"
   printf "\\n[leg_run_docker] Error: This script must to be sourced\\n\\n"
   return 254
 fi
@@ -16,14 +16,18 @@ if [[ $# -eq 1 ]]; then
   yp_srcrev_projects_path=$1
 fi
 
-export YP_PROJECT_DIR=$(pwd)
-export YP_BUILD_SSTATE_DIR=$(pwd)/build/sstate-cache
-export YP_BUILD_DL_DIR=$(pwd)/downloads
-export YP_SRCREV_PROJECTS_DIR=${yp_srcrev_projects_path}
+YP_PROJECT_DIR=$(pwd)
+YP_BUILD_SSTATE_DIR=$(pwd)/build/sstate-cache
+YP_BUILD_DL_DIR=$(pwd)/downloads
+YP_SRCREV_PROJECTS_DIR=${yp_srcrev_projects_path}
+export YP_PROJECT_DIR
+export YP_BUILD_SSTATE_DIR
+export YP_BUILD_DL_DIR
+export YP_SRCREV_PROJECTS_DIR
 
 docker run --rm -it \
-  -v ${YP_PROJECT_DIR}:/home/yocto \
-  -v ${YP_BUILD_DL_DIR}:/opt/yocto/shared/downloads \
-  -v ${YP_BUILD_SSTATE_DIR}:/opt/yocto/shared/sstate-cache \
-  -v ${YP_SRCREV_PROJECTS_DIR}:/home/yocto/srcrev \
+  -v "${YP_PROJECT_DIR}":/home/yocto \
+  -v "${YP_BUILD_DL_DIR}":/opt/yocto/shared/downloads \
+  -v "${YP_BUILD_SSTATE_DIR}":/opt/yocto/shared/sstate-cache \
+  -v "${YP_SRCREV_PROJECTS_DIR}":/home/yocto/srcrev \
   mweng/yp-build

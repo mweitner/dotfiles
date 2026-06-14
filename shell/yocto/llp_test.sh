@@ -1,12 +1,15 @@
 #!/bin/bash
 
+result=()
+
 function filter_arguments() {
+  local filtered=()
+  local var
   for var in "$@"; do
-    shift
     [[ "$var" = -llp* ]] && continue
-    set -- "$@" "$var"
+    filtered+=("$var")
   done
-  result="$@"
+  result=("${filtered[@]}")
 }
 
 function contains_arg() {
@@ -22,11 +25,11 @@ function contains_arg() {
   done
   return 0
 }
-contains_arg "-llpnetboot" $@
+contains_arg "-llpnetboot" "$@"
 netboot_support=$?
 echo "${netboot_support}"
 
-filter_arguments $@
+filter_arguments "$@"
 
-set -- "${result}"
+set -- "${result[@]}"
 echo "$@"

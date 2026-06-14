@@ -1,14 +1,18 @@
-!/bin/sh
+#!/bin/sh
 
 # https://code.visualstudio.com/docs/setup/linux#_rhel-fedora-and-centos-based-distributions
 
+sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
+printf '%s\n' \
+	'[code]' \
+	'name=Visual Studio Code' \
+	'baseurl=https://packages.microsoft.com/yumrepos/vscode' \
+	'enabled=1' \
+	'autorefresh=1' \
+	'type=rpm-md' \
+	'gpgcheck=1' \
+	'gpgkey=https://packages.microsoft.com/keys/microsoft.asc' \
+	| sudo tee /etc/yum.repos.d/vscode.repo >/dev/null
 
-```sh
-sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc &&
-echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\nautorefresh=1\ntype=rpm-md\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" | sudo tee /etc/yum.repos.d/vscode.repo > /dev/null
-```
-
-```sh
-dnf check-update &&
+dnf check-update
 sudo dnf install code # or code-insiders
-```

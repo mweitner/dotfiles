@@ -1,3 +1,5 @@
+#!/bin/bash
+
 missing_attributes=$(git ls-files | git check-attr -a --stdin | grep 'text: auto' || printf '\n')
 
 if [ -n "$missing_attributes" ]; then

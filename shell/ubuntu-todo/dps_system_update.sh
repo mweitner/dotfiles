@@ -4,14 +4,14 @@
 # dps_system_update.sh - adapts the system_update.deb file for firmware update
 #
 
-if [ "${BASH_SOURCE}" = "${0}" ]; then
-  echo "[dps_system_update] BASH_SOURCE: ${BASH_SOURCE}"
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  echo "[dps_system_update] BASH_SOURCE: ${BASH_SOURCE[0]}"
 	printf "\\n[dps_system_update] Error: This script must to be sourced\\n\\n"
   return 254
 fi
 
 project_root=$(pwd)
-project_name=$(basename ${project_root})
+project_name=$(basename "${project_root}")
 dps_build_root="${project_root}/build/tmp/deploy/images/imx6sleg-mtg"
 dps_system_update_work="${dps_build_root}/system_update_work"
 dps_system_update_out="${dps_system_update_work}/system_update"
@@ -73,10 +73,3 @@ rm -f "${dps_system_update_out}/system_update/u-boot.imx"
 dpkg-deb --build "${dps_system_update_out}"
 
 return 0
-
-bb_machine="$MACHINE"
-if [[ -z "$bb_machine" ]]; then
-  echo "[dps_system_update] Error bb_machine not set"
-  print_usage()
-  return 250
-fi

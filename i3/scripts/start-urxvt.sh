@@ -9,6 +9,6 @@
 #
 name=$1
 
-if [[ ! $(pgrep -u $UID -f "urxvt -name ${name}") ]]; then
-  urxvt -name $name &
+if ! pgrep -u "$UID" -f "urxvt -name ${name}" >/dev/null 2>&1; then
+  urxvt -name "$name" &
 fi

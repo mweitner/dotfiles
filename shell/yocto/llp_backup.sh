@@ -4,7 +4,7 @@
 # llp_backup.sh - backup llp project to be able to do git clean -xdf
 #
 
-if [ "${BASH_SOURCE}" = "${0}" ]; then
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
 	printf "\\n[llp_backup] Error: This script must to be sourced\\n\\n"
   return 254
 fi
@@ -32,13 +32,13 @@ bb_image_recipe=liebherr-image-base
 bb_machine="$MACHINE"
 if [[ -z "$bb_machine" ]]; then
   echo "[llp_backup] Error bb_machine not set"
-  print_usage()
+  print_usage
   return 250
 fi
 project_name=dev-llp
 project_root=$(cdn 1)
 build_root=${BBPATH}
-echo "args:$# $0 $1 $@"
+echo "args:$# $0 $1 $*"
 if [[ $# -gt 1 ]]; then
     if [[ "$1" = "-h" ]]; then
       print_usage
@@ -64,6 +64,7 @@ echo "[llp_backup] Project root: ${project_root}"
 echo "[llp_backup] Build root: ${build_root}"
 echo "[llp_backup] Target (machine id): ${bb_machine}"
 echo "[llp_backup] Image recipe: ${bb_image_recipe}"
+echo "[llp_backup] Project name: ${project_name}"
 echo "[llp_backup] Backup folder: ${llp_backup_dir}"
 echo "[llp_backup] System test root: ${llp_system_test_root}"
 

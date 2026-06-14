@@ -10,7 +10,7 @@ if [[ -e "/sys/class/net/$PRIMARY_IFACE" ]]; then
     ADDR=$(ip -4 addr show "$PRIMARY_IFACE" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}/\d+' | head -1)
     if [[ -n "$ADDR" ]]; then
         # Primary Ethernet is up with IP
-        echo "{\"text\":\"\uf796  $ADDR\",\"tooltip\":\"Ethernet: $PRIMARY_IFACE\n$ADDR\",\"class\":\"ethernet\"}"
+        printf '{"text":"\\uf796  %s","tooltip":"Ethernet: %s\\n%s","class":"ethernet"}\n' "$ADDR" "$PRIMARY_IFACE" "$ADDR"
         exit 0
     fi
 fi
@@ -26,7 +26,7 @@ if [[ -n "$ALT_ETH" ]]; then
     ALT_ETH_DEV=$(echo "$ALT_ETH" | cut -d: -f4)
     ALT_ETH_IP=$(ip -4 addr show "$ALT_ETH_DEV" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}/\d+' | head -1)
     if [[ -n "$ALT_ETH_IP" ]]; then
-        echo "{\"text\":\"\uf796  $ALT_ETH_IP\",\"tooltip\":\"Ethernet: $ALT_ETH_DEV\n$ALT_ETH_IP\",\"class\":\"ethernet\"}"
+        printf '{"text":"\\uf796  %s","tooltip":"Ethernet: %s\\n%s","class":"ethernet"}\n' "$ALT_ETH_IP" "$ALT_ETH_DEV" "$ALT_ETH_IP"
         exit 0
     fi
 fi
@@ -40,7 +40,7 @@ if [[ -n "$WIFI_CONN" ]]; then
     if [[ -n "$WIFI_DEV" ]]; then
         IP_ADDR=$(ip -4 addr show "$WIFI_DEV" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}/\d+' | head -1)
         if [[ -n "$IP_ADDR" ]]; then
-            echo "{\"text\":\"\uf1eb  $WIFI_CONN  $IP_ADDR\",\"tooltip\":\"WiFi: $WIFI_CONN\n$IP_ADDR\",\"class\":\"wifi\"}"
+            printf '{"text":"\\uf1eb  %s  %s","tooltip":"WiFi: %s\\n%s","class":"wifi"}\n' "$WIFI_CONN" "$IP_ADDR" "$WIFI_CONN" "$IP_ADDR"
             exit 0
         fi
     fi
@@ -66,15 +66,15 @@ if [[ -n "$ACTIVE" ]]; then
         if [[ -n "$IP_ADDR" ]]; then
             case "$CONN_TYPE" in
                 ethernet|802-3-ethernet)
-                    echo "{\"text\":\"\uf796  $IP_ADDR\",\"tooltip\":\"Ethernet: $ACTIVE_DEV\n$IP_ADDR\",\"class\":\"ethernet\"}"
+                    printf '{"text":"\\uf796  %s","tooltip":"Ethernet: %s\\n%s","class":"ethernet"}\n' "$IP_ADDR" "$ACTIVE_DEV" "$IP_ADDR"
                     exit 0
                     ;;
                 vpn)
-                    echo "{\"text\":\"\uf023  $CONN_NAME  $IP_ADDR\",\"tooltip\":\"VPN: $CONN_NAME\n$IP_ADDR\",\"class\":\"vpn\"}"
+                    printf '{"text":"\\uf023  %s  %s","tooltip":"VPN: %s\\n%s","class":"vpn"}\n' "$CONN_NAME" "$IP_ADDR" "$CONN_NAME" "$IP_ADDR"
                     exit 0
                     ;;
                 *)
-                    echo "{\"text\":\"\uf796  $CONN_NAME  $IP_ADDR\",\"tooltip\":\"$CONN_TYPE: $CONN_NAME\n$IP_ADDR\",\"class\":\"other\"}"
+                    printf '{"text":"\\uf796  %s  %s","tooltip":"%s: %s\\n%s","class":"other"}\n' "$CONN_NAME" "$IP_ADDR" "$CONN_TYPE" "$CONN_NAME" "$IP_ADDR"
                     exit 0
                     ;;
             esac

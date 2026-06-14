@@ -12,15 +12,15 @@
 # make sure xdg path and dotfiles repo is found
 # alternative is to set it directly here using ~/.config
 # might be best solution!
-if [ ! $XDG_CONFIG_HOME ]; then
+if [ -z "$XDG_CONFIG_HOME" ]; then
   echo "Warning need to make sure XDG_CONFIG_HOME is set"
   XDG_CONFIG_HOME="$HOME/.config"
 fi
-if [ ! $XDG_DATA_HOME ]; then
+if [ -z "$XDG_DATA_HOME" ]; then
   echo "Warning need to make sure XDG_DATA_HOME is set"
   XDG_DATA_HOME="$XDG_CONFIG_HOME/local/share"
 fi
-if [ ! $DOTFILES ]; then
+if [ -z "$DOTFILES" ]; then
   echo "Warning need to make sure DOTFILES is set"
   DOTFILES="$HOME/dotfiles"
 fi

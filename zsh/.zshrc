@@ -1,3 +1,4 @@
+# shellcheck shell=bash disable=SC1090,SC1091,SC2206
 # Source user's profile for environment setup (including systemd --user)
 # This block should be near the top of your .zshrc, or preferably in .zprofile
 # if you use that for login-specific configurations.
@@ -60,7 +61,7 @@ zle -N edit-command-line
 bindkey -M vicmd v edit-command-line
 
 #enable fzf
-if [ $(command -v "fzf") ]; then
+if command -v fzf >/dev/null 2>&1; then
   if [ -f "/usr/share/fzf/completion.zsh" ]; then
     source /usr/share/fzf/completion.zsh
   fi
@@ -128,11 +129,13 @@ export PATH
 if [ "$(tty)" = "/dev/tty1" ]; then
 # echo "Starting i3 on $(tty) by startx"
 # pgrep i3 || exec startx "$XDG_CONFIG_HOME/X11/.xinitrc"
+  true
 fi
 
 if [ ! "$(tty)" = "/dev/tty1" ]; then
   #always list tmuxp sessions
   #ftmuxp
+  true
 fi
 
 #

@@ -81,9 +81,12 @@ if [[ -z "$REMOTE_STAGE_DIR" ]]; then
 fi
 
 echo "==> Copying certificate files to NAS ($REMOTE_STAGE_DIR)"
+# shellcheck disable=SC2029
 cat "$ROOT_CA" | ssh "$NAS_HOST" "cat > '$REMOTE_STAGE_DIR/LiebherrRootCA2.crt'"
+# shellcheck disable=SC2029
 cat "$ENTERPRISE_CA" | ssh "$NAS_HOST" "cat > '$REMOTE_STAGE_DIR/LiebherrEnterpriseCA02.crt'"
 
+# shellcheck disable=SC2029
 ssh "$NAS_HOST" "test -s '$REMOTE_STAGE_DIR/LiebherrRootCA2.crt' && test -s '$REMOTE_STAGE_DIR/LiebherrEnterpriseCA02.crt'"
 
 echo "==> Installing certificates into system trust store"

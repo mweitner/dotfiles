@@ -1,6 +1,13 @@
-# Dotfiles – Fedora Installation & Setup
+# Dotfiles - Fedora Installation and Setup
 
-Complete Fedora Workstation setup with Wayland/Sway, development tools, home office VPN support, and Yocto build environment.
+Personal Fedora Workstation setup with Sway/Wayland, fish-based shell workflows, development
+tooling, home-office VPN helpers, and Yocto-oriented automation.
+
+Upcoming first release: `0.1.0`
+
+- Release notes: [CHANGELOG.md](CHANGELOG.md)
+- Contribution workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
+- AI editing and validation rules: [.AI-GUIDELINES.md](.AI-GUIDELINES.md)
 
 ## Quick Start
 
@@ -11,249 +18,218 @@ git clone <repo> ~/dotfiles
 # Run base installation
 bash ~/dotfiles/install-fedora.sh
 
-# Optionally install dev tools and pinned VS Code version
+# Optionally install dev tools and a pinned or latest VS Code
 bash ~/dotfiles/install-fedora-dev.sh
 
 # Reboot and start Sway
 reboot
 # or:
 sway
-```text
+```
+
+## What This Repo Covers
+
+- Fedora-first workstation bootstrap
+- Wayland/Sway desktop configuration
+- Fish, Bash, and Zsh shell setup
+- Developer tooling, editors, and CLI utilities
+- Yocto helper scripts and key-profile switching
+- VPN, DNS, and remote-access helpers
+- Personal documentation built with Sphinx
+
 ## Installation Scripts
 
 ### `install-fedora.sh`
 
-Base system setup for Fedora Workstation (41+). Idempotent — safe to re-run.
+Base system setup for Fedora Workstation 41+. The script is intended to be idempotent and safe to
+re-run after updates or partial setup.
 
-## 
+Phases:
 
-1. **Phase 1**: Package installation (Sway, tools, VPN, Docker, fonts, etc.)
-2. **Phase 2**: Config symlinks (sway, waybar, fish, git, etc.)
-3. **Phase 3**: Services & daemon config (NetworkManager, greetd, tlp, TLP dock tuning, etc.)
-4. **Phase 4**: Yocto shared directories (/opt/yocto/shared)
+1. Package installation for desktop, network, and development tools
+2. Config symlinks for shell, editor, desktop, and Git setup
+3. Services and daemon configuration for system integration
+4. Shared Yocto directory preparation under `/opt/yocto`
 
-## 
+Usage:
 
 ```bash
 install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--skip-docker] \
                   [--skip-docker-daemon-config] [--skip-dev] \
                   [--with-ssh-secrets] [--with-netrc-secrets] [--with-1password-ssh-agent]
-```text
-## 
+```
 
-- Wayland/Sway + Waybar, wofi, foot terminal
-- Modern CLI tools (ripgrep, fd-find, fzf, zoxide, htop)
+Highlights:
+
+- Sway, Waybar, wofi, foot, and related Wayland tooling
+- Modern CLI tools such as `rg`, `fd`, `fzf`, `zoxide`, and `htop`
 - NetworkManager with iwd backend
-- VPN: GlobalProtect (gpclient) + openconnect fallback
-- Docker (native Fedora setup)
-- Yocto build environment (/opt/yocto)
-- **Home office VPN DNS fix**: `fix-vpn-dns-browser` (auto-installed)
+- Docker using a native Fedora setup path
+- Yocto build environment preparation
+- Auto-installed VPN DNS repair helper workflow
 
 ### `install-fedora-dev.sh`
 
-Development tools & environment integration. Can be run independently.
+Optional development tooling bootstrap that can be run independently from the base install.
 
-## 
+Includes:
 
-- Neovim + git-delta + meld
-- Go, pre-commit, GitHub CLI, plantuml, pandoc
-- MQTT tools (mosquitto, MQTT Explorer)
-- Hawkbit upload tooling (hbc)
-- Yocto host build dependencies (gawk, diffstat, chrpath, socat, perl, etc.)
-- VS Code (version-pinnable)
+- Neovim, git-delta, meld, and general editor tooling
+- Go, pre-commit, GitHub CLI, PlantUML, and pandoc
+- MQTT tools such as mosquitto clients and MQTT Explorer
+- Yocto host build dependencies
+- VS Code installation with version pinning support
 - Azure CLI
 
-## 
+Example:
 
 ```bash
-VSCODE_VERSION=1.115 bash install-fedora-dev.sh    # Pin VS Code to 1.115.x
-VSCODE_VERSION=""    bash install-fedora-dev.sh    # Track latest
-```text
-### `install-ubuntu-bash.sh` & `install.sh`
+VSCODE_VERSION=1.115 bash install-fedora-dev.sh
+VSCODE_VERSION="" bash install-fedora-dev.sh
+```
 
-Legacy Ubuntu/Bash setups. For reference only; primary target is Fedora + fish.
+### `install-ubuntu-bash.sh` and `install.sh`
 
-## Home Office VPN & GitHub Controller Access
+Legacy Ubuntu and Bash-focused setup paths are kept for reference. The primary target for active
+maintenance is Fedora with fish and Sway.
 
-### Problem
+## Documentation and Validation
 
-From Fedora Workstation with Liebherr VPN, GitHub Controller API fails due to browser DNS bypass (Firefox DoH, Chrome socket caching).
+The repository includes a local Sphinx documentation workspace in [doc-engine](doc-engine).
 
-### Solution
+Common validation commands:
+
+```bash
+make -C doc-engine html
+pre-commit run --all-files
+```
+
+Use these before tagging a release or after larger changes to scripts, docs, or shell config.
+
+## Home Office VPN and DNS Repair
+
+This repo includes helpers for the case where browser DNS behavior bypasses VPN-provided name
+resolution.
 
 After connecting to VPN, run:
 
 ```bash
-fix-vpn-dns-browser       # Auto-detects VPN interface, fixes all layers
-test-vpn-dns              # Verify OS DNS resolution → 10.243.65.137
-test-browser-dns          # Verify HTTPS connectivity
-```text
-The script:
+fix-vpn-dns-browser
+test-vpn-dns
+test-browser-dns
+```
 
-1. Configures systemd-resolved domain routing for `liebherr.com`
-2. Disables Firefox DNS-over-HTTPS permanently
-3. Clears Chrome/Firefox caches
-4. Flushes system DNS cache
-5. Restarts browsers (optional)
+The workflow is designed to:
 
-### Full Documentation
+1. Configure systemd-resolved domain routing
+2. Disable conflicting browser DNS behavior where needed
+3. Clear DNS-related caches
+4. Re-check browser connectivity
 
-→ `~/document/wiki/doc-engine/source/analysis/homeoffice-github-controller-access/`
+Additional background is documented in [INTEGRATION-VPN-DNS-FIX.md](INTEGRATION-VPN-DNS-FIX.md).
 
-Includes:
-
-- [README.md](../document/wiki/doc-engine/source/analysis/homeoffice-github-controller-access/README.md) – Overview
-- [CHEATSHEET.md](../document/wiki/doc-engine/source/analysis/homeoffice-github-controller-access/CHEATSHEET.md) – Quick commands
-- [RUNBOOK-vpn-dns-browser-fix.md](../document/wiki/doc-engine/source/analysis/homeoffice-github-controller-access/RUNBOOK-vpn-dns-browser-fix.md) – Detailed guide & troubleshooting
-
-## Directory Structure
+## Repository Layout
 
 ```text
 ~/dotfiles/
-├── install-fedora.sh               # Base Fedora setup
-├── install-fedora-dev.sh           # Dev tools (independently runnable)
-├── install.sh                      # Legacy (refer to install-fedora.sh)
-├── shell/                          # Executable scripts
-│   ├── vpn-on                      # VPN connection script
-│   ├── fix-vpn-dns-browser         # VPN DNS fix (NEW)
-│   ├── setup-machine-network-profiles.sh
-│   ├── setup-docker-fedora-native.sh
-│   ├── monitor-*                   # Display layout helpers
-│   ├── yocto/                      # Yocto/LPO build scripts
-│   └── ...
-├── fish/
-│   ├── config.fish                 # Main config (sources vpc-dns-fix functions)
-│   ├── conf.d/                     # Hook/plugin configs
-│   └── functions/
-│       ├── vpn-dns-fix.fish        # VPN DNS functions (NEW)
-│       └── ...
-├── sway/                           # Sway WM config
-├── waybar/                         # Waybar status bar
-├── i3/                             # i3 WM config (legacy)
-├── tmux/                           # tmux multiplexer
-├── tmuxp/                          # tmuxp session files
-├── git/                            # Git config
-├── zsh/ & bash/                    # Shell configs
-├── dnsmasq/                        # DNS/DHCP profiles
-├── greetd/                         # Display manager config
-├── systemd/                        # systemd service/timer configs
-├── tlp/                            # Power management config
-├── mako/                           # Wayland notifications
-├── qutebrowser/                    # Qutebrowser browser config
-├── remmina/                        # Remote desktop profiles
-├── docs/doc-engine/                # Doc build system (Sphinx)
-└── .secrets/                       # ⚠️ Private (not checked in)
-    ├── ssh/                        # SSH keys & profiles
-    ├── yocto/keys/                 # Yocto keys (prod/dev)
-    └── ...
-```text
-## Fish Shell Functions
+|- install-fedora.sh
+|- install-fedora-dev.sh
+|- install.sh
+|- shell/
+|- fish/
+|- sway/
+|- waybar/
+|- tmux/
+|- tmuxp/
+|- git/
+|- systemd/
+|- remmina/
+|- doc-engine/
+`- .secrets/
+```
 
-Auto-sourced from `~/.config/fish/functions/`. Key additions:
+Key areas:
 
-```fish
-fix-vpn-dns-browser [interface]    # Fix VPN DNS + browser cache
-test-vpn-dns                       # Test OS DNS resolution
-test-browser-dns                   # Test HTTPS connectivity
-```text
-Other available:
+- `shell/`: executable helpers, including Yocto and network tooling
+- `fish/`: shell configuration and interactive helper functions
+- `sway/`, `waybar/`, `foot/`, `mako/`: desktop environment configuration
+- `systemd/`, `greetd/`, `tlp/`: system integration and service configuration
+- `doc-engine/`: personal documentation source and local HTML build setup
+- `.secrets/`: private material that must never be committed
 
-- `compress <dir>` – Create tar.gz
-- `zipdir <dir>` – Create .zip (Windows-friendly)
-- `wikipedia <query>` – Search Wikipedia in qutebrowser
-- `duckduckgo <query>` – Search DuckDuckGo in qutebrowser
-
-## Secrets & Private Data
-
-### `.secrets/` Directory Structure
-
-```text
-.secrets/
-├── .gitignore              # Exclude all from git
-├── ssh/                    # SSH keys
-│   └── dev-pc/.ssh/        # Machine-specific SSH profile
-├── yocto/keys/             # Yocto build keys
-│   ├── llp/{dev,prod}/
-│   ├── lpo/{dev,prod}/
-│   └── ...
-├── home/$USER/
-│   └── .netrc              # Credentials file (opt-in install)
-├── git/                    # Git commit signing keys
-│   └── ...
-├── microsoft/              # Azure/Teams credentials
-├── ci/                     # GitHub Actions secrets
-└── iot-gateways/           # Device provisioning
-```text
-Install secrets selectively:
-
-```bash
-install-fedora.sh --with-ssh-secrets         # Copy ~/.ssh from .secrets
-install-fedora.sh --with-netrc-secrets       # Copy ~/.netrc
-install-fedora.sh --with-1password-ssh-agent # Set up 1Password SSH agent
-```text
 ## Common Tasks
 
 ### Update Fedora packages
 
 ```bash
 sudo dnf upgrade
-bash install-fedora.sh --skip-symlinks   # Refresh config symlinks after major update
-```text
+bash install-fedora.sh --skip-symlinks
+```
+
+### Set up a Yocto build workspace
+
+```bash
+setup-yocto-project --project linux-lpo
+cd ~/lpo-dev/linux-lpo
+lpo-build bitbake -u knotty -v lpo-display-image
+```
+
 ### Switch Yocto key profile
 
 ```bash
-switch-yocto-keys-profile llp prod       # Switch llp from dev → prod keys
-switch-yocto-keys-profile lpo dev        # Switch lpo from prod → dev keys
-```text
-### Set up Yocto build
+switch-yocto-keys-profile llp prod
+switch-yocto-keys-profile lpo dev
+```
+
+### Open remote desktop profiles
 
 ```bash
-setup-yocto-project --project linux-lpo  # Initialize LPO Yocto
-cd ~/lpo-dev/linux-lpo
-lpo-build bitbake -u knotty -v lpo-display-image
-```text
-### Connect to Liebherr VPN (home office)
+remmina
+```
+
+## Secrets and Private Data
+
+Private material belongs under `.secrets/` and should stay out of Git.
+
+Use the install flags only when you intentionally want to copy local private data into a machine
+setup:
 
 ```bash
-vpn-on                                   # Interactive SAML browser flow
-fix-vpn-dns-browser                      # Fix DNS + browser cache
-test-vpn-dns && test-browser-dns         # Verify connectivity
-```text
-### Remote desktop (Windows/hop-PC)
+install-fedora.sh --with-ssh-secrets
+install-fedora.sh --with-netrc-secrets
+install-fedora.sh --with-1password-ssh-agent
+```
 
-```bash
-remmina                                  # Open GUI; profiles stored in ~/.config/remmina/
-```text
+Do not document or commit real credentials, tokens, or internal private keys.
+
 ## Troubleshooting
 
-### VPN DNS still resolves wrong IP?
-
-See [RUNBOOK-vpn-dns-browser-fix.md](../document/wiki/doc-engine/source/analysis/homeoffice-github-controller-access/RUNBOOK-vpn-dns-browser-fix.md) **Troubleshooting** section.
-
-### Pre-commit SSL errors (Python 3.14)?
+### Pre-commit problems
 
 ```bash
-pre-commit-helper --fix-config                # Patch node/golang to system
-setup-pre-commit                              # Re-run setup + pre-cache
-```text
-See `~/document/wiki/...` for details.
+pre-commit run --all-files
+pre-commit-helper --fix-config
+setup-pre-commit
+```
 
-### Yocto build fails?
+### VPN or DNS still looks wrong
+
+Re-run the repair helpers and confirm the expected target resolves through the VPN path.
+
+### Yocto build setup fails
 
 ```bash
-setup-yocto-project --help                    # Project initialization
-yocto-prefetch-source --help                  # Manual source fetch
-```text
+setup-yocto-project --help
+yocto-prefetch-source --help
+```
+
 ## References
 
 - [Sway Documentation](https://swaywm.org/)
-- [Fedora Minimal Install](https://docs.fedoraproject.org/)
+- [Fedora Documentation](https://docs.fedoraproject.org/)
 - [Yocto Project](https://www.yoctoproject.org/)
-- [Liebherr Internal Wiki](file:///mnt/nas/...)
-- [GitHub Controller API](https://lis-github.liebherr.com/)
 
----
+## Release Planning
 
-**Last Updated**: 2026-05-26
-**Target**: Fedora 41+ Workstation (Sway/Wayland)
-**Maintained**: Local user dotfiles & wiki integration
+The next intended milestone is `0.1.0`, which captures the first documented Fedora-first baseline
+for workstation bootstrap, development tooling, documentation, and validation.
