@@ -68,4 +68,3 @@ name = 'VersionControl'
 
 [[layers]]
 name = 'sudo'
-

@@ -13,7 +13,7 @@ for dir in "${components[@]}"; do
     if [ -d "$dir" ]; then
         echo "Processing project in: $dir"
         cd "$dir" || continue
-        
+
         # Check if pyproject.toml exists (ensures it's a Poetry project)
         if [ -f "pyproject.toml" ]; then
             # Run the installation, including dev dependencies for development environment
@@ -23,7 +23,7 @@ for dir in "${components[@]}"; do
         else
             echo "Skipping $dir: pyproject.toml not found."
         fi
-        
+
         # Move back to the root workspace folder
         cd "$OLDPWD"
     else

@@ -12,10 +12,9 @@
 | echo $! |             |
 | shopt login_shell | prints out sh option `login_shell`  <br> which is off for a non login shell and on for a login shell |
 
-
 ## Special Script Parameter
 
-### $!
+### $
 
 reference the process ID of the most recently executed command in background.
 
@@ -23,7 +22,7 @@ reference the process ID of the most recently executed command in background.
 
 reference the process ID of bash shell itself
 
-### $#
+### $ #
 
 expands to a number of positional parameters in decimal.
 
@@ -47,7 +46,7 @@ exit status of the most recently executed command in the foreground.
 
 reference the absolute file name of the shell or bash script which is being executed as specified in the argument list. This bash parameter is also used to hold the name of mail file while checking emails.
 
-Use Cases: 
+Use Cases:
 
 * used to hold the name of mail file while checking emails
 
@@ -129,7 +128,7 @@ Pipe output of one command to another
 
 run any process in the background.
 
-### ;
+###
 
 (semi colon ) is used to separate commands on same line
 
@@ -153,13 +152,13 @@ matching single character in filename
 switch cursor to block:
 
 ```javascript
-$ echo -e "\033[2 q"
+echo -e "\033[2 q"
 ```
 
 switch cursor to pipe:
 
 ```javascript
-$ echo -e "\033[6 q"
+echo -e "\033[6 q"
 ```
 
 | command | description |
@@ -173,7 +172,7 @@ $ echo -e "\033[6 q"
 
 ## How to debug ssh error?
 
-* usage scenarion git@github.com
+* usage scenarion <git@github.com>
 
 ```javascript
 $ ssh -vvT git@github.com
@@ -211,20 +210,20 @@ Mount a sd-card img file:
 * then mount the loop device in our example the second partition which is the actual rootfs of Raspberry PI OS image
 
 ```bash
- > sudo partx -a -v ~/Downloads/2022-04-04-raspios-bullseye-armhf-lite.img                                                        
+ > sudo partx -a -v ~/Downloads/2022-04-04-raspios-bullseye-armhf-lite.img
 partition: none, disk: /home/michael/Downloads/2022-04-04-raspios-bullseye-armhf-lite.img, lower: 0, upper: 0
 Trying to use '/dev/loop3' for the loop device
 /dev/loop3: partition table type 'dos' detected
 range recount: max partno=2, lower=0, upper=0
 /dev/loop3: partition #1 added
 /dev/loop3: partition #2 added
-                                                                                                                                       
-/mnt > lsblk                                                                                                                          
+
+/mnt > lsblk
 NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
 ...
-loop3         7:3    0   1.9G  0 loop 
-├─loop3p1   259:4    0   256M  0 part 
-└─loop3p2   259:5    0   1.6G  0 part 
+loop3         7:3    0   1.9G  0 loop
+├─loop3p1   259:4    0   256M  0 part
+└─loop3p2   259:5    0   1.6G  0 part
 ...
 
 > sudo mount /dev/loop3p2 /mnt/iso

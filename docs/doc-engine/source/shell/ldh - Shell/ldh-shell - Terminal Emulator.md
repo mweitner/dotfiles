@@ -10,7 +10,6 @@ In our base ArchLinux system the terminal we are login is directly emulated by t
 
  ![keyboard input processing by terminal emulator](uploads/02026def-d437-4c64-a89a-337add5098db/5b341217-6677-4415-963e-7e599a3bfcdf/terminal-emulator-input-processing-os.png)
 
-
 [https://drive.google.com/file/d/1tHYR-Znz5XR21Z%5FZnLm4SqBcXLegPdlY/view?usp=sharing](https://drive.google.com/file/d/1tHYR-Znz5XR21Z%5FZnLm4SqBcXLegPdlY/view?usp=sharing)
 
 The terminal emulator like `urxvt` processes keyboard input:

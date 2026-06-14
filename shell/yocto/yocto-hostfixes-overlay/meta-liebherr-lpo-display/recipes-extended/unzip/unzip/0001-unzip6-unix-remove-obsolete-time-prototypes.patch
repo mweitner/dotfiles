@@ -27,7 +27,7 @@ index fa200ce..ccdb7d7 100644
  #  include <time.h>
 -   struct tm *gmtime(), *localtime();
  #endif
- 
+
  #if (defined(BSD4_4) || (defined(SYSV) && defined(MODERN)))
--- 
+--
 2.43.0

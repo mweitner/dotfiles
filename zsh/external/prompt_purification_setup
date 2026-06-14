@@ -89,7 +89,7 @@ git_prompt_status() {
 
 
 prompt_git_branch() {
-    autoload -Uz vcs_info 
+    autoload -Uz vcs_info
     precmd_vcs_info() { vcs_info }
     precmd_functions+=( precmd_vcs_info )
     setopt prompt_subst
@@ -130,7 +130,7 @@ prompt_purification_setup() {
     #RPROMPT='$(prompt_git_info) $(git_prompt_status)'
     #PROMPT=$'%F{white}%~ %B%F{blue}>%f%b '
     # I rather have :
-    # michael@snake: ~/dotfiles$  
+    # michael@snake: ~/dotfiles$
     PROMPT='%(?.%F{blue}√.%F{red}?%?)%f %B%F{240}%n@%m: %~%f%b$ '
 }
 

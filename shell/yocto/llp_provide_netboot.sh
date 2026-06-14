@@ -38,7 +38,7 @@ bb_machine="$MACHINE"
 if [[ -z "$bb_machine" ]]; then
   echo "[llp_provide_netboot] Error bb_machine not set"
   print_usage
-  return 252 
+  return 252
 fi
 
 # replaced old project_root var setting using cdn 1 by pwd
@@ -62,7 +62,7 @@ if [[ $# -gt 0 ]]; then
     if [[ "$1" = "-h" ]]; then
       print_usage
       return 0
-    fi 
+    fi
 
   if [[ $# -eq 1 ]]; then
     bb_image_recipe=$1
@@ -120,13 +120,13 @@ kpi_image_overhead_factor=$(MACHINE="${bb_machine}" bitbake -e "${bb_image_recip
 
 echo "[llp_provide_netboot] 1/4. create tmp provider"
 if [[ ! -d "${nb_boot_tmp}" ]]; then
-  sudo mkdir -p "${nb_boot_tmp}" 
+  sudo mkdir -p "${nb_boot_tmp}"
 fi
 if [[ ! -d "${nb_image_tmp}" ]]; then
-  sudo mkdir -p "${nb_image_tmp}" 
+  sudo mkdir -p "${nb_image_tmp}"
 fi
 if [[ ! -d "${nb_root_tmp}" ]]; then
-  sudo mkdir -p "${nb_root_tmp}" 
+  sudo mkdir -p "${nb_root_tmp}"
 fi
 
 #kpi swu image

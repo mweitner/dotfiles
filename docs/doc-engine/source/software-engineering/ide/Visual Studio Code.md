@@ -36,6 +36,7 @@ sudo dnf versionlock delete code
 ```
 
 **Installation details:**
+
 - Microsoft GPG key is imported automatically for package verification
 - Official Fedora repository: `https://packages.microsoft.com/yumrepos/vscode`
 - Supports both stable `code` and `code-insiders` packages

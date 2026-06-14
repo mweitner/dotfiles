@@ -173,4 +173,3 @@ log-facility=/var/log/dnsmasq.log
 log-async
 log-queries
 log-dhcp
-

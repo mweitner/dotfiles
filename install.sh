@@ -101,4 +101,3 @@ if [ -d "$XDG_CONFIG_HOME/qutebrowser" ]; then
   rm -f "$XDG_CONFIG_HOME/qutebrowser/config.py"
   ln -sf "$DOTFILES/qutebrowser/config.py" "$XDG_CONFIG_HOME/qutebrowser/"
 fi
-

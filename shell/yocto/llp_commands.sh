@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# llp_commands.sh - Provide LLP specific build commands 
+# llp_commands.sh - Provide LLP specific build commands
 #
 # MACHINE=imx6sleg-mcg source llp_commands.sh
 #
@@ -155,7 +155,7 @@ function llp_print_kpis() {
   elif [[ -f "${build_images_root}/u-boot.img" ]];then
     kpi_size_uboot=$(du -Lh "${build_root}/tmp/deploy/images/${bb_machine}/u-boot.img")
    fi
-  
+
   #provide boot
   kpi_size_kernel=""
   kpi_size_dtb=""
@@ -178,15 +178,15 @@ function llp_print_kpis() {
   if [[ -f "${build_root}/tmp/deploy/images/${bb_machine}/${bb_machine}-tianma-tm121-1280x800.dtb" ]];then
     kpi_size_dtb=$(du -Lh "${build_root}/tmp/deploy/images/${bb_machine}/${bb_machine}-tianma-tm121-1280x800.dtb")
   fi
-  
+
   #provide root
   kpi_size_rootfs=""
   kpi_size_rootfs_targz=$(du -Lh "${build_images_root}/${bb_image_recipe}-${bb_machine}.tar.gz")
   #todo support extracted tar size
   kpi_size_rootfs=$(zcat "${build_images_root}/${bb_image_recipe}-${bb_machine}.tar.gz" | wc -c)
-  
+
   echo "[llp_commands] kpi: "
-  
+
   echo $kpi_distro_features
   echo $kpi_image_rootfs_size |awk '{print "IMAGE_ROOTFS_SIZE: " $1 }'
   echo $kpi_image_rootfs_extra_space |awk '{print "IMAGE_ROOTFS_EXTRA_SPACE: " $1 }'
@@ -222,7 +222,7 @@ function llp_get_active_project() {
     echo "[llp_get_active_project] Error yp_active_project_path=${yp_active_project_path} is not a symlink"
     return 238
   fi
-  
+
   local_project_name=""
   if [[ -h "${yp_active_project_path}" ]]; then
     # as project root is a symlink, read the target file name
@@ -260,7 +260,7 @@ function llp_activate_project() {
   fi
   echo "[llp_activate_project] Using local_yp_project_build=${local_yp_project_build}"
   echo "[llp_activate_project] activating project: $1"
-  
+
   ln -fns "${local_yp_project_source}" "${yp_active_project_path}"
   if [[ $? != 0 ]];then
     echo "[llp_activate_project] Error failed to symlink ${local_yp_project_source}"

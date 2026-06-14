@@ -341,7 +341,7 @@ fi
 else
   # Remove version lock if it exists (from previous pinned installs)
   sudo dnf versionlock delete code 2>/dev/null || true
-  
+
   # Upgrade to latest (dnf upgrade installs if not present, upgrades if already installed)
   sudo dnf upgrade -y code
   echo "==> VS Code upgraded to latest (no version pin)."

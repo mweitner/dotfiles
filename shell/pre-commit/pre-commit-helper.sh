@@ -63,14 +63,14 @@ cmd_run() {
 cmd_commit() {
     require_repo
     local message="$1"
-    
+
     if [ -z "$message" ]; then
         echo "Error: commit message required"
         return 1
     fi
-    
+
     echo "Attempting commit with pre-commit hooks..."
-    
+
     if git commit -m "$message" 2>/dev/null; then
         echo "Commit successful with pre-commit hooks"
         return 0

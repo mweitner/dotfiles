@@ -2,10 +2,10 @@
 
 This guide covers setting up a git server on your UGREEN NAS for small team collaboration. We'll start with simple bare repos via SSH, then evolve to full Gerrit code review if needed.
 
-**Hardware:** UGREEN NAS DXP480T Plus (Debian 12 Bookworm, ARM64)  
-**Storage:** `/volume1/data/git` (on Btrfs volume)  
-**Network:** 192.168.1.110 (home), 192.168.3.91 (company)  
-**Team size:** 2-5 developers  
+**Hardware:** UGREEN NAS DXP480T Plus (Debian 12 Bookworm, ARM64)
+**Storage:** `/volume1/data/git` (on Btrfs volume)
+**Network:** 192.168.1.110 (home), 192.168.3.91 (company)
+**Team size:** 2-5 developers
 
 ---
 
@@ -124,6 +124,7 @@ Host ugreen-nas
 ### Prerequisites
 
 Gerrit requires:
+
 - Java (OpenJDK 11+)
 - Sufficient RAM (at least 2GB, preferably 4GB+)
 - Git (already on NAS)
@@ -170,6 +171,7 @@ sudo -u gerrit java -jar /var/gerrit/gerrit-3.9.0.war init -d /var/gerrit/review
 ```
 
 During initialization, accept defaults or configure:
+
 - Listen address: `0.0.0.0:8080` (or behind nginx)
 - Database backend: PostgreSQL
 - Email: optional
@@ -301,17 +303,20 @@ git push origin HEAD:refs/heads/main
 ### SSH Access Denied
 
 1. Verify SSH key is added to NAS:
+
    ```bash
    ssh git@ugreen-nas  # should show git-shell prompt or error
    ```
 
 2. Check NAS `/home/git/.ssh/authorized_keys`:
+
    ```bash
    ssh michael@ugreen-nas
    sudo cat /home/git/.ssh/authorized_keys
    ```
 
 3. Verify key permissions:
+
    ```bash
    ssh michael@ugreen-nas
    sudo ls -la /home/git/.ssh/
@@ -424,7 +429,7 @@ sudo systemctl enable --now gerrit-backup.timer
 
 ## Summary
 
-**Phase 1 (Now):** Start with bare repos + SSH keys. Zero overhead, works immediately.  
+**Phase 1 (Now):** Start with bare repos + SSH keys. Zero overhead, works immediately.
 **Phase 2 (Later):** Upgrade to Gerrit when team needs code review workflows.
 
 Both phases use the same underlying git storage on the NAS. Gerrit simply adds the web UI and review layer on top.

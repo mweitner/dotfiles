@@ -9,12 +9,10 @@ As of the linux-lpo repo docs, the default ip of the dc5 is **192.168.2.130/24**
   * dhcp: enabled
 * customer service/maintenance access: 192.168.2.?/24
 
-
 :::info
 The litu3 as the modem router has DHCP enabled and provides ip addresses within machine network.
 
 :::
-
 
 :::warning
 There is also a laptop specific machine network setup documentation at:
@@ -28,7 +26,6 @@ However, this was introduced with the mining-excavator use case for field tests.
 # Manual Setup (Deprecated)
 
 The old manual setup was using ip command as not persistent solution
-
 
 :::warning
 This is not a perfect solution as it is not persitent throughout dev-pc reboots.
@@ -48,7 +45,6 @@ Gateway setup, where dev-pc acts as gateway:
 ~$ sudo ip link set dev enx00e04cb828b5 up
 ~$ sudo ip route add 192.168.3.0/24 via 192.168.3.1 dev enx00e04cb828b5
 ```
-
 
 :::warning
 If we use LiTU3 as the modem router, the LiTU3 is the gateway and we can not setup dev-pc as gateway.
@@ -133,12 +129,10 @@ the classic VPN "route hijacking." Your `route -n` output shows exactly what is 
 
 Look at these two lines in your routing table:
 
-
 1. `192.168.2.0 0.0.0.0 255.255.255.0 U 0 tun0`
 2. `192.168.2.0 0.0.0.0 255.255.255.0 U 1 enx00e04c6805c8`
 
 The VPN has created a route for `192.168.2.0` on the **tun0** interface with a metric of **0**. Because a lower metric wins, your computer is trying to send all "Machine Network" traffic into the VPN tunnel instead of out through your USB adapter.
-
 
 :::info
 See following VPN Fix options, where we go for "Option 1: Specific Route Hack"
@@ -200,7 +194,6 @@ sudo iptables -I FORWARD 1 -i enx00e04c6805c8 -j ACCEPT
 sudo iptables -I FORWARD 2 -o enx00e04c6805c8 -j ACCEPT
 ```
 
-
 :::info
 It is not needed with our VPN
 
@@ -237,7 +230,7 @@ case "$1" in
     cms) PROFILE="Machine-lpo-CSM" ;;
     gw)  PROFILE="Machine-lpo-CSM-GW" ;;
     dc5) PROFILE="Machine-lpo-dc5" ;;
-    off) 
+    off)
         nmcli device disconnect "$IFACE"
         echo "Interface $IFACE disconnected."
         exit 0 ;;
@@ -265,7 +258,6 @@ chmod +x ~/lpo-switch.sh
 
 ### 3. How this workflow looks now
 
-
 1. **Plug in any USB Ethernet adapter.**
 2. **Run the script:** `./lpo-switch.sh cms`.
 3. **The script finds the adapter** (e.g., `enx00e...` or a new one like `enx66a...`).
@@ -276,14 +268,13 @@ chmod +x ~/lpo-switch.sh
 
 If you have old versions of these profiles that keep auto-connecting, you can remove all of them first before running the new commands: `nmcli connection show | grep Machine-lpo | awk '{print $1}' | xargs -I{} nmcli connection delete id "{}"`
 
-
 ---
 
 ### Why this is "VPN-Proof"
 
 By using `ip route replace ... metric 0` in the script, you are manually overwriting whatever the VPN client just tried to do. Even if the VPN adds a route for the same range, your script (running second) ensures your local USB adapter is the preferred path.
 
-### Important Tip for `gw` (Gateway) mode:
+### Important Tip for `gw` (Gateway) mode
 
 In **Gateway mode**, the components in the trailer (like the battery controllers) will try to send their internet traffic to **192.168.2.1**. For this to actually work, make sure your NAT rules from the previous step are still active on the `dev-pc`:
 
@@ -474,7 +465,6 @@ NTP=192.168.2.1
 ## Activate CSM Profile
 
 Using nmtui:
-
 
  ![](attachments/0d21a9d0-afb1-4f1f-9520-05d5d9b21913.png " =661x1002")
 

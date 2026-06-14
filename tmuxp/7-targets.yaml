@@ -1,6 +1,5 @@
 session_name: 7-targets
 start_directory: $HOME
-
 windows:
   - window_name: serial
     panes:

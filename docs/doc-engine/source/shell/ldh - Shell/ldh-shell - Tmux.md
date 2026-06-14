@@ -25,7 +25,7 @@ tmux 3.2a
 ubuntu:
 
 ```javascript
-$ sudo apt install -y tmux
+sudo apt install -y tmux
 ```
 
 # Concept
@@ -92,7 +92,7 @@ Advanced session management is done by using tmuxp:
 ubuntu:
 
 ```javascript
-$ sudo apt install tmuxp
+sudo apt install tmuxp
 ```
 
 Alternatives/Additions to tmuxp are:
@@ -112,7 +112,7 @@ Create tmux session config for`term-ws1`at dotfiles repo:
 $ vim ~/dotfiles/tmuxp/term-ws1.yaml
 session_name: term-ws1
 windows:
-  - window_name: term-ws1 
+  - window_name: term-ws1
     panes:
       - blank
 :wq
@@ -126,7 +126,7 @@ Load tmux session at i3 workspace 1 terminal:
 * load template tmux session `starter` in that terminal instance
 
 ```javascript
-$ tmuxp load starter
+tmuxp load starter
 ```
 
 Verify with xprop tool that terminal instance has got explicit name:
@@ -155,7 +155,7 @@ Adapt tmux session layout until happy and then save it:
 
 ```javascript
  $ tmuxp freeze starter
-Convert to [yaml]: 
+Convert to [yaml]:
 ---------------------------------------------------------------
 Freeze does its best to snapshot live tmux sessions.
 
@@ -189,7 +189,7 @@ windows:
 Load tmux session to verify:
 
 ```javascript
-$ tmuxp load term-ws1
+tmuxp load term-ws1
 ```
 
 That's it nice method to start from tmux template and store reusable instance of tmux session.
@@ -254,7 +254,7 @@ Usage as is follows:
 * current session is term-dev
 
 ```javascript
-$ tmux-new-window term-dev /home/michael/dev/linux_rpi/linux
+tmux-new-window term-dev /home/michael/dev/linux_rpi/linux
 ```
 
 # Pair Programming
@@ -264,7 +264,6 @@ Tmux supports pair programming by sharing tmux session…
 * <https://www.hamvocke.com/blog/remote-pair-programming-with-tmux/>
 * <https://dev.to/casonadams/pair-programing-with-vi-and-tmux-2h47>
 * <https://medium.com/@gaelollivier/connect-to-your-raspberry-pi-from-anywhere-using-ngrok-801e9fd1dd46>
-
 
 \
 

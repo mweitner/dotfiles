@@ -8,23 +8,23 @@
 function to-bash --wraps bash --description 'Launch bash with fish environment'
     # Ensure bash uses the standard history file
     set -lx HISTFILE "$HOME/.bash_history"
-    
+
     # Save/sync history immediately (not just on shell exit)
     set -lx PROMPT_COMMAND 'history -a; history -n'
-    
+
     # Standard bash history settings
     set -lx HISTSIZE 5000
     set -lx HISTFILESIZE 10000
     set -lx HISTCONTROL ignoreboth:erasedups
-    
+
     # Ensure editor/pager are set
     set -lx EDITOR nvim
     set -lx VISUAL nvim
     set -lx PAGER less
-    
+
     # Terminal environment
     set -lx TERM xterm-256color
-    
+
     # Use absolute path to avoid fish function shadowing issues
     /usr/bin/bash $argv
 end
@@ -41,18 +41,18 @@ function bash-full --wraps bash --description 'Launch bash with comprehensive se
     set -lx HISTSIZE 5000
     set -lx HISTFILESIZE 10000
     set -lx HISTCONTROL ignoreboth:erasedups
-    
+
     # Full environment
     set -lx EDITOR nvim
     set -lx VISUAL nvim
     set -lx PAGER less
     set -lx TERM xterm-256color
-    
+
     # XDG Base Directories
     set -lx XDG_CONFIG_HOME "$HOME/.config"
     set -lx XDG_DATA_HOME "$HOME/.local/share"
     set -lx XDG_CACHE_HOME "$HOME/.cache"
-    
+
     # Preserve current directory and launch as login shell
     builtin cd (pwd)
     /usr/bin/bash --login $argv
@@ -64,13 +64,13 @@ function to-zsh --wraps zsh --description 'Launch zsh with fish environment'
     set -lx HISTFILE "$HOME/.zsh_history"
     set -lx HISTSIZE 5000
     set -lx SAVEHIST 10000
-    
+
     # Environment
     set -lx EDITOR nvim
     set -lx VISUAL nvim
     set -lx PAGER less
     set -lx TERM xterm-256color
-    
+
     # Use absolute path to avoid fish function shadowing issues
     /usr/bin/zsh $argv
 end

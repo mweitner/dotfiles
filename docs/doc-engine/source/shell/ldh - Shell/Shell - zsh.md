@@ -18,13 +18,13 @@ The following is valid for ArchLinux as prototype as well as:
 # Install
 
 ```javascript
-$ sudo pacman -S zsh
+sudo pacman -S zsh
 ```
 
 ubuntu:
 
 ```javascript
-$ sudo apt install zsh
+sudo apt install zsh
 ```
 
 Important for further configuration especially for pimping zsh prompt, is to have locale setup properly, because I had layout problems with zsh prompt when my locale was on `C` set. So make sure we have e.g. locale `en_US` setup by using locale-gen, and localectl commands.
@@ -48,8 +48,8 @@ We us 2 config files of the 5 possible:
 * .zshrc - configures shell itself and runs commands
 
 ```javascript
-$ touch ~/.zshrc
-$ touch ~/.config/zsh/.zshenv
+touch ~/.zshrc
+touch ~/.config/zsh/.zshenv
 ```
 
 The actual zsh configuration can be found at my dotfiles repo:
@@ -63,11 +63,11 @@ Current prompt after initial install:
 ```javascript
 sloth% echo $USER
 michael
-sloth% pwd       
+sloth% pwd
 /home/michael/dotfiles
-sloth% git branch 
+sloth% git branch
 * main
-sloth% 
+sloth%
 ```
 
 After pimping:
@@ -75,17 +75,17 @@ After pimping:
 * I am not sure about the one line gap for each command and I do not really like the right hand side output with git details
 
 ```bash
-~ > cd dotfiles                                                               
-                                                                               
+~ > cd dotfiles
+
 ~/dotfiles > echo $USER                                        λ:main  [   ]
 michael
-                                                                               
+
 ~/dotfiles > pwd                                               λ:main  [   ]
 /home/michael/dotfiles
-                                                                               
+
 ~/dotfiles > git branch                                        λ:main  [   ]
 * main
-                                                                               
+
 ~/dotfiles >                                                   λ:main  [   ]
 ```
 
@@ -98,7 +98,7 @@ michael
 /home/michael/dotfiles
 [michael@sloth dotfiles]$ git branch
 * main
-[michael@sloth dotfiles]$ 
+[michael@sloth dotfiles]$
 ```
 
 ## Directory Stack
@@ -107,15 +107,15 @@ zsh is setup for nice dir stack with alias `d` which shows last n elements on st
 
 ```javascript
 ~/dotfiles/zsh > cd ~                                          λ:main  [   ]
-                                                                               
-~ > d                                                                         
-0	~
-1	~/dotfiles/zsh
-                                                                               
-~ > 1                                                                         
+
+~ > d
+0 ~
+1 ~/dotfiles/zsh
+
+~ > 1
 ~/dotfiles/zsh
-                                                                               
-~/dotfiles/zsh >                                               λ:main  [   ]      
+
+~/dotfiles/zsh >                                               λ:main  [   ]
 ```
 
 ## Enable Vi Mode
@@ -211,7 +211,7 @@ export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 jump to directory:
 
 ```javascript
-~/book-src/mousless-book-companion/part_II > bd 2                                                                         
+~/book-src/mousless-book-companion/part_II > bd 2
 ~/book-src >
 ```
 
@@ -235,7 +235,6 @@ fi
 When starting devshell of yp build I get following error:
 
 * <https://www.godo.dev/tutorials/macos-fix-zsh-compinit-insecure-directories/?utm_content=cmp-true>
-
 
 * <https://stackoverflow.com/questions/13762280/zsh-compinit-insecure-directories>
 * <https://github.com/zsh-users/zsh-completions/issues/680>

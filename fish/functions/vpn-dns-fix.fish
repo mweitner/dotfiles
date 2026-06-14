@@ -5,7 +5,7 @@
 function fix-vpn-dns-browser --description 'Fix DNS and browser cache after VPN connect (Fedora + Liebherr VPN)'
     # Auto-detect or use passed interface
     set vpn_interface "$argv[1]"
-    
+
     # If no argument, try auto-detect
     if test -z "$vpn_interface"
         set vpn_interface (ip link show 2>/dev/null | grep -E 'tun[0-9]+|ppp[0-9]+|cscotun' | head -1 | awk '{print $2}' | tr -d ':')
@@ -14,9 +14,9 @@ function fix-vpn-dns-browser --description 'Fix DNS and browser cache after VPN 
             return 1
         end
     end
-    
+
     echo "🔧 Fixing DNS and browser cache for VPN interface: $vpn_interface"
-    
+
     # Call the shell script (make sure it's in PATH or run it directly)
     if command -v fix-vpn-dns-browser >/dev/null 2>&1
         # Script is in PATH

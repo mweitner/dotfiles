@@ -46,5 +46,6 @@ notify-send "Hello from mako!"
 ```
 
 ## References
-- https://github.com/emersion/mako
-- https://man.sr.ht/~emersion/mako/
+
+- <https://github.com/emersion/mako>
+- <https://man.sr.ht/~emersion/mako/>

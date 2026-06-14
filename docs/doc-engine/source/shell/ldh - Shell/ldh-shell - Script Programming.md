@@ -46,7 +46,6 @@ If error flag is enabled: Shell script terminates, if any command fails with an 
 
 It is also possible to enable/disable error flag within same script.
 
-
 :::warning
 If script is sourced, the error handling terminates the current shell, where user does not see any message just a terminated shell.
 
@@ -76,12 +75,10 @@ BASH_SOURCE: /home/ldcwem0/.local/bin/llp_provide_netboot.sh
 
 ## Comparision Operators
 
-* <https://tldp.org/LDP/abs/html/comparison-ops.html>
+- <https://tldp.org/LDP/abs/html/comparison-ops.html>
 
 ### -n - string is not null
 
-
 ### -z - string is *null*, that is, has zero length
-
 
 \

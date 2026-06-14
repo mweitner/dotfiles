@@ -2,7 +2,7 @@
 
 #
 # execute tmuxp loading a terminal with given name
-# 
+#
 # It makes sure there is only one instance with given name
 #
 name=$1

@@ -36,7 +36,7 @@ if [[ -d "${dps_system_update_work}" ]]; then
 fi
 
 if [[ ! -d "${dps_system_update_out}" ]]; then
-  mkdir -p "${dps_system_update_out}" 
+  mkdir -p "${dps_system_update_out}"
 fi
 
 if [[ ! -f "${dps_build_root}/system_update.deb" ]]; then
@@ -80,4 +80,3 @@ if [[ -z "$bb_machine" ]]; then
   print_usage()
   return 250
 fi
-

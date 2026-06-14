@@ -11,7 +11,6 @@ Protocol: GlobalProtect (GP).
 
 Authentication: SAML (This requires the gpclient GUI or a specific openconnect version that supports —protocol=gp).
 
-
 Special Flag: --hip (This is for Host Information Profile, required by many corporate environments).
 
 Legacy Support: Your ~/.config/gpgui/openssl.cnf shows you need UnsafeLegacyServerConnect. This is common when connecting to older VPN gateways that haven't updated their SSL/TLS handshakes.
@@ -24,8 +23,11 @@ On Fedora, you can install the same gpclient you were using on Ubuntu. It is oft
 
 Bash
 sudo dnf install openconnect
-# You may need to build or install the specific gpclient 
-# if you want the exact same GUI behavior.
+
+# You may need to build or install the specific gpclient
+
+# if you want the exact same GUI behavior
+
 Step B: Apply the "Legacy SSL" Fix
 Without this, your connection will likely fail with a "SSL Alert" error on Fedora's newer OpenSSL version.
 
@@ -50,8 +52,10 @@ sudo gpclient connect lis01.vpn.liebherr.com --hip
 In your Sway config, you already have a placeholder for this. To make sure the SAML auth window (which pops up during login) behaves correctly, ensure this line is in your ~/.config/sway/config:
 
 Plaintext
+
 # Ensure the VPN auth window floats and centers
-for_window [instance="gpclient"] floating enable, move position center 
-bindsym $mod+Shift+v [instance="gpclient"] scratchpad show 
+
+for_window [instance="gpclient"] floating enable, move position center
+bindsym $mod+Shift+v [instance="gpclient"] scratchpad show
 Next Step for you:
 Since you are using fish now, would you like me to create a fish function called vpn-on that automatically sets the OPENSSL_CONF environment variable and starts this connection for you?

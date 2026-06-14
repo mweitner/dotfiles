@@ -65,4 +65,3 @@ _bd () {
 }
 
 compctl -V directories -K _bd bd
-

@@ -24,7 +24,7 @@ Active: active (running)
 
 ```bash
 sudo dnf install -y NetworkManager iwd xdg-utils \
-	network-manager-applet nm-connection-editor
+ network-manager-applet nm-connection-editor
 ```
 
 Compatibility note: some Fedora releases still provide `NetworkManager-gnome` as a meta package.

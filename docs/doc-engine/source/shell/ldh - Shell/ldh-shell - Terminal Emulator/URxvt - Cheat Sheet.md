@@ -26,5 +26,4 @@ CTRL+SHIFT+L - move tab to the right
 
 CTRL+d - close tab (close pseudo terminal PTY of current tab)
 
-
 \

@@ -54,7 +54,7 @@
 URxvt*font: xft:Monospace:size=14:antialias=true
 ! gemini support: changed font to FiraCode Nerd Font Mono
 ! - This single line tells URxvt to use the FiraCode Nerd Font Mono at a size of 16, with antialiasing enabled.
-! - The term FiraCode Nerd Font Mono is the correct, full name for the font you installed 
+! - The term FiraCode Nerd Font Mono is the correct, full name for the font you installed
 ! URxvt*font: xft:FiraCode Nerd Font Mono:antialias=true:size=16
 ! URxvt*font: xft:FiraCode Nerd Font:size=16:antialias=true,xft:Noto Sans Mono:size=16:antialias=true
 ! URxvt*font: xft:FiraCode Nerd Font Mono:size=12:antialias=true,xft:Noto Sans Mono:size=12:antialias=true
@@ -78,7 +78,7 @@ URxvt*saveLines: 5000
 URxvt*cursorBlink: false
 URxvt*cursorUnderline: true
 URxvt*letterSpace: -2
-  
+
 URxvt*perl-ext-common: default,tabbedex
 
 !changed keybind as need for vim and tmux

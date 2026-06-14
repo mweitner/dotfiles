@@ -1,13 +1,13 @@
 session_name: term-dev
 windows:
-- window_name: dotfiles
-  panes:
-  - shell_command:
-    - cd ${HOME}/dotfiles
-    - nvim
-  - focus: 'true'
-- window_name: dev1
-  panes:
-    - shell_command:
-      - nvim
-    - focus: 'true'
+  - window_name: dotfiles
+    panes:
+      - shell_command:
+          - cd ${HOME}/dotfiles
+          - nvim
+      - focus: 'true'
+  - window_name: dev1
+    panes:
+      - shell_command:
+          - nvim
+      - focus: 'true'

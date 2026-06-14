@@ -1,6 +1,5 @@
 session_name: 4-dev
 start_directory: $HOME
-
 windows:
   - window_name: editor
     panes:

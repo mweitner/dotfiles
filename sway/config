@@ -269,7 +269,7 @@ for_window [window_role="pop-up"] floating enable
 for_window [window_role="task_dialog"] floating enable
 for_window [class="vlc"] floating enable
 
-# virtual box mmnager, 
+# virtual box mmnager,
 # WM_NAME("Oracle VM VirtualBox Manager")
 # WM_CLASS("VirtualBox Manager", *)
 #for_window [class="VirtualBox Manager"] floating enabled
@@ -311,7 +311,7 @@ set $white2 #ffffff
 # hide borders
 hide_edge_borders both
 
-# class border backgr. text indicator child_border 
+# class border backgr. text indicator child_border
 client.focused    #333333 $black2 $white2 #285577
 client.focused_inactive #333333 $background $foreground #484e50
 client.unfocused  #333333 #222222 #888888 #292d2e #222222

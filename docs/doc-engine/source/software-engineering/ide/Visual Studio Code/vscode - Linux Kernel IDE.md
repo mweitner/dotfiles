@@ -8,7 +8,6 @@ First inspiration:
 
 # Remote Debugging
 
-- [ ] remote debugging with gdbserver and vscode…
-
+* [ ] remote debugging with gdbserver and vscode…
 
 \

@@ -23,7 +23,7 @@ import argparse
 import json
 import sys
 import time
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -37,7 +37,9 @@ AUTHORITY_BASE = "https://login.microsoftonline.com"
 
 def _post(url: str, data: dict) -> dict:
     body = urlencode(data).encode()
-    req = Request(url, data=body, headers={"Content-Type": "application/x-www-form-urlencoded"})
+    req = Request(
+        url, data=body, headers={"Content-Type": "application/x-www-form-urlencoded"}
+    )
     try:
         with urlopen(req) as resp:
             return json.loads(resp.read())
@@ -69,11 +71,14 @@ def device_code_flow(tenant: str, scope: str) -> str:
     while time.monotonic() < deadline:
         time.sleep(interval)
         try:
-            result = _post(token_url, {
-                "client_id": CLIENT_ID,
-                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
-                "device_code": dc["device_code"],
-            })
+            result = _post(
+                token_url,
+                {
+                    "client_id": CLIENT_ID,
+                    "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                    "device_code": dc["device_code"],
+                },
+            )
         except RuntimeError as exc:
             msg = str(exc)
             if "authorization_pending" in msg:
@@ -120,6 +125,7 @@ def main() -> None:
         with open(args.output, "w") as fh:
             fh.write(token)
         import os
+
         os.chmod(args.output, 0o600)
         print(f"Token written to {args.output}", file=sys.stderr)
     else:

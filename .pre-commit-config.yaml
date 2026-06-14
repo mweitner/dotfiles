@@ -1,0 +1,42 @@
+default_language_version:
+  ruby: 3.2.1
+  node: 20.19.0
+  golang: 1.25.4
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: pretty-format-json
+        args: [--autofix]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.16
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.11.0
+    hooks:
+      - id: shellcheck
+  - repo: https://github.com/google/yamlfmt
+    rev: v0.21.0
+    hooks:
+      - id: yamlfmt
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: "v0.48.0"
+    hooks:
+      - id: markdownlint
+        args: [--fix]
+        stages: [pre-commit]
+exclude: |
+  (?x)
+  ^(?:\.devcontainer/.*|\.vscode/launch.json|\.vscode/.*|\.tmp/.*|\.secrets/.*)

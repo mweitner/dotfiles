@@ -11,7 +11,6 @@ References:
 
 As of recent problems with mixed docker installation on my ubuntu 22.04 system with native docker and snap docker installation, following describes the clean up and clean installation of one docker installation.
 
-
 :::info
 **Why Use Native Docker Installation Instead of Snap on Development PCs**
 
@@ -179,10 +178,11 @@ Now that you have a clean native installation, you can apply the `daemon.json` c
       "bip": "100.127.232.1/25",
       "fixed-cidr": "100.127.232.0/25"
     }
-    
+
     ```
 
     Current on ubuntu machine with some changes from KI and back some changes from martin d.:
+
   * ```bash
     √ ldcwem0@ldcnb-ldcwem0: ~$ cat /etc/docker/daemon.json
     {
@@ -195,8 +195,9 @@ Now that you have a clean native installation, you can apply the `daemon.json` c
         }
       ]
     }
-    
+
     ```
+
 * Restart the Docker service to apply the new settings:
 
   ```javascript
@@ -247,9 +248,9 @@ General chat:
 >
 > docker network ls
 >
-> ip link set dev 
+> ip link set dev
 >
-> ip route add 
+> ip route add
 
 ## Problem Analysis - 1
 
@@ -272,7 +273,7 @@ default via 10.146.72.1 dev wlan0 proto dhcp metric 600
 172.19.0.0/16 dev br-0b7db18e7a89 proto kernel scope link src 172.19.0.1 linkdown
 192.168.3.0/24 dev enx00e04c680221 proto kernel scope link src 192.168.3.1
 192.168.122.0/24 dev virbr0 proto kernel scope link src 192.168.122.1 linkdown
-                                                                                                                                                          
+
 $ docker network ls
 NETWORK ID     NAME                       DRIVER    SCOPE
 2c2dc8822030   bridge                     bridge    local
@@ -280,7 +281,7 @@ NETWORK ID     NAME                       DRIVER    SCOPE
 5d2d127273bd   host                       host      local
 0b7db18e7a89   mosquitto_broker_default   bridge    local
 831c57624a0f   none                       null      local
-                                                                                                                                                          
+
 $ docker inspect mosquitto_broker_default
 [
     {
@@ -318,7 +319,7 @@ $ docker inspect mosquitto_broker_default
         }
     }
 ]
-                                                                                                                                                          
+
 $ docker inspect ci_default
 [
     {
@@ -355,7 +356,7 @@ $ docker inspect ci_default
         }
     }
 ]
-                                                                                                                                                          
+
 $ docker inspect host
 [
     {
@@ -383,7 +384,7 @@ $ docker inspect host
         "Labels": {}
     }
 ]
-                                                                                                                                                          
+
 $ docker inspect bridge
 [
     {
@@ -424,7 +425,7 @@ $ docker inspect bridge
         "Labels": {}
     }
 ]
-                                                                                                                                                          
+
 $ docker inspect none
 [
     {
@@ -505,7 +506,7 @@ NETWORK ID     NAME         DRIVER    SCOPE
 76bb234b1a04   ci_default   bridge    local
 5d2d127273bd   host         host      local
 831c57624a0f   none         null      local
-                                                                                                                                                          
+
 $ cat /etc/docker/daemon.json
 {
   "bip": "100.127.232.1/25",
@@ -530,7 +531,7 @@ default via 10.146.72.1 dev wlan0 proto dhcp metric 600
 Solution add route:
 
 ```javascript
-$ sudo ip route add 172.18.6.136/32 via 10.146.72.1
+sudo ip route add 172.18.6.136/32 via 10.146.72.1
 ```
 
 # HowTo Mandatory Build Args?
@@ -549,7 +550,7 @@ RUN set -ex \
 several if conditions:
 
 * make sure syntax is correct with 1 =:
-*  
+*
 
 ```javascript
 ...

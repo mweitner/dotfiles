@@ -105,7 +105,7 @@ function create_feature_summary() {
   else
     echo "[llp_init_build] devtool_workspace_active=off (0)" >> "${feature_file}"
   fi
-    
+
   if [ "${netboot_support}" = "1" ]; then
     echo "[llp_init_build] netboot_support=on (1)" >> "${feature_file}"
   else
@@ -120,31 +120,31 @@ function create_feature_summary() {
     else
       echo "[llp_init_build]\tnetwork_support=off (0)" >> "${feature_file}"
     fi
-    
+
     if [ "${scfwdev_support}" = "1" ]; then
       echo "[llp_init_build]\tscfwdev_support=on (1)" >> "${feature_file}"
     else
       echo "[llp_init_build]\tscfwdev_support=off (0)" >> "${feature_file}"
     fi
- 
+
     if [ "${nodistroboot_support}" = "1" ]; then
       echo "[llp_init_build]\tdistroboot_support=off (nodistroboot_support=1)" >> "${feature_file}"
     else
       echo "[llp_init_build]\tdistroboot_support=on (nodistroboot_support=0)" >> "${feature_file}"
     fi
-  
+
     if [ "${bus_support}" = "1" ]; then
       echo "[llp_init_build]\tbus_support=on (1)" >> "${feature_file}"
     else
       echo "[llp_init_build]\tbus_support=off (0)" >> "${feature_file}"
     fi
-  
+
     if [ "${pythontest_support}" = "1" ]; then
       echo "[llp_init_build]\tpythontest_support=on (1)" >> "${feature_file}"
     else
       echo "[llp_init_build]\tpythontest_support=off (0)" >> "${feature_file}"
     fi
-  
+
     if [ "${sotatest_support}" = "1" ]; then
       echo "[llp_init_build]\tsotatest_support=on (1)" >> "${feature_file}"
     else
@@ -173,7 +173,7 @@ if [[ $# -gt 0 ]]; then
     if [[ "$1" = "-h" ]]; then
       print_usage
       return 0
-    fi 
+    fi
 fi
 
 yp_build_mixed_project_root="/opt/yocto/workspace"
@@ -396,7 +396,7 @@ if [[ "${sign_support}" = "1" ]] || [[ -f "${project_keys_path}/swupdate-private
     echo "[llp_init_build] export SWUPDATE_PRIVATE_KEY=${SWUPDATE_PRIVATE_KEY}"
     append_passthrough_var "SWUPDATE_PRIVATE_KEY"
   fi
-  # Export SWUpdate public key  
+  # Export SWUpdate public key
   if [[ -f "${project_keys_path}/swupdate-public.pem" ]]; then
     export SWUPDATE_PUBLIC_KEY="${project_keys_path}/swupdate-public.pem"
     echo "[llp_init_build] export SWUPDATE_PUBLIC_KEY=${SWUPDATE_PUBLIC_KEY}"
@@ -566,7 +566,7 @@ cat <<EOT >> "${project_root}/build/conf/local.conf"
 # - mosquitto (development mqtt)
 CORE_IMAGE_EXTRA_INSTALL:append = " traceroute mtr mosquitto"
 CORE_IMAGE_EXTRA_INSTALL:append = " mosquitto libmosquitto1 libmosquittopp1 mosquitto-clients"
-# network dev/analysis 
+# network dev/analysis
 # - openembedded-core/iptables already included by meta-leg-cell (lh-legacy-mm)
 # - openembedded-networking/tcpdump required to add here
 CORE_IMAGE_EXTRA_INSTALL:append = " tcpdump"

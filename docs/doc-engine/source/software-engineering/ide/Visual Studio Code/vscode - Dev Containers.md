@@ -53,7 +53,6 @@ create devcontainer project:
 }
 ```
 
-
 :::info
 This file tells VS Code which image to use, which extensions to install, and what settings to apply. We will use a standard, modern Ubuntu image to guarantee GLIBC 2.36+ compatibility.
 
@@ -127,7 +126,6 @@ Launching stable environment is a two step process:
 
 * Attach VS Code to the Running Container
 
-
 :::warning
 The gemini suggested command does not exist with my devcontainer version 0.80.1:
 
@@ -185,7 +183,6 @@ Select devcontainer and attach it to this vscode session
 
  ![](uploads/dab17d54-dfa7-4792-b340-8fdd42442c9d/443fca92-47b3-455b-8c52-4567c8732d02/2025-11-07-114456_1732x449_scrot.png " =1732x449")
 
-
  ![](uploads/dab17d54-dfa7-4792-b340-8fdd42442c9d/6a7003c6-234b-4596-a2d1-18f3417c7726/2025-11-07-114756_1031x766_scrot.png " =1031x766")
 
 ## Verify
@@ -204,9 +201,8 @@ How do we know everything is setup as we want it using the devcontainer?
 
 ## Open gemini chat
 
-
 :::info
-The auto update to gemini v2.57.0 is announced now, as we solved the 
+The auto update to gemini v2.57.0 is announced now, as we solved the
 
 :::
 

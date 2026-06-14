@@ -1,0 +1,14 @@
+default: true
+# MD013/line-length - Line length
+MD013:
+  # Number of characters default=80
+  # Policy: Keep regular prose readable around 119 chars.
+  line_length: 119
+  code_blocks: false # Disable line length checks for code blocks
+  links: false # Disable line length checks for links
+  tables: false # Disable line length checks for tables
+# MD029/ol-prefix - Ordered list prefix
+# Disabled: code blocks within list items reset list numbering context
+MD029: false
+MD060:
+  style: padded

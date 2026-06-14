@@ -32,19 +32,19 @@ What are the benefits of using one of the oldest terminal emulators?
 # Install
 
 ```javascript
-$ sudo pacman -S rxvt-unicode
+sudo pacman -S rxvt-unicode
 ```
 
 ubuntu:
 
 ```javascript
-$ sudo apt install rxvt-unicode
+sudo apt install rxvt-unicode
 ```
 
 fedora:
 
 ```bash
-$ sudo dnf install rxvt-unicode
+sudo dnf install rxvt-unicode
 ```
 
 Example on my Purism Laptop:
@@ -79,7 +79,7 @@ Following shows general configuration which is than integrated into dotfiles rep
 As mentioned at benefits section above, urxvt is configured through a simple text file X11 environment`~/.Xresources` .
 
 ```bash
-$ touch ~/.Xresources
+touch ~/.Xresources
 ```
 
 Setup Xresources file with font size colors, and other configuration:
@@ -87,7 +87,7 @@ Setup Xresources file with font size colors, and other configuration:
 Good practice is to symlink it to the default config:
 
 ```bash
-$ ln -s ~/.Xresources ~/.Xdefaults
+ln -s ~/.Xresources ~/.Xdefaults
 ```
 
 After configuration changes, the X11 config is updated through xrdb command:
@@ -127,7 +127,7 @@ URxvt*font: xft:Inconsolata Nerd Font Mono:style=Medium:size=14:pixelsize=16:ant
 One good test is simply define unknown font like foo, where you know it must fallback:
 
 ```bash
-$ urxvt -fn 'xft:foo'
+urxvt -fn 'xft:foo'
 ```
 
  ![](uploads/02026def-d437-4c64-a89a-337add5098db/05f371ad-fb09-4152-ad8b-f3de42a06bcf/2022-08-02-133451_435x87_scrot%20(1).png)
@@ -135,7 +135,7 @@ $ urxvt -fn 'xft:foo'
 simply call terminal which should pick up current active X11 font:
 
 ```bash
-$ urxvt
+urxvt
 ```
 
 ## Install fonts
@@ -179,7 +179,6 @@ total 10784
 2048 -rw-r--r-- 1 root staff 2096384 Aug  2 13:17 'Droid Sans Mono Nerd Font Complete.otf'
 2048 -rw-r--r-- 1 root staff 2096428 Aug  2 13:17 'Droid Sans Mono Nerd Font Complete Windows Compatible.otf'
 ```
-
 
 Configure urxvt X11 settings at Xresources file:
 
@@ -241,31 +240,30 @@ Simply call terminal emulator which should pick up new X11 config of `DroidSansM
 
  ![](uploads/02026def-d437-4c64-a89a-337add5098db/10d9bbef-65d6-4060-a39c-14c33b02ef1d/2022-08-02-134554_346x119_scrot%20(1).png)
 
-
 Another nice tool is neofetch which prints out current system state including active font:
 
 ```bash
 ~$ neofetch
-            .-/+oossssoo+/-.               michael@snake 
-        `:+ssssssssssssssssss+:`           ------------- 
-      -+ssssssssssssssssssyyssss+-         OS: Ubuntu 22.04 LTS x86_64 
-    .ossssssssssssssssssdMMMNysssso.       Host: Librem 14 1.0 
-   /ssssssssssshdmmNNmmyNMMMMhssssss/      Kernel: 5.15.0-41-generic 
-  +ssssssssshmydMMMMMMMNddddyssssssss+     Uptime: 5 days, 20 hours, 8 mins 
- /sssssssshNMMMyhhyyyyhmNMMMNhssssssss/    Packages: 1818 (dpkg), 15 (snap) 
-.ssssssssdMMMNhsssssssssshNMMMdssssssss.   Shell: zsh 5.8.1 
-+sssshhhyNMMNyssssssssssssyNMMMysssssss+   Resolution: 1920x1080, 1920x1080, 1920x1080 
-ossyNMMMNyMMhsssssssssssssshmmmhssssssso   WM: i3 
-ossyNMMMNyMMhsssssssssssssshmmmhssssssso   Theme: Yaru [GTK3] 
-+sssshhhyNMMNyssssssssssssyNMMMysssssss+   Icons: Yaru [GTK3] 
-.ssssssssdMMMNhsssssssssshNMMMdssssssss.   Terminal: urxvt 
- /sssssssshNMMMyhhyyyyhdNMMMNhssssssss/    Terminal Font: DroidSansMono Nerd Font Mono 
-  +sssssssssdmydMMMMMMMMddddyssssssss+     CPU: Intel i7-10710U (12) @ 4.700GHz 
-   /ssssssssssshdmNNNNmyNMMMMhssssss/      GPU: Intel Comet Lake UHD Graphics 
-    .ossssssssssssssssssdMMMNysssso.       Memory: 3811MiB / 64188MiB 
+            .-/+oossssoo+/-.               michael@snake
+        `:+ssssssssssssssssss+:`           -------------
+      -+ssssssssssssssssssyyssss+-         OS: Ubuntu 22.04 LTS x86_64
+    .ossssssssssssssssssdMMMNysssso.       Host: Librem 14 1.0
+   /ssssssssssshdmmNNmmyNMMMMhssssss/      Kernel: 5.15.0-41-generic
+  +ssssssssshmydMMMMMMMNddddyssssssss+     Uptime: 5 days, 20 hours, 8 mins
+ /sssssssshNMMMyhhyyyyhmNMMMNhssssssss/    Packages: 1818 (dpkg), 15 (snap)
+.ssssssssdMMMNhsssssssssshNMMMdssssssss.   Shell: zsh 5.8.1
++sssshhhyNMMNyssssssssssssyNMMMysssssss+   Resolution: 1920x1080, 1920x1080, 1920x1080
+ossyNMMMNyMMhsssssssssssssshmmmhssssssso   WM: i3
+ossyNMMMNyMMhsssssssssssssshmmmhssssssso   Theme: Yaru [GTK3]
++sssshhhyNMMNyssssssssssssyNMMMysssssss+   Icons: Yaru [GTK3]
+.ssssssssdMMMNhsssssssssshNMMMdssssssss.   Terminal: urxvt
+ /sssssssshNMMMyhhyyyyhdNMMMNhssssssss/    Terminal Font: DroidSansMono Nerd Font Mono
+  +sssssssssdmydMMMMMMMMddddyssssssss+     CPU: Intel i7-10710U (12) @ 4.700GHz
+   /ssssssssssshdmNNNNmyNMMMMhssssss/      GPU: Intel Comet Lake UHD Graphics
+    .ossssssssssssssssssdMMMNysssso.       Memory: 3811MiB / 64188MiB
       -+sssssssssssssssssyyyssss+-
-        `:+ssssssssssssssssss+:`                                   
-            .-/+oossssoo+/-.                                       
+        `:+ssssssssssssssssss+:`
+            .-/+oossssoo+/-.
 ```
 
 # Install fonts at dotfiles repo

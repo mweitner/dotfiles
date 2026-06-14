@@ -56,7 +56,7 @@ if [[ "$REPO_NAME" == *".."* ]]; then
   exit 1
 fi
 
-# Resolve hostname to IP  
+# Resolve hostname to IP
 case "$NAS_HOST" in
   ugreen-nas)
     NAS_IP="192.168.3.91"
@@ -130,14 +130,14 @@ echo ""
 # Step 3: Clone locally if requested
 if [[ -n "$CLONE_PATH" ]]; then
   echo "📥 Cloning repository to $CLONE_PATH..."
-  
+
   if [[ -d "$CLONE_PATH/$REPO_NAME" ]]; then
     echo "⚠️  Clone directory already exists at $CLONE_PATH/$REPO_NAME"
   else
     mkdir -p "$CLONE_PATH"
     if git clone "$GIT_URL" "$CLONE_PATH/$REPO_NAME" 2>/dev/null; then
       echo "✓ Repository cloned to $CLONE_PATH/$REPO_NAME"
-      
+
       # Add initial commit if empty
       cd "$CLONE_PATH/$REPO_NAME"
       if ! git rev-parse HEAD >/dev/null 2>&1; then

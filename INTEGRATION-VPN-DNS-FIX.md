@@ -16,6 +16,7 @@ The GitHub Controller API VPN DNS fix is now fully integrated into your dotfiles
   - Link to full wiki documentation
 
 **Example output when running install-fedora.sh:**
+
 ```
 ── Home Office VPN DNS fix (GitHub Controller access) ──────────────
 
@@ -47,6 +48,7 @@ Documentation:
   - Link to full documentation
 
 **Example output when running install-fedora-dev.sh:**
+
 ```
 ── Dev: Home Office VPN & GitHub Controller access ──────────────────
 
@@ -65,10 +67,11 @@ See wiki docs for full details:
 #### 3. **README.md** (New)
 
 Created comprehensive dotfiles README documenting:
+
 - Installation quick start
 - Base vs dev script phases
 - VPN DNS fix overview & usage
-- Home office workflow  
+- Home office workflow
 - Directory structure
 - Secrets management
 - Common tasks
@@ -89,6 +92,7 @@ Created comprehensive dotfiles README documenting:
 ### Workflow Integration
 
 #### Fresh Fedora Install
+
 ```bash
 # 1. Clone your dotfiles
 git clone <repo> ~/dotfiles
@@ -104,6 +108,7 @@ reboot
 ```
 
 #### Using VPN at Home Office
+
 ```bash
 # 1. Connect to VPN
 vpn-on
@@ -141,19 +146,23 @@ test-browser-dns                    # Verify HTTPS connectivity
 ## Verification
 
 ✅ **Script installed and linked:**
+
 ```
 -rwxr-xr-x. 1 ldcwem0 ldcwem0 6.6K May 26 09:16 /home/ldcwem0/dotfiles/shell/fix-vpn-dns-browser
 lrwxrwxrwx. 1 ldcwem0 ldcwem0   48 May 26 09:17 /home/ldcwem0/.local/bin/fix-vpn-dns-browser
 ```
 
 ✅ **Integrated into install-fedora.sh:**
+
 - Line 460: Symlink instruction
 - Lines 828-843: Installation notes
 
 ✅ **Integrated into install-fedora-dev.sh:**
+
 - Lines 326-340: Dev documentation
 
 ✅ **Documentation created:**
+
 - README.md (comprehensive)
 - Wiki analysis folder (detailed)
 - Fish functions (auto-sourced)
@@ -189,6 +198,6 @@ Solution: fix-vpn-dns-browser script is now installed:
 
 ---
 
-**Status**: ✅ Complete  
-**Date**: 2026-05-26  
+**Status**: ✅ Complete
+**Date**: 2026-05-26
 **Scope**: Fedora installation scripts + fish config + wiki docs

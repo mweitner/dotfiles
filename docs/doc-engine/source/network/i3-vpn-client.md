@@ -12,13 +12,12 @@ LDC uses openconnect client but needs also SAML Authentication which is provided
 # Installation
 
 ```javascript
-$ sudo add-apt-repository ppa:yuezk/globalprotect-openconnect
-$ sudo apt update
-$ sudo apt install globalprotect-openconnect
+sudo add-apt-repository ppa:yuezk/globalprotect-openconnect
+sudo apt update
+sudo apt install globalprotect-openconnect
 ```
 
 The cli is openconnect as the VPN backend, and the GUI is called gpclient.
-
 
 :::warning
 Since 03.2024, the GUI client requires a license!
@@ -66,7 +65,6 @@ Deprecated: Simply start **gpclient** as the GUI VPN client and connect to serve
 
  ![UI gpclient](attachments/c54ac205-11e7-4ebf-8302-cb5621da6d46.png)
 
-
 :::warning
 It is important to store certificates at all browsers as vpn client picks up certificates at webkit backend and UI at actual browser. It is not 100% clear but there were problems when certificates were not imported to all browsers firefox and chrome!
 
@@ -96,7 +94,7 @@ WM_CLASS(STRING) = "gpclient", "gpclient"
 
 As GUI is not working anymore use cli client:
 
-* the command follows authentication with michael.weitner@liebherr.com as user
+* the command follows authentication with <michael.weitner@liebherr.com> as user
 
 ```none
 $ sudo gpclient connect lis01.vpn.liebherr.com

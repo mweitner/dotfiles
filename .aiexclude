@@ -1,0 +1,8 @@
+# Paths to ignore for AI tooling
+.secrets/
+.tmp/
+build/
+doc-engine/build/
+node_modules/
+.vscode/
+.devcontainer/

@@ -12,7 +12,7 @@ if [[ $# -eq 1 ]]; then
     echo "Usage: source leg_run_docker <srcrev-project-path>"
     echo " <srcrev-project-path> (optional) := srcrev project path"
     return 0
-  fi 
+  fi
   yp_srcrev_projects_path=$1
 fi
 
@@ -27,4 +27,3 @@ docker run --rm -it \
   -v ${YP_BUILD_SSTATE_DIR}:/opt/yocto/shared/sstate-cache \
   -v ${YP_SRCREV_PROJECTS_DIR}:/home/yocto/srcrev \
   mweng/yp-build
-

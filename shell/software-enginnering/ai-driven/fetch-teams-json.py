@@ -38,11 +38,17 @@ def parse_teams_link(teams_url: str) -> LinkInfo:
     if len(path_parts) >= 3 and path_parts[0] == "l" and path_parts[1] == "chat":
         return LinkInfo(kind="chat", chat_id=unquote(path_parts[2]))
 
-    if len(path_parts) >= 3 and path_parts[0] == "l" and path_parts[1] in ("channel", "message"):
+    if (
+        len(path_parts) >= 3
+        and path_parts[0] == "l"
+        and path_parts[1] in ("channel", "message")
+    ):
         team_id = query.get("groupId", [None])[0]
         if not team_id:
             raise ValueError("Channel/message link is missing groupId query parameter")
-        return LinkInfo(kind="channel", team_id=team_id, channel_id=unquote(path_parts[2]))
+        return LinkInfo(
+            kind="channel", team_id=team_id, channel_id=unquote(path_parts[2])
+        )
 
     raise ValueError("Unsupported Teams URL format")
 
@@ -103,7 +109,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", required=True, help="Output JSON file")
     parser.add_argument("--token", default="", help="Graph bearer token")
     parser.add_argument("--top", type=int, default=50, help="Page size")
-    parser.add_argument("--include-replies", action="store_true", help="Include replies")
+    parser.add_argument(
+        "--include-replies", action="store_true", help="Include replies"
+    )
     return parser.parse_args()
 
 
@@ -124,7 +132,9 @@ def main() -> int:
                 msg_id = msg.get("id")
                 if not msg_id:
                     continue
-                replies = graph_get_all(build_replies_url(info, str(msg_id), args.top), token)
+                replies = graph_get_all(
+                    build_replies_url(info, str(msg_id), args.top), token
+                )
                 for reply in replies:
                     reply["_parentMessageId"] = msg_id
                 with_replies.extend(replies)

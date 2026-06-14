@@ -1,6 +1,5 @@
 session_name: 5-tools
 start_directory: $HOME
-
 windows:
   - window_name: shell
     panes:

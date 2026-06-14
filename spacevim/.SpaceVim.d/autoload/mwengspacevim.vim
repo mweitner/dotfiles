@@ -21,4 +21,3 @@ function! mwengspacevim#after() abort
   " you can remove key binding in bootstrap_after function
   " iunmap kj
 endfunction
-

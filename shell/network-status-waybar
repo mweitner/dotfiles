@@ -54,15 +54,15 @@ if [[ -n "$ACTIVE" ]]; then
     CONN_NAME=$(echo "$ACTIVE" | cut -d: -f1)
     CONN_TYPE=$(echo "$ACTIVE" | cut -d: -f3)
     ACTIVE_DEV=$(echo "$ACTIVE" | cut -d: -f4)
-    
+
     # Get IP address for the active connection
     if [[ -z "$ACTIVE_DEV" ]]; then
         ACTIVE_DEV=$(nmcli -t -f DEVICE connection show "$CONN_NAME" 2>/dev/null | head -1)
     fi
-    
+
     if [[ -n "$ACTIVE_DEV" ]]; then
         IP_ADDR=$(ip -4 addr show "$ACTIVE_DEV" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}/\d+' | head -1)
-        
+
         if [[ -n "$IP_ADDR" ]]; then
             case "$CONN_TYPE" in
                 ethernet|802-3-ethernet)

@@ -1,6 +1,6 @@
 #!/bin/bash
 # lpo-build - Initialize Yocto build environment and execute commands
-# 
+#
 # Usage:
 #   lpo-build bash                    # Enter initialized bash shell
 #   lpo-build bitbake -u knotty -v lpo-display-image

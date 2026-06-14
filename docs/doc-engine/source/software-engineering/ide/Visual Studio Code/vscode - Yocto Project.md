@@ -10,9 +10,9 @@ There are several extensions found for yp search:
 
 | Name(link) | Date | Details |
 |------------|------|---------|
-| [yocto-project.yocto-bitbake](https://marketplace.visualstudio.com/items?itemName=yocto-project.yocto-bitbake) | latest:* 19.09.2024 <br> * 2.7.0since:* 19.03.2024 <br> * 2.3.0 | Default: recommendedDownloads: 29.889 |
-| [oelint-adv](https://marketplace.visualstudio.com/items?itemName=kweihmann.oelint-vscode) | latest:* 18.10.1024 <br> * 1.6.0since:* 03.11.2020 <br> * 1.3.0 | - [ ] todo verify its usage … |
-| [EugenWiens.bitbake](https://marketplace.visualstudio.com/items?itemName=EugenWiens.bitbake) | latest:* 15.03.2018 <br> * 1.1.2since:* 03.06.2018 <br> * 1.0.0 | Deprecated: Use yocto-project.yocto-bitbake extension |
+| [yocto-project.yocto-bitbake](https://marketplace.visualstudio.com/items?itemName=yocto-project.yocto-bitbake) | latest:*19.09.2024 <br>* 2.7.0since:*19.03.2024 <br>* 2.3.0 | Default: recommendedDownloads: 29.889 |
+| [oelint-adv](https://marketplace.visualstudio.com/items?itemName=kweihmann.oelint-vscode) | latest:*18.10.1024 <br>* 1.6.0since:*03.11.2020 <br>* 1.3.0 | - [ ] todo verify its usage … |
+| [EugenWiens.bitbake](https://marketplace.visualstudio.com/items?itemName=EugenWiens.bitbake) | latest:*15.03.2018 <br>* 1.1.2since:*03.06.2018 <br>* 1.0.0 | Deprecated: Use yocto-project.yocto-bitbake extension |
 
 # Settings
 
@@ -58,14 +58,14 @@ Example:
 
 ```json
 {
-	"folders": [
-		{
-			"path": "."
-		}
-	],
-	"settings": {
-		"search.searchOnType": true
-	}
+ "folders": [
+  {
+   "path": "."
+  }
+ ],
+ "settings": {
+  "search.searchOnType": true
+ }
 }
 ```
 
@@ -113,11 +113,9 @@ Add recommended settings from extension docu:
 }
 ```
 
-
 ## Single Root Workspace
 
 First open yp project folder example leg-cms:
-
 
  ![](uploads/dab17d54-dfa7-4792-b340-8fdd42442c9d/c070e78d-07ae-4282-820e-f047e1e39f09/2024-12-03-112903_901x348_scrot(1).png)
 
@@ -125,19 +123,16 @@ Save the project as workspace:
 
 * Save workspace as…
 
-
 :::info
 vscode suggests <project-root>.code-workspace as default
 
 The vscode docs tell to use simply .code-workspace
 
-- [ ] todo verify if this works nicely also in case of mixed single and multi root workspace …
+* [ ] todo verify if this works nicely also in case of mixed single and multi root workspace …
 
 :::
 
-
  ![](uploads/dab17d54-dfa7-4792-b340-8fdd42442c9d/3233501c-b5d1-4718-b1c1-5a9f85a461b6/2024-12-03-113010_551x285_scrot(1).png)
-
 
 \
 
@@ -159,7 +154,7 @@ The yp multi root workspace integrates the main yp development folder at:
 ```none
 /opt/yocto/
 ▶ build/        #< root build folder, where each project has its own build folder
-▶ keys/         #< root keys folder, where each project has its own secrets folder 
+▶ keys/         #< root keys folder, where each project has its own secrets folder
 ▶ project/      #< root project folder, where each project has its own yp folder
 ▶ shared/       #< default yp shared folder for all projects (downloads, sstate-cache)
 ▼ workspace/ -> /media/ldcwem0/sandiskmw/linux-dps-review/ #< active yp project
@@ -175,7 +170,7 @@ The `/opt/yocto/workspace` is not the multi root workspace, it is the symlink na
 
 * [linux-dps - HowTo Build Fw](/doc/linux-dps-howto-build-fw-eALvoRDhuJ)
 
-- [ ] describe multi root workspace
+* [ ] describe multi root workspace
 
 ## Single Root Workspace - Active yp
 
@@ -186,7 +181,6 @@ First open the active yp folder at /opt/yocto/workspace:
 * CTRL-K CTRL-O
 
  ![](uploads/dab17d54-dfa7-4792-b340-8fdd42442c9d/ab6d5487-96c8-469b-a065-62e5a5c4904d/2024-12-05-093634_1100x838_scrot(1).png)
-
 
 :::info
 Somehow, the open folder command created a settings.json file under new folder .vscode. This was mainly done because the default profile had yocto-project.yocto-bitbake extension installed.
@@ -204,7 +198,6 @@ Save the open folder as workspace:
 * File / Save Workspace as …
 * name and save the workspace config file at `.vscode/linux-dps.code-workspace`
 
-
 :::info
 It is a good idea to use the specific project name like **linux-dps** instead of a general name like linux-workspace or yp-workspace as it helps to identify the project currently active.
 
@@ -218,7 +211,6 @@ The vscode project or lets say vscode workspace is renamed (displayed) as of the
 
  ![](uploads/dab17d54-dfa7-4792-b340-8fdd42442c9d/c6cf56cc-5062-49c7-89f7-76732eb5dde0/2024-12-05-095245_945x519_scrot(1).png)
 
-
 :::info
 Typically, the .code-workspace settings would only contain folders settings.
 
@@ -230,38 +222,38 @@ Adapted the settings:
 
 ```none
 {
-	"folders": [
-		{
-			"path": ".."
-		}
-	],
-	"settings": {
-		"python.autoComplete.extraPaths": [
-			"${workspaceFolder}/layers/poky/bitbake/lib",
-			"${workspaceFolder}/layers/poky/meta/lib"
-		],
-		"python.analysis.extraPaths": [
-			"${workspaceFolder}/layers/poky/bitbake/lib",
-			"${workspaceFolder}/layers/poky/meta/lib"
-		],
-		"files.associations": {
-			"*.conf": "bitbake",
-			"*.inc": "bitbake"
-		},
-		"bitbake.buildConfigurations": [
-			{
-				"name": "Build",
-				"buildCommand": "${pathToBitbake} ${buildTarget}",
-				"cleanCommand": "${pathToBitbake} -c clean ${buildTarget}",
-				"buildTargets": [
-					"core-image-minimal",
-					"core-image-sato"
-				]
-			}
-		],
-		"bitbake.pathToBitbakeFolder": "${workspaceFolder}/layers/poky/bitbake",
-		"bitbake.pathToEnvScript": "${workspaceFolder}/layers/poky/oe-init-build-env",
-	}
+ "folders": [
+  {
+   "path": ".."
+  }
+ ],
+ "settings": {
+  "python.autoComplete.extraPaths": [
+   "${workspaceFolder}/layers/poky/bitbake/lib",
+   "${workspaceFolder}/layers/poky/meta/lib"
+  ],
+  "python.analysis.extraPaths": [
+   "${workspaceFolder}/layers/poky/bitbake/lib",
+   "${workspaceFolder}/layers/poky/meta/lib"
+  ],
+  "files.associations": {
+   "*.conf": "bitbake",
+   "*.inc": "bitbake"
+  },
+  "bitbake.buildConfigurations": [
+   {
+    "name": "Build",
+    "buildCommand": "${pathToBitbake} ${buildTarget}",
+    "cleanCommand": "${pathToBitbake} -c clean ${buildTarget}",
+    "buildTargets": [
+     "core-image-minimal",
+     "core-image-sato"
+    ]
+   }
+  ],
+  "bitbake.pathToBitbakeFolder": "${workspaceFolder}/layers/poky/bitbake",
+  "bitbake.pathToEnvScript": "${workspaceFolder}/layers/poky/oe-init-build-env",
+ }
 }
 ```
 
@@ -275,7 +267,6 @@ Open profiles setting:
 * Select the profile yocto
 
  ![](uploads/dab17d54-dfa7-4792-b340-8fdd42442c9d/6704e46c-44df-4f38-ab3b-77ae06990e24/2024-12-05-101527_1711x764_scrot(1).png)
-
 
 :::info
 The behavior of profile usage by vscode is not clear for me. I can see following behavior:
@@ -298,14 +289,13 @@ The question arises Where does vscode store the active profile information for a
 > \
 > Here's how you can view and change the active profile for a workspace:
 >
-> 
+>
 > 1. Open the **Command Palette** (Ctrl+Shift+P).  
 > 2. Type **"Profiles: Show Contents"** and press Enter.
 > 3. This will open the **Profiles** view, where you can see all your profiles and their associated folders and workspaces.
 > 4. To change the active profile for a workspace, simply select the desired profile and then click on the **"Associate Workspace"** button.
 >
 > This is the recommended way to manage your VS Code profiles and their associations with workspaces.
-
 
 The state.vscdb is SQLite database file:
 
@@ -351,7 +341,7 @@ The state.vscdb is SQLite database file:
 >
 > **If you're truly determined to find the exact mapping:**
 >
-> 
+>
 > 1. **SQLite Browser:** Use a tool like DB Browser for SQLite to open
 >
 >    ```javascript
@@ -373,8 +363,8 @@ The state.vscdb is SQLite database file:
 
 :::
 
-- [ ] todo idea for feature of my upcoming yp tool
-  - [ ] support of git repo storing entire yp project including yp workspace settings like this vscode at sub-folder .vscode, etc..
+* [ ] todo idea for feature of my upcoming yp tool
+  * [ ] support of git repo storing entire yp project including yp workspace settings like this vscode at sub-folder .vscode, etc..
 
 # Yocto Programming with vscode
 
@@ -382,4 +372,4 @@ The state.vscdb is SQLite database file:
 
 > This guide demonstrates how to create and debug a C++ application using VS Code on the DART-MX8M-MINI.
 
-- [ ] todo mweitner try it out and compare to other IDEs like CLion etc…
+* [ ] todo mweitner try it out and compare to other IDEs like CLion etc…

@@ -43,7 +43,7 @@ if [[ $# -gt 1 ]]; then
     if [[ "$1" = "-h" ]]; then
       print_usage
       return 0
-    fi 
+    fi
 
   if [[ $# -eq 2 ]]; then
     bb_image_recipe=$1
@@ -79,13 +79,13 @@ fi
 
 echo "[llp_backup] 1/2. create tmp backup"
 if [[ ! -d "${llp_backup_dir_tmp}" ]]; then
-  mkdir -p "${llp_backup_dir_tmp}" 
+  mkdir -p "${llp_backup_dir_tmp}"
 fi
 pushd "${llp_system_test_root}"
 git clean -xdf
 popd
 
-#restore system-test project root 
+#restore system-test project root
 if [[ -d "${llp_backup_dir}/.idea" ]]; then
   cp -R "${llp_backup_dir}/.idea" "${llp_system_test_root}"
 fi
@@ -97,4 +97,3 @@ if [[ -d "${llp_backup_dir}/config" ]]; then
 fi
 
 return 0
-

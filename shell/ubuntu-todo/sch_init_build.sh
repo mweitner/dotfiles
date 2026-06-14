@@ -19,4 +19,3 @@ export WORKSPACE=${project_root}
 echo "[sch_init_build] build prepared simply call ./scripts/build.sh <type>"
 echo "[sch_init_build] <type> := [debug, testimage prod]"
 cd ${WORKSPACE}/sources
-

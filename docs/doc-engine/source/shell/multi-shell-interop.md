@@ -3,6 +3,7 @@
 ## Problem
 
 When you have multiple shells (fish, bash, zsh) configured, switching between them can break:
+
 - Command history isolation and search
 - Tab completion context
 - Shell-specific key bindings
@@ -26,6 +27,7 @@ Each shell maintains separate history:
 ### Design Decision: Separate Histories
 
 Keep histories separate. This is safer because:
+
 1. Each shell's history format is optimized for that shell
 2. Fish history includes command runtime, exit status, and working directory
 3. Cross-shell history synchronization is fragile
@@ -36,16 +38,19 @@ Keep histories separate. This is safer because:
 When calling bash from fish, ensure:
 
 1. **HISTFILE is set correctly**
+
    ```bash
    export HISTFILE="$HOME/.bash_history"
    ```
 
 2. **History is saved immediately** (not just on exit)
+
    ```bash
    export PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
    ```
 
 3. **History size is reasonable**
+
    ```bash
    export HISTSIZE=5000
    export HISTFILESIZE=10000
@@ -56,6 +61,7 @@ When calling bash from fish, ensure:
 ### Basic Approach
 
 Type in fish:
+
 ```fish
 bash
 ```
@@ -91,6 +97,7 @@ alias bash=to-bash
 ```
 
 Key points:
+
 1. Use a custom function name (`to-bash` not `bash`) to avoid shadowing the external command
 2. Create an alias (`alias bash=to-bash`) so typing `bash` works naturally
 3. Use absolute path (`/usr/bin/bash`) instead of `command bash`
@@ -131,15 +138,16 @@ function bash-full --wraps bash --description 'Launch bash with comprehensive en
     set -lx TERM xterm-256color
     set -lx EDITOR nvim
     set -lx VISUAL nvim
-    
+
     # Preserve current directory
     builtin cd (pwd)
-    
+
     command bash --login "$argv"
 end
 ```
 
 Usage:
+
 ```fish
 bash-full
 ```
@@ -240,16 +248,19 @@ export TERM=xterm-256color
 Then in each shell's RC file:
 
 **Bash (.bashrc):**
+
 ```bash
 [[ -s "$HOME/.profile" ]] && source "$HOME/.profile"
 ```
 
 **Zsh (.zshrc):**
+
 ```zsh
 [[ -s "$HOME/.profile" ]] && source "$HOME/.profile"
 ```
 
 **Fish (config.fish):**
+
 ```fish
 test -s "$HOME/.profile" && source "$HOME/.profile"
 ```
@@ -261,6 +272,7 @@ test -s "$HOME/.profile" && source "$HOME/.profile"
 Fish auto-generates completions from man pages and has excellent defaults. Nothing extra needed.
 
 Add custom completions if needed:
+
 ```bash
 # ~/.config/fish/completions/mycommand.fish
 complete -c mycommand -s f -l file -d "Input file"
@@ -269,11 +281,13 @@ complete -c mycommand -s f -l file -d "Input file"
 ### Bash Completion System
 
 Enable bash-completion package:
+
 ```bash
 sudo dnf install -y bash-completion
 ```
 
 Source it in ~/.bashrc:
+
 ```bash
 if [ -f /etc/bash_completion ]; then
     source /etc/bash_completion
@@ -301,6 +315,7 @@ zstyle ':completion:*:(ssh|scp):*' hosts off
 ### Problem: Bash history not persisting
 
 **Solution:** Check HISTFILE and add to ~/.bashrc:
+
 ```bash
 export HISTFILE="$HOME/.bash_history"
 export PROMPT_COMMAND="history -a; history -n"
@@ -309,6 +324,7 @@ export PROMPT_COMMAND="history -a; history -n"
 ### Problem: Shell switching loses PWD (current directory)
 
 **Solution:** When using `exec` to switch shells, current directory is preserved automatically. If using subshell, add:
+
 ```fish
 builtin cd (pwd)
 bash
@@ -317,6 +333,7 @@ bash
 ### Problem: Completion doesn't work in bash
 
 **Solution:** Install bash-completion and source it:
+
 ```bash
 sudo dnf install -y bash-completion
 source /usr/share/bash-completion/bash_completion
@@ -325,6 +342,7 @@ source /usr/share/bash-completion/bash_completion
 ### Problem: Environment variables missing in subshell
 
 **Solution:** Source ~/.profile in each shell's RC file. Verify with:
+
 ```bash
 bash -c 'echo $EDITOR'  # Should show 'nvim'
 fish -c 'echo $EDITOR' # Should show 'nvim'

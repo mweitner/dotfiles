@@ -11,7 +11,10 @@ from typing import Any, Dict, List
 try:
     from bs4 import BeautifulSoup
 except ImportError:
-    print("Error: BeautifulSoup4 not found. Install with: pip install beautifulsoup4", file=sys.stderr)
+    print(
+        "Error: BeautifulSoup4 not found. Install with: pip install beautifulsoup4",
+        file=sys.stderr,
+    )
     raise SystemExit(1)
 
 
@@ -90,7 +93,9 @@ def generate_markdown(messages: List[Dict[str, Any]]) -> str:
         formatted_time = format_timestamp(msg.get("createdDateTime", ""))
 
         body_obj = msg.get("body", {})
-        body_raw = body_obj.get("content", "") if isinstance(body_obj, dict) else str(body_obj)
+        body_raw = (
+            body_obj.get("content", "") if isinstance(body_obj, dict) else str(body_obj)
+        )
         clean_text = clean_html_body(body_raw)
 
         if clean_text.strip():

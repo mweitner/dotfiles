@@ -1,6 +1,5 @@
 session_name: dotfiles
 start_directory: $HOME/dotfiles
-
 windows:
   - window_name: spacevim dotfiles
     layout: tiled

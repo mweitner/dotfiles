@@ -30,8 +30,8 @@ autoload -Uz cursor_mode && cursor_mode
 zmodload zsh/complist
 bindkey -M menuselect 'h' vi-backward-char
 bindkey -M menuselect 'k' vi-up-line-or-history
-bindkey -M menuselect 'l' vi-forward-char  
-bindkey -M menuselect 'j' vi-down-line-or-history 
+bindkey -M menuselect 'l' vi-forward-char
+bindkey -M menuselect 'j' vi-down-line-or-history
 
 #remap clear-screen as Ctrl-l is used by tmux to navigate pane left
 bindkey -r '^l'
@@ -79,7 +79,7 @@ fi
 if [ -f "/usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]; then
   source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi
-#ubuntu stores zsh-syntax-highlighting at 
+#ubuntu stores zsh-syntax-highlighting at
 if [ -f "/usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]; then
   source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi
@@ -95,7 +95,7 @@ source "$DOTFILES/zsh/scripts.sh"
 # The java home env is also used for path environment
 #  to point to right jdk.
 # Note: installing jdk at /bin/ makes command like java, ...
-# already available 
+# already available
 #
 if [[ -e /usr/lib/jvm/java-8-openjdk-amd64 ]]; then
   export JAVA_HOME="/usr/lib/jvm/java-8-openjdk-amd64"

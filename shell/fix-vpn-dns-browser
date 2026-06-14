@@ -85,20 +85,20 @@ if [[ ! -d "$FIREFOX_CONFIG_DIR" ]]; then
 else
     # Find the default profile(s)
     FIREFOX_PROFILES=$(find "$FIREFOX_CONFIG_DIR" -name "prefs.js" 2>/dev/null)
-    
+
     if [[ -z "$FIREFOX_PROFILES" ]]; then
         echo "    ⚠️  No Firefox profiles found; skipping"
     else
         while IFS= read -r prefs_file; do
             profile_dir=$(dirname "$prefs_file")
             echo "    Updating profile: $profile_dir"
-            
+
             # Disable DNS-over-HTTPS (DoH)
             # This forces Firefox to use system DNS instead of Cloudflare/NextDNS/etc.
             sed -i '/user_pref.*network\.trr.*enabled/d' "$prefs_file" 2>/dev/null || true
             echo 'user_pref("network.trr.mode", 5);' >> "$prefs_file"
             echo 'user_pref("network.trr.uri", "");' >> "$prefs_file"
-            
+
             echo "    ✓ Firefox DoH disabled; will use system DNS"
         done <<< "$FIREFOX_PROFILES"
     fi
@@ -142,7 +142,7 @@ echo "    ✓ Browser caches cleared"
 if [[ "$RESTART_BROWSERS" != "--no-restart" ]]; then
     echo ""
     echo "==> Step 4: restarting browsers to apply DNS changes..."
-    
+
     # Kill Firefox
     if pgrep -u "$UID" -x firefox >/dev/null 2>&1; then
         echo "    Closing Firefox..."
@@ -151,7 +151,7 @@ if [[ "$RESTART_BROWSERS" != "--no-restart" ]]; then
         # Ensure it's dead
         killall -KILL firefox 2>/dev/null || true
     fi
-    
+
     # Kill Chrome
     for browser_cmd in google-chrome google-chrome-stable chromium chromium-browser; do
         if pgrep -u "$UID" -f "$browser_cmd" >/dev/null 2>&1; then
@@ -159,9 +159,9 @@ if [[ "$RESTART_BROWSERS" != "--no-restart" ]]; then
             killall -TERM "$browser_cmd" 2>/dev/null || true
         fi
     done
-    
+
     sleep 2
-    
+
     echo "    ✓ Browsers closed; restart them manually or with: firefox &"
 else
     echo ""

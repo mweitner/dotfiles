@@ -11,4 +11,3 @@ export PROJECT_DIR=$(pwd)
 docker run --rm -it \
   -v ${PROJECT_DIR}:/home/user \
   mweng/dtspec-doc
-

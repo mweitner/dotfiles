@@ -60,18 +60,16 @@ There is very often a misunderstanding of the meaning of vertical and horizontal
 | `tmux kill-window` | kill window |
 | `tmux move-window -t <target> -s <source>:<id>` | move window with <id> from <source> session to <target> session. <br> e.g. move window 5 of session term-dev to session term-ws1: <br> `tmux move-window -t term-ws1 -s term-dev:5` |
 
-
 # Window
 
 | Command | Description |
 |---------|-------------|
-| `$mod [1-n] ` | select window with index n. default: \[0-n\] |
+| `$mod [1-n]` | select window with index n. default: \[0-n\] |
 | `$mod f`  | find window. Shows window hierarchy to choose any |
-| `$mod w ` | create new window. default: ? |
-| `$mod n ` | rename current window |
-| `$mod i ` | show info for selected window:pane |
+| `$mod w` | create new window. default: ? |
+| `$mod n` | rename current window |
+| `$mod i` | show info for selected window:pane |
 | `$ tmux-new-window <session> <path> <name>` | script opens new tmux window at session with working path and optional name |
-
 
 # Pane
 
@@ -160,12 +158,12 @@ Reference:
 | tmuxp freeze | freeze current tmux session by it's name at config path e.g <br> `~/.config/tmuxp/name.yml`. |
 
 ```javascript
-~ > tmuxp freeze                                                                                                                      
+~ > tmuxp freeze
 ---------------------------------------------------------------
 Freeze does its best to snapshot live tmux sessions.
 
 The new config *WILL* require adjusting afterwards. Save config? [y/N]: y
-Save to: /home/michael/.config/tmuxp/term-web.yaml [/home/michael/.config/tmuxp/term-web.yaml]: 
+Save to: /home/michael/.config/tmuxp/term-web.yaml [/home/michael/.config/tmuxp/term-web.yaml]:
 Save to /home/michael/.config/tmuxp/term-web.yaml? [y/N]: y
 Saved to /home/michael/.config/tmuxp/term-web.yaml.
 ```

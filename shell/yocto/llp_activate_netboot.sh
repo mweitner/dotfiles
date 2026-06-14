@@ -42,7 +42,7 @@ if [[ $# -gt 0 ]]; then
     if [[ "$1" = "-h" ]]; then
       print_usage
       return 0
-    fi 
+    fi
 
   if [[ $# -eq 1 ]]; then
     project_name=$1
@@ -97,4 +97,3 @@ sudo rm -f "${nb_root}"
 sudo ln -s "${nb_project_root}" "${nb_root}"
 
 return 0
-

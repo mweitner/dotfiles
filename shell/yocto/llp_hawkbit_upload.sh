@@ -57,7 +57,7 @@ bb_machine="$MACHINE"
 if [[ -z "$bb_machine" ]]; then
   echo "[llp_hawkbit_upload] Error bb_machine not set"
   print_usage
-  return 252 
+  return 252
 fi
 
 bb_image_recipe=liebherr-image-base
@@ -73,7 +73,7 @@ if [[ $# -gt 0 ]] && [[ $# -lt 3 ]];then
   if [[ "$1" = "-h" ]]; then
     print_usage
     return 0
-  fi 
+  fi
   contains_arg_distro_layer "$1"
   if [[ $? = 1 ]]; then
     project_distro_layer="$1"
@@ -158,4 +158,3 @@ pushd "${project_distro_layer_path}/../liebherr/ci/scripts"
 popd
 
 return 0
-

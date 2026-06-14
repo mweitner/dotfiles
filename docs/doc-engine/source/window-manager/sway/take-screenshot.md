@@ -3,7 +3,6 @@
 On Wayland and Sway, `scrot` does not work because it relies on X11 protocols. The industry-standard replacement for
 Sway is a combination of two tools:
 
-
 1. `**grim**`: The tool that actually grabs the image (the "camera").
 2. `**slurp**`: The tool that lets you select a region with your mouse (the "viewfinder").
 

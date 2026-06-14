@@ -73,7 +73,7 @@ BBMASK:append = " \\
 #
 PREFERRED_VERSION:python3.8-cython = "\${bb.utils.contains('SMD_FEATURES', 'smd-python38-support', '0.29.24', d)}"
 PREFERRED_VERSION:python3.8-numpy = "\${bb.utils.contains('SMD_FEATURES', 'smd-pythons38-support', '1.21.2', d)}"
-PREFERRED_VERSION:python3.8-scipy = "\${bb.utils.contains('SMD_FEATURES', 'smd-python38-support', '1.5.4', '', d)}" 
+PREFERRED_VERSION:python3.8-scipy = "\${bb.utils.contains('SMD_FEATURES', 'smd-python38-support', '1.5.4', '', d)}"
 PREFERRED_VERSION:lapack = "\${bb.utils.contains('SMD_FEATURES', 'smd-python38-support', '3.10.0', '', d)}"
 #BBMASK does not support regular expression as bb.utils.contains
 #BBMASK:append = "\${bb.utils.contains('SMD_FEATURES', 'smd-python38-suppport', '\${PYTHON38_BBMASK}', '', d)}"

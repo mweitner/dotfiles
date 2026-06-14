@@ -5,16 +5,19 @@ This guide covers setup of multiple USB2Ethernet adapters (typically Realtek r81
 ## Quick Start
 
 List registered adapters:
+
 ```bash
 setup-adapters --list-adapters
 ```
 
 Assign all machine profiles to adapter-c:
+
 ```bash
 setup-adapters --adapter c
 ```
 
 Assign different adapters per machine group:
+
 ```bash
 setup-adapters --group crane=a --group concrete=b --group mining=c --group lpo=c
 ```
@@ -56,11 +59,13 @@ Each profile specifies fixed IP(s), gateway, and never-default routing policy.
 ## Usage Examples
 
 ### All profiles on adapter-a (default)
+
 ```bash
 setup-adapters --adapter a
 ```
 
 ### Per-group assignment
+
 ```bash
 setup-adapters \
   --group crane=a \
@@ -101,6 +106,7 @@ nas-status
 ```
 
 ### Mixed: most on adapter-a, one specific on adapter-b
+
 ```bash
 setup-adapters \
   --adapter a \
@@ -108,11 +114,13 @@ setup-adapters \
 ```
 
 ### Preview changes without applying
+
 ```bash
 setup-adapters --adapter c --dry-run
 ```
 
 ### Get help
+
 ```bash
 setup-adapters --help
 ```
@@ -122,14 +130,18 @@ setup-adapters --help
 1. Plug in adapters (they auto-enumerate as enx<mac> by default).
 2. Determine which adapter to use for which machine network.
 3. Run `setup-adapters` with desired mapping:
+
    ```bash
    setup-adapters --group lpo=c --group mining=b
    ```
+
 4. Run `nmcli connection show | grep '^Machine-'` to list created profiles.
 5. Activate profile manually:
+
    ```bash
    nmcli connection up Machine-lpo-dc5
    ```
+
    Or set `autoconnect=yes` if the adapter is always connected in that environment.
 
 ## Troubleshooting
@@ -171,9 +183,11 @@ If you add USB adapters later:
 
 1. Plug in the adapter and identify its MAC in `ip -br link | grep enx`.
 2. Edit `~/.local/bin/setup-adapters` and add a new entry to the `ADAPTERS` array:
+
    ```bash
    [d]="XX:XX:XX:XX:XX:XX"
    ```
+
 3. Run `setup-adapters --list-adapters` to confirm.
 4. Use the new adapter-d in your setup commands.
 

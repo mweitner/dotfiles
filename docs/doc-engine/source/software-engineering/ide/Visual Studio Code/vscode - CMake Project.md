@@ -14,5 +14,4 @@ The extensions to be installed is `CMake Tools` which installs another extension
 
 see [CMake](/doc/cmake-YBsUGhQwj9).
 
-
 \

@@ -1,0 +1,10 @@
+# AI model capabilities and recommended settings for dotfiles
+models:
+  gpt-5-mini:
+    purpose: "Default assistant for small edits and doc suggestions"
+accounts:
+  personal_github:
+    preferred: gpt-5-mini
+defaults:
+  temperature: 0.0
+  max_tokens: 1024
