@@ -13,3 +13,9 @@ ai/gemini/oauth_creds.json
 .secrets/
 .tmp/
 ~.tmp/.gitkeep
+
+# Doc engine build output
+doc-engine/build/
+
+# Lockfile for virtualenv sync
+# (tracked intentionally — do not ignore)

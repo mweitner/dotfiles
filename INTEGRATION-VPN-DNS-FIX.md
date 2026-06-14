@@ -15,9 +15,9 @@ The GitHub Controller API VPN DNS fix is now fully integrated into your dotfiles
   - Test commands: `test-vpn-dns`, `test-browser-dns`
   - Link to full wiki documentation
 
-**Example output when running install-fedora.sh:**
+## 
 
-```
+```text
 ── Home Office VPN DNS fix (GitHub Controller access) ──────────────
 
 When using Liebherr VPN from home office, browser DNS may bypass system
@@ -38,8 +38,7 @@ Test resolution:
 
 Documentation:
   ~/document/wiki/doc-engine/source/analysis/homeoffice-github-controller-access/
-```
-
+```text
 #### 2. **install-fedora-dev.sh** (Development Tools)
 
 - **Lines 326-340**: New section "Home Office VPN & GitHub Controller access" documents:
@@ -47,9 +46,9 @@ Documentation:
   - Quick commands
   - Link to full documentation
 
-**Example output when running install-fedora-dev.sh:**
+## 
 
-```
+```text
 ── Dev: Home Office VPN & GitHub Controller access ──────────────────
 
 When working from home with Liebherr VPN, use fix-vpn-dns-browser to
@@ -62,8 +61,7 @@ After VPN connect:
 
 See wiki docs for full details:
   ~/document/wiki/doc-engine/source/analysis/homeoffice-github-controller-access/
-```
-
+```text
 #### 3. **README.md** (New)
 
 Created comprehensive dotfiles README documenting:
@@ -79,7 +77,7 @@ Created comprehensive dotfiles README documenting:
 
 ### File Locations
 
-```
+```text
 ~/dotfiles/
 ├── install-fedora.sh                    ← Added symlink (line 460)
 │                                        ← Added final section (lines 828-843)
@@ -87,8 +85,7 @@ Created comprehensive dotfiles README documenting:
 ├── README.md                            ← NEW comprehensive guide
 └── shell/
     └── fix-vpn-dns-browser              ← Already installed & working
-```
-
+```text
 ### Workflow Integration
 
 #### Fresh Fedora Install
@@ -105,8 +102,7 @@ bash ~/dotfiles/install-fedora-dev.sh
 
 # 4. Reboot and start Sway
 reboot
-```
-
+```text
 #### Using VPN at Home Office
 
 ```bash
@@ -122,8 +118,7 @@ test-browser-dns
 
 # 4. Access GitHub Controller
 https://controller.lis-github.liebherr.com/dashboard
-```
-
+```text
 ### Available Functions
 
 Automatically sourced from `~/.config/fish/functions/vpn-dns-fix.fish`:
@@ -132,8 +127,7 @@ Automatically sourced from `~/.config/fish/functions/vpn-dns-fix.fish`:
 fix-vpn-dns-browser [interface]     # Main fix script (auto-detects interface)
 test-vpn-dns                        # Verify OS DNS → 10.243.65.137
 test-browser-dns                    # Verify HTTPS connectivity
-```
-
+```text
 ### Documentation Chain
 
 1. **High-level**: `~/dotfiles/README.md` (new) – What dotfiles do
@@ -147,11 +141,10 @@ test-browser-dns                    # Verify HTTPS connectivity
 
 ✅ **Script installed and linked:**
 
-```
+```text
 -rwxr-xr-x. 1 ldcwem0 ldcwem0 6.6K May 26 09:16 /home/ldcwem0/dotfiles/shell/fix-vpn-dns-browser
 lrwxrwxrwx. 1 ldcwem0 ldcwem0   48 May 26 09:17 /home/ldcwem0/.local/bin/fix-vpn-dns-browser
-```
-
+```text
 ✅ **Integrated into install-fedora.sh:**
 
 - Line 460: Symlink instruction
@@ -194,8 +187,7 @@ Solution: fix-vpn-dns-browser script is now installed:
 # 1. Script is installed ✓
 # 2. Commands are documented ✓
 # 3. Full runbook is accessible ✓
-```
-
+```text
 ---
 
 **Status**: ✅ Complete

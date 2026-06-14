@@ -20,8 +20,7 @@ find: ‘/home/ldcwem0/.launchpadlib’: Permission denied
 /home/ldcwem0/.config/remmina
 /home/ldcwem0/.config/remmina/remmina.pref
 /home/ldcwem0/.config/autostart/remmina-applet.desktop
-```
-
+```text
 ## group setting
 
 - ldc-terminal-server
@@ -122,8 +121,7 @@ sharefolder=/home/ldcwem0/Downloads
 window_width=1920
 sound=off
 websockets=0
-```
-
+```text
 ## .config / Preferences
 
 ```sh
@@ -243,4 +241,4 @@ periodic_rmnews_uuid_prefix=4A7BC5A53CW988
 [remmina]
 name=
 ignore-tls-errors=1
-```
+```text
