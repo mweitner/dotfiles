@@ -19,7 +19,12 @@ set -euo pipefail
 
 # ── Version pins (override via environment) ────────────────────────────────────
 # Set VSCODE_VERSION to empty string to always track the latest stable release.
-VSCODE_VERSION="${VSCODE_VERSION:-1.124.0}"
+#
+# The latest known compatible VS Code version is 1.124.2 (released 2024-06-10).
+# - [VS Code 1.124 Focuses on Agent Autonomy and Parallel Sessions](https://visualstudiomagazine.com/articles/2026/06/11/vsm-vs-code-1-124.aspx#:~:text=Microsoft%20has%20released%20Visual%20Studio,added%20to%20the%20Agents%20window.)
+# - [Visual Studio Code 1.124](https://code.visualstudio.com/updates/v1_124)
+# - [Microsoft Build 2026 Day 2 LIVE | GitHub Copilot, VS Code, and more](https://www.youtube.com/live/xDXnWL-Mmz0)
+VSCODE_VERSION="${VSCODE_VERSION:-1.124.2}"
 SKIP_MQTT_TOOLS=false
 
 for arg in "$@"; do
