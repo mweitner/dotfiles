@@ -57,4 +57,6 @@ html_theme = "furo"
 html_title = f"{project} ({release})"
 html_static_path = ["_static"]
 
+latex_engine = "xelatex"
+
 todo_include_todos = True

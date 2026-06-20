@@ -4,6 +4,7 @@ SOURCEDIR     = source
 BUILDDIR      = build
 
 .PHONY: help html singlehtml clean
+.PHONY: latexpdf pdf
 
 help:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
@@ -13,6 +14,11 @@ html:
 
 singlehtml:
 	@$(SPHINXBUILD) -M singlehtml "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+
+latexpdf:
+	@$(SPHINXBUILD) -M latexpdf "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+
+pdf: latexpdf
 
 clean:
 	@$(SPHINXBUILD) -M clean "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)

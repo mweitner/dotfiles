@@ -371,6 +371,12 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   # NAS/SMB client tools
   sudo dnf install -y cifs-utils
 
+  # Printer stack (CUPS + GTK printer UI)
+  # - cups: scheduler and command-line tools
+  # - system-config-printer: GUI for adding/managing printers in Sway/i3 setups
+  # - cups-pk-helper: polkit integration for non-root printer admin actions
+  sudo dnf install -y cups system-config-printer cups-pk-helper
+
   # Lightweight DNS/DHCP server for machine-network profiles
   sudo dnf install -y dnsmasq
 
@@ -712,6 +718,22 @@ EOF
   fi
   echo "==> Added $USER to serial access groups (dialout/lock when available)."
   echo "   Re-login required for group membership changes to take effect."
+
+  echo ""
+  echo "── Phase 3c1a: Printer service (CUPS) ───────────────────────────────────"
+  # Match minimal Ubuntu/i3 setup: ensure CUPS is active and user can manage
+  # printers without a full desktop control center.
+  sudo systemctl enable --now cups 2>/dev/null || true
+  if getent group lpadmin >/dev/null; then
+    sudo usermod -aG lpadmin "$USER" 2>/dev/null || true
+    echo "==> CUPS enabled. Added $USER to lpadmin printer-admin group."
+    echo "   Re-login required for new group membership to take effect."
+  else
+    echo "WARN: lpadmin group not found; CUPS enabled but printer-admin group unchanged."
+    echo "      Check manually: getent group lpadmin"
+  fi
+  echo "   Open CUPS web UI at: http://localhost:631"
+  echo "   Optional GTK tool: system-config-printer"
 
   echo ""
   echo "── Phase 3c2: Thunderbolt authorization (bolt) ──────────────────────────"

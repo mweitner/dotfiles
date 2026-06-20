@@ -52,7 +52,13 @@ echo ""
 echo "── Dev: Documentation tools ─────────────────────────────────────────────"
 sudo dnf install -y \
   plantuml \
-  pandoc
+  pandoc \
+  latexmk \
+  texlive-scheme-medium \
+  texlive-xetex
+
+echo "==> PDF documentation support installed (latexmk + XeLaTeX)."
+echo "    Use: make -C doc-engine latexpdf"
 
 echo ""
 echo "── Dev: Git hooks ───────────────────────────────────────────────────────"

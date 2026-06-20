@@ -75,7 +75,7 @@ Optional development tooling bootstrap that can be run independently from the ba
 Includes:
 
 - Neovim, git-delta, meld, and general editor tooling
-- Go, pre-commit, GitHub CLI, PlantUML, and pandoc
+- Go, pre-commit, GitHub CLI, PlantUML, pandoc, and PDF build support for Sphinx
 - MQTT tools such as mosquitto clients and MQTT Explorer
 - Yocto host build dependencies
 - VS Code installation with version pinning support
@@ -86,6 +86,13 @@ Example:
 ```bash
 VSCODE_VERSION=1.115 bash install-fedora-dev.sh
 VSCODE_VERSION="" bash install-fedora-dev.sh
+```
+
+PDF output for the local documentation workspace is available after the dev
+script has installed the required LaTeX tooling:
+
+```bash
+make -C doc-engine latexpdf
 ```
 
 ### `install-ubuntu-bash.sh` and `install.sh`
