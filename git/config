@@ -8,3 +8,6 @@
 	defaultBranch = main
 [color]
 	ui = auto
+[credential "https://lis-github.liebherr.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential

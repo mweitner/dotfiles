@@ -55,9 +55,11 @@ sudo dnf install -y \
   pandoc \
   latexmk \
   texlive-scheme-medium \
-  texlive-xetex
+  texlive-xetex \
+  texlive-capt-of \
+  texlive-ellipse
 
-echo "==> PDF documentation support installed (latexmk + XeLaTeX)."
+echo "==> PDF documentation support installed (latexmk + XeLaTeX + Sphinx LaTeX helpers)."
 echo "    Use: make -C doc-engine latexpdf"
 
 echo ""

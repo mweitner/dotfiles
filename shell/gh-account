@@ -1,0 +1,353 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  gh-account login [--host HOST] [--method web|token|netrc] [--git-protocol https|ssh] [--user USER] [--insecure-storage]
+  gh-account switch --host HOST --user USER
+  gh-account status [--host HOST]
+  gh-account list [--host HOST]
+  gh-account help
+
+Examples:
+  gh-account login --host github.com --method web --git-protocol https --user mweitner
+  gh-account login --host lis-github.liebherr.com --method token --git-protocol https --user michael-weitner
+  gh-account login --host lis-github.liebherr.com --method netrc --git-protocol https --user michael-weitner
+  gh-account switch --host lis-github.liebherr.com --user michael-weitner
+  gh-account status
+  gh-account list
+
+Notes:
+  - --method token reads GH_TOKEN/GITHUB_TOKEN first, then prompts securely.
+  - --method netrc reads token from ~/.netrc for the selected host.
+  - For GitHub Enterprise token page, open: https://<host>/settings/tokens
+  - If token creation is disabled by enterprise policy, use --method web.
+  - --insecure-storage stores credentials in ~/.config/gh/hosts.yml instead of keyring.
+EOF
+}
+
+require_gh() {
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "ERROR: gh CLI is not installed."
+    echo "Install first (Fedora): sudo dnf install -y gh"
+    exit 1
+  fi
+}
+
+token_from_netrc() {
+  local host="$1"
+  local netrc_file="$HOME/.netrc"
+
+  if [[ ! -f "$netrc_file" ]]; then
+    echo "ERROR: ~/.netrc not found."
+    return 1
+  fi
+
+  awk -v host="$host" '
+    BEGIN { in_block=0; token="" }
+    $1 == "machine" {
+      in_block = ($2 == host)
+      next
+    }
+    in_block && $1 == "password" {
+      token = $2
+      print token
+      exit
+    }
+  ' "$netrc_file"
+}
+
+cmd_login() {
+  local host="github.com"
+  local method="web"
+  local git_protocol="https"
+  local user=""
+  local token=""
+  local insecure_storage=false
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --host)
+        host="${2:-}"
+        shift 2
+        ;;
+      --method)
+        method="${2:-}"
+        shift 2
+        ;;
+      --git-protocol)
+        git_protocol="${2:-}"
+        shift 2
+        ;;
+      --user)
+        user="${2:-}"
+        shift 2
+        ;;
+      --insecure-storage)
+        insecure_storage=true
+        shift
+        ;;
+      -h|--help)
+        usage
+        return 0
+        ;;
+      *)
+        echo "ERROR: Unknown option for login: $1"
+        usage
+        return 2
+        ;;
+    esac
+  done
+
+  if [[ "$method" != "web" && "$method" != "token" && "$method" != "netrc" ]]; then
+    echo "ERROR: --method must be 'web', 'token', or 'netrc'."
+    return 2
+  fi
+
+  if [[ "$git_protocol" != "https" && "$git_protocol" != "ssh" ]]; then
+    echo "ERROR: --git-protocol must be 'https' or 'ssh'."
+    return 2
+  fi
+
+  if [[ -z "$host" ]]; then
+    echo "ERROR: --host cannot be empty."
+    return 2
+  fi
+
+  echo "==> Authenticating host: $host"
+  echo "==> Method: $method"
+
+  if [[ "$method" == "web" ]]; then
+    if [[ "$insecure_storage" == true ]]; then
+      gh auth login --hostname "$host" --git-protocol "$git_protocol" --web --insecure-storage
+    else
+      gh auth login --hostname "$host" --git-protocol "$git_protocol" --web
+    fi
+  elif [[ "$method" == "token" ]]; then
+    token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+    if [[ -z "$token" ]]; then
+      printf "Enter token for %s: " "$host" >&2
+      read -r -s token
+      printf "\n" >&2
+    fi
+
+    if [[ -z "$token" ]]; then
+      echo "ERROR: Empty token."
+      echo "Token page: https://$host/settings/tokens"
+      return 1
+    fi
+
+    if [[ "$insecure_storage" == true ]]; then
+      printf '%s\n' "$token" | gh auth login --hostname "$host" --git-protocol "$git_protocol" --with-token --insecure-storage
+    else
+      printf '%s\n' "$token" | gh auth login --hostname "$host" --git-protocol "$git_protocol" --with-token
+    fi
+  else
+    token="$(token_from_netrc "$host" || true)"
+    if [[ -z "$token" ]]; then
+      echo "ERROR: No password token for host '$host' found in ~/.netrc."
+      echo "       Expected block: machine $host ... password <token>"
+      return 1
+    fi
+
+    if [[ "$insecure_storage" == true ]]; then
+      printf '%s\n' "$token" | gh auth login --hostname "$host" --git-protocol "$git_protocol" --with-token --insecure-storage
+    else
+      printf '%s\n' "$token" | gh auth login --hostname "$host" --git-protocol "$git_protocol" --with-token
+    fi
+  fi
+
+  gh auth setup-git -h "$host"
+
+  if [[ -n "$user" ]]; then
+    if ! gh auth switch --hostname "$host" --user "$user"; then
+      echo "WARN: Could not switch to user '$user' on host '$host'."
+      echo "      The username may be case-sensitive."
+      echo "      Check available accounts with: gh auth status -h $host"
+    fi
+  fi
+
+  gh auth status -h "$host"
+
+  cat <<EOF
+
+==> Account setup complete for $host.
+Switch users later with:
+  gh-account switch --host $host --user <username>
+
+EOF
+}
+
+cmd_switch() {
+  local host=""
+  local user=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --host)
+        host="${2:-}"
+        shift 2
+        ;;
+      --user)
+        user="${2:-}"
+        shift 2
+        ;;
+      -h|--help)
+        usage
+        return 0
+        ;;
+      *)
+        echo "ERROR: Unknown option for switch: $1"
+        usage
+        return 2
+        ;;
+    esac
+  done
+
+  if [[ -z "$host" || -z "$user" ]]; then
+    echo "ERROR: switch requires --host and --user."
+    usage
+    return 2
+  fi
+
+  gh auth switch --hostname "$host" --user "$user"
+  gh auth status -h "$host"
+}
+
+cmd_status() {
+  local host=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --host)
+        host="${2:-}"
+        shift 2
+        ;;
+      -h|--help)
+        usage
+        return 0
+        ;;
+      *)
+        echo "ERROR: Unknown option for status: $1"
+        usage
+        return 2
+        ;;
+    esac
+  done
+
+  if [[ -n "$host" ]]; then
+    gh auth status -h "$host"
+  else
+    gh auth status
+  fi
+}
+
+cmd_list() {
+  local host=""
+  local status_output=""
+  local parsed=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --host)
+        host="${2:-}"
+        shift 2
+        ;;
+      -h|--help)
+        usage
+        return 0
+        ;;
+      *)
+        echo "ERROR: Unknown option for list: $1"
+        usage
+        return 2
+        ;;
+    esac
+  done
+
+  if [[ -n "$host" ]]; then
+    status_output="$(gh auth status -h "$host" 2>&1 || true)"
+  else
+    status_output="$(gh auth status 2>&1 || true)"
+  fi
+
+  if printf '%s\n' "$status_output" | grep -qi "not logged into any GitHub hosts"; then
+    echo "No authenticated hosts found."
+    return 0
+  fi
+
+  parsed="$(printf '%s\n' "$status_output" | awk '
+    /^[^[:space:]].*/ {
+      current=$1
+      gsub(/:$/, "", current)
+      if (!(current in seen_host)) {
+        hosts[++hcount]=current
+        seen_host[current]=1
+      }
+    }
+    /Logged in to / && / account / {
+      user=$0
+      sub(/^.* account /, "", user)
+      sub(/ .*/, "", user)
+      if (current == "") {
+        next
+      }
+      key=current "|" user
+      if (!(key in seen_user)) {
+        seen_user[key]=1
+        users[current]=users[current] (users[current] ? ", " : "") user
+      }
+    }
+    END {
+      for (i=1; i<=hcount; i++) {
+        host=hosts[i]
+        if (users[host] != "") {
+          printf "%s: %s\n", host, users[host]
+        }
+      }
+    }
+  ')"
+
+  if [[ -n "$parsed" ]]; then
+    printf '%s\n' "$parsed"
+  else
+    if [[ -n "$host" ]]; then
+      echo "No authenticated users found for host '$host'."
+    else
+      echo "No authenticated users found."
+    fi
+  fi
+}
+
+main() {
+  require_gh
+
+  local cmd="${1:-help}"
+  shift || true
+
+  case "$cmd" in
+    login)
+      cmd_login "$@"
+      ;;
+    switch)
+      cmd_switch "$@"
+      ;;
+    status)
+      cmd_status "$@"
+      ;;
+    list)
+      cmd_list "$@"
+      ;;
+    help|-h|--help)
+      usage
+      ;;
+    *)
+      echo "ERROR: Unknown command: $cmd"
+      usage
+      return 2
+      ;;
+  esac
+}
+
+main "$@"

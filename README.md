@@ -207,6 +207,43 @@ switch-yocto-keys-profile lpo dev
 remmina
 ```
 
+### Set up GitHub CLI for personal + enterprise
+
+```bash
+# Authenticate personal GitHub account
+gh-account login --host github.com --method web --git-protocol https --user mweitner
+
+# Authenticate enterprise GitHub account
+gh-account login --host lis-github.liebherr.com --method web --git-protocol https --user michael-weitner
+
+# If CLI hangs after browser approval (common without desktop keyring), retry with:
+gh-account login --host lis-github.liebherr.com --method web --git-protocol https --user michael-weitner --insecure-storage
+
+# If web auth stalls, use token mode instead (token is read from prompt or GH_TOKEN)
+gh-account login --host lis-github.liebherr.com --method token --git-protocol https --user michael-weitner
+
+# If you already have enterprise credentials in ~/.netrc, use them directly
+gh-account login --host lis-github.liebherr.com --method netrc --git-protocol https --user michael-weitner --insecure-storage
+
+# Show authenticated hosts/accounts
+gh-account status
+
+# Show compact host -> users mapping
+gh-account list
+
+# Switch active user on a host
+gh-account switch --host lis-github.liebherr.com --user michael-weitner
+gh-account switch --host github.com --user mweitner
+```
+
+Token notes for enterprise hosts:
+
+- Token page pattern: `https://<host>/settings/tokens`
+- Example enterprise URL: `https://lis-github.liebherr.com/settings/tokens`
+- If token creation is blocked by enterprise policy, use web login mode.
+- `--insecure-storage` avoids keyring dependencies and stores auth in `~/.config/gh/hosts.yml`.
+- `--method netrc` uses `~/.netrc` (`machine <host> ... password <token>`) as a non-interactive fallback.
+
 ## Secrets and Private Data
 
 Private material belongs under `.secrets/` and should stay out of Git.

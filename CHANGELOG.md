@@ -10,14 +10,23 @@ and changes are grouped using a Semantic Versioning style when tagged releases a
 ### Added (Unreleased)
 
 - Placeholder for changes planned after the first tagged release.
+- Added `shell/gh-account` helper to set up and switch GitHub CLI auth across
+    personal (`github.com`) and enterprise hosts.
+- Added `gh-account list` subcommand for a compact host-to-user overview.
 
 ### Changed (Unreleased)
 
 - Placeholder for updates to existing setup scripts, configuration defaults, and docs.
+- `install-fedora.sh` now links `gh-account` into `~/.local/bin`.
+- `README.md` now documents multi-account GitHub/GitHub Enterprise CLI authentication.
 
 ### Fixed (Unreleased)
 
 - Placeholder for bug fixes in automation, workstation setup, and validation tooling.
+- `gh-account` now supports `--insecure-storage` to avoid GitHub CLI auth hangs in
+    sessions without a working desktop keyring.
+- `gh-account` now supports `--method netrc` to authenticate from existing
+    enterprise credentials in `~/.netrc` when browser auth stalls.
 
 ## [0.1.0] - 2026-06-14
 

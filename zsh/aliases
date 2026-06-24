@@ -9,7 +9,7 @@ alias vim='nvim'
 alias ga='git add'
 alias gc='git commit'
 alias gp='git push'
-alias gl='git log --decorate --oneline --graph --all'
+alias gl='git log --graph --decorate --oneline --branches --tags -n 40'
 
 alias mc='EDITOR=nvim . /usr/lib/mc/mc-wrapper.sh'
 

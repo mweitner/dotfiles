@@ -522,6 +522,7 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/setup-nas-ca-certificates" ]] && ln -sf "$DOTFILES/shell/setup-nas-ca-certificates" "$HOME/.local/bin/setup-nas-ca-certificates"
   [[ -f "$DOTFILES/shell/setup-nas-git-repo" ]] && ln -sf "$DOTFILES/shell/setup-nas-git-repo" "$HOME/.local/bin/setup-nas-git-repo"
   [[ -f "$DOTFILES/shell/setup-1password-ssh-agent" ]] && ln -sf "$DOTFILES/shell/setup-1password-ssh-agent" "$HOME/.local/bin/setup-1password-ssh-agent"
+  [[ -f "$DOTFILES/shell/gh-account" ]] && ln -sf "$DOTFILES/shell/gh-account" "$HOME/.local/bin/gh-account"
   [[ -f "$DOTFILES/shell/yocto/llp_init_build.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_init_build.sh" "$HOME/.local/bin/llp_init_build.sh"
   [[ -f "$DOTFILES/shell/yocto/setup-yocto-project" ]] && ln -sf "$DOTFILES/shell/yocto/setup-yocto-project" "$HOME/.local/bin/setup-yocto-project"
   [[ -f "$DOTFILES/shell/yocto/llp_yocto_wrapper.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_yocto_wrapper.sh" "$HOME/.local/bin/llp-yocto-build"
