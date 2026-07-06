@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Wayland-native monitor configuration for beamer/projector presentation.
+# Disables all external outputs, then enables the beamer on the first
+# non-eDP output found (HDMI-A-1, DP-1, etc.).
+#
+# Default: laptop screen off, beamer only at 1920x1080.
+# Override resolution via env:
+#   BEAMER_MODE=1280x720 monitor-beamer
+#
+# To mirror instead of extend, set BEAMER_MIRROR=1:
+#   BEAMER_MIRROR=1 monitor-beamer
+
+BEAMER_MODE="${BEAMER_MODE:-1920x1080}"
+BEAMER_MIRROR="${BEAMER_MIRROR:-0}"
+
+if ! command -v jq >/dev/null 2>&1; then
+    echo "ERROR: jq is required for monitor-beamer" >&2
+    exit 1
+fi
+
+# Find first non-eDP output that is connected (active or inactive).
+BEAMER_OUT="$(swaymsg -t get_outputs -r \
+    | jq -r '[.[] | select(.name | test("^eDP") | not)] | first | .name // empty')"
+
+if [[ -z "$BEAMER_OUT" ]]; then
+    echo "ERROR: No external output found. Is the beamer/projector connected?" >&2
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send "Beamer not found" \
+            "No external output detected. Connect the beamer and retry." \
+            --icon=video-display --urgency=critical
+    fi
+    exit 1
+fi
+
+if [[ "$BEAMER_MIRROR" == "1" ]]; then
+    # Mirror mode: both outputs at 0,0 — laptop stays on
+    swaymsg output eDP-1      enable mode 2560x1600 position 0 0 scale 1.25
+    swaymsg output "$BEAMER_OUT" enable mode "$BEAMER_MODE" position 0 0 scale 1
+    echo "✓ Beamer mirror profile applied (laptop + beamer at 0,0)"
+else
+    # Presentation mode: laptop off, beamer only
+    swaymsg output eDP-1         disable
+    swaymsg output "$BEAMER_OUT" enable mode "$BEAMER_MODE" position 0 0 scale 1
+    echo "✓ Beamer-only profile applied"
+fi
+
+echo "  beamer=${BEAMER_OUT}  mode=${BEAMER_MODE}"
+
+if command -v notify-send >/dev/null 2>&1; then
+    (
+        sleep 1
+        notify-send "Beamer profile applied" \
+            "output=${BEAMER_OUT}  mode=${BEAMER_MODE}\nMirror=${BEAMER_MIRROR}" \
+            --icon=video-display
+    ) >/dev/null 2>&1 &
+fi

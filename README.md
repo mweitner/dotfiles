@@ -31,11 +31,47 @@ sway
 
 - Fedora-first workstation bootstrap
 - Wayland/Sway desktop configuration
+- Wayland-native screenshot and screen-recording helpers
 - Fish, Bash, and Zsh shell setup
 - Developer tooling, editors, and CLI utilities
 - Yocto helper scripts and key-profile switching
 - VPN, DNS, and remote-access helpers
 - Personal documentation built with Sphinx
+
+## German Umlauts on US Keyboard (Fedora + Sway)
+
+This setup keeps an English keyboard layout and English system settings, while still allowing fast
+German text input (for example in documentation repos).
+
+Default in this repo:
+
+- Sway keyboard layout stays `us` with variant `intl` (US-International with dead keys)
+- Compose key is mapped to Menu key via `compose:menu`
+
+Preferred umlaut input with US-International:
+
+- `"` then `a` -> a-umlaut
+- `"` then `o` -> o-umlaut
+- `"` then `u` -> u-umlaut
+
+Compose fallback sequences:
+
+- `Menu`, then `"`, then `a` -> a-umlaut
+- `Menu`, then `"`, then `o` -> o-umlaut
+- `Menu`, then `"`, then `u` -> u-umlaut
+- `Menu`, then `s`, then `s` -> sharp-s
+- Use uppercase letters for A-umlaut, O-umlaut, U-umlaut
+
+Verification:
+
+```bash
+swaymsg -t get_inputs | rg -n "xkb_layout|xkb_active_layout_name|xkb_options"
+```
+
+Recommended day-to-day usage:
+
+- Use `"` + letter for umlauts (`"` + `a/o/u`)
+- Use `Menu` + `s` + `s` for sharp-s
 
 ## Installation Scripts
 
@@ -62,6 +98,7 @@ install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--skip-
 Highlights:
 
 - Sway, Waybar, wofi, foot, and related Wayland tooling
+- `grimshot.sh` and `wf-record.sh` for screenshots and browser/player screencasts
 - Modern CLI tools such as `rg`, `fd`, `fzf`, `zoxide`, and `htop`
 - NetworkManager with iwd backend
 - Docker using a native Fedora setup path

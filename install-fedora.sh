@@ -8,7 +8,7 @@ set -euo pipefail
 # Hardware target:    HP ZBook Power G11 (HiDPI, Wayland/Sway)
 #
 # Usage:
-#   bash install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--skip-docker] [--skip-docker-daemon-config] [--skip-dev] [--with-ssh-secrets] [--with-netrc-secrets] [--with-1password-ssh-agent]
+#   bash install-fedora.sh [--skip-packages] [--skip-symlinks] [--skip-services] [--skip-docker] [--skip-docker-daemon-config] [--skip-dev] [--with-ssh-secrets] [--with-netrc-secrets] [--with-1password-ssh-agent] [--with-legacy-printer-drivers]
 #
 # Idempotent: safe to re-run.  All symlinks use -sf (force/overwrite).
 #
@@ -19,6 +19,7 @@ SKIP_SERVICES=false
 WITH_SSH_SECRETS=false
 WITH_NETRC_SECRETS=false
 WITH_1PASSWORD_SSH_AGENT=false
+WITH_LEGACY_PRINTER_DRIVERS=false
 SKIP_DOCKER=false
 SKIP_DOCKER_DAEMON_CONFIG=false
 SKIP_DEV=false
@@ -34,6 +35,7 @@ for arg in "$@"; do
     --with-ssh-secrets) WITH_SSH_SECRETS=true ;;
     --with-netrc-secrets) WITH_NETRC_SECRETS=true ;;
     --with-1password-ssh-agent) WITH_1PASSWORD_SSH_AGENT=true ;;
+    --with-legacy-printer-drivers) WITH_LEGACY_PRINTER_DRIVERS=true ;;
   esac
 done
 
@@ -339,11 +341,11 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
                # (used by monitor-layout-ui / Super+x m; nwg-displays is better
                #  but not in Fedora repos — build from source if desired)
 
-  # Screenshot tooling
+  # Screenshot and screencast tooling
   # requires sway stack packages wl-clipboard libnotify
   # ImageMagick provides both magick and convert used by lock.sh blur step
   # zenity provides GTK file-save dialog for the save-as screenshot variants
-  sudo dnf install -y grim slurp ImageMagick zenity
+  sudo dnf install -y grim slurp wf-recorder ImageMagick zenity
 
   # Graphics editor
   sudo dnf install -y gimp
@@ -376,6 +378,23 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   # - system-config-printer: GUI for adding/managing printers in Sway/i3 setups
   # - cups-pk-helper: polkit integration for non-root printer admin actions
   sudo dnf install -y cups system-config-printer cups-pk-helper
+
+  # Optional legacy printer stack for older Samsung/HP devices.
+  # Keep disabled by default because many network printers work with CUPS
+  # driverless (IPP Everywhere) without extra daemons or vendor drivers.
+  if [[ "$WITH_LEGACY_PRINTER_DRIVERS" == true ]]; then
+    # - avahi*: mDNS/Bonjour discovery in local networks
+    # - hplip*: HP Linux Imaging and Printing (many Samsung models are HP-supported)
+    # - splix: Samsung SPL printer driver backend for older Samsung devices
+    sudo dnf install -y avahi avahi-tools nss-mdns
+    if ! sudo dnf install -y hplip hplip-gui splix; then
+      echo "WARN: one or more optional printer drivers failed to install (hplip/hplip-gui/splix)."
+      echo "      Continuing with base CUPS setup; install missing driver packages manually if needed."
+    fi
+  else
+    echo "INFO: Legacy printer drivers skipped by default."
+    echo "      Use --with-legacy-printer-drivers for avahi/hplip/splix."
+  fi
 
   # Lightweight DNS/DHCP server for machine-network profiles
   sudo dnf install -y dnsmasq
@@ -544,6 +563,7 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/monitor-ulm-office"      ]] && ln -sf "$DOTFILES/shell/monitor-ulm-office"      "$HOME/.local/bin/monitor-ulm-office"
   [[ -f "$DOTFILES/shell/monitor-layout-ui"       ]] && ln -sf "$DOTFILES/shell/monitor-layout-ui"       "$HOME/.local/bin/monitor-layout-ui"
   [[ -f "$DOTFILES/shell/monitor-profile-waybar"  ]] && ln -sf "$DOTFILES/shell/monitor-profile-waybar"  "$HOME/.local/bin/monitor-profile-waybar"
+  [[ -f "$DOTFILES/shell/monitor-beamer"          ]] && ln -sf "$DOTFILES/shell/monitor-beamer"          "$HOME/.local/bin/monitor-beamer"
   [[ -f "$DOTFILES/shell/recover-dock-kvm-input"  ]] && ln -sf "$DOTFILES/shell/recover-dock-kvm-input"  "$HOME/.local/bin/recover-dock-kvm-input"
   [[ -f "$DOTFILES/shell/network-status-waybar"   ]] && ln -sf "$DOTFILES/shell/network-status-waybar"   "$HOME/.local/bin/network-status-waybar"
 
@@ -725,6 +745,9 @@ EOF
   # Match minimal Ubuntu/i3 setup: ensure CUPS is active and user can manage
   # printers without a full desktop control center.
   sudo systemctl enable --now cups 2>/dev/null || true
+  if [[ "$WITH_LEGACY_PRINTER_DRIVERS" == true ]]; then
+    sudo systemctl enable --now avahi-daemon 2>/dev/null || true
+  fi
   if getent group lpadmin >/dev/null; then
     sudo usermod -aG lpadmin "$USER" 2>/dev/null || true
     echo "==> CUPS enabled. Added $USER to lpadmin printer-admin group."
@@ -735,6 +758,10 @@ EOF
   fi
   echo "   Open CUPS web UI at: http://localhost:631"
   echo "   Optional GTK tool: system-config-printer"
+  echo "   Samsung network printer quick setup (example):"
+  echo "   lpadmin -p samsung-netz -E -v socket://<DRUCKER-IP>:9100 -m everywhere"
+  echo "   lpoptions -d samsung-netz"
+  echo "   Or use CUPS web UI: Administration -> Add Printer"
 
   echo ""
   echo "── Phase 3c2: Thunderbolt authorization (bolt) ──────────────────────────"

@@ -18,8 +18,9 @@ bindsym $mod+Return exec foot -e fish
 ## Supporting Docs
 
 1. Screenshot tooling: `docs/doc-engine/source/window-manager/sway/take-screenshot.md`
-2. Diff tooling: `docs/doc-engine/source/window-manager/sway/diff.md`
-3. Shell runbook: `docs/doc-engine/source/shell/shell.md`
+2. Screen recording: `docs/doc-engine/source/window-manager/sway/record-screen.md`
+3. Diff tooling: `docs/doc-engine/source/window-manager/sway/diff.md`
+4. Shell runbook: `docs/doc-engine/source/shell/shell.md`
 
 ## Reproducible Install
 

@@ -11,6 +11,13 @@
 
 set $mod Mod4
 
+# Keyboard input: keep US base layout and use US-International with dead keys.
+# This keeps quote+a/o/u umlaut input working and Compose fallback on Menu.
+input type:keyboard {
+  xkb_layout us
+  xkb_variant intl
+  xkb_options compose:menu,lv3:ralt_switch
+}
 
 # Font for window titles and bar
 font pango:Noto Sans, Noto Serif, Noto Emoji, FontAwesome, monospace 11
@@ -79,12 +86,21 @@ bindsym $mod+Shift+q kill
 # Use wofi as launcher (Wayland-native)
 bindsym $mod+d exec wofi --show run
 
-# Screenshots — quick save to ~/pictures/screenshots + clipboard
+# Screenshots - quick save to ~/pictures/screenshots + clipboard
 bindsym $mod+Shift+s exec ~/.config/sway/scripts/grimshot.sh region
 bindsym $mod+Ctrl+s exec ~/.config/sway/scripts/grimshot.sh full
-# Screenshots — pick save location via file dialog
+# Screenshots - pick save location via file dialog
 bindsym $mod+Mod1+s exec ~/.config/sway/scripts/grimshot.sh region-save-as
 bindsym $mod+Mod1+Ctrl+s exec ~/.config/sway/scripts/grimshot.sh full-save-as
+
+# Screen recording - selected region / full output
+bindsym $mod+Shift+v exec /home/ldcwem0/.config/sway/scripts/wf-record.sh region
+bindsym $mod+Ctrl+Shift+v exec /home/ldcwem0/.config/sway/scripts/wf-record.sh full
+# Screen recording with desktop audio
+bindsym $mod+Mod1+Shift+v exec /home/ldcwem0/.config/sway/scripts/wf-record.sh region-audio
+bindsym $mod+Mod1+Ctrl+v exec /home/ldcwem0/.config/sway/scripts/wf-record.sh full-audio
+# Stop active screen recording
+bindsym $mod+Mod1+v exec /home/ldcwem0/.config/sway/scripts/wf-record.sh stop
 
 # change focus within workspace (using arrow keys)
 bindsym $mod+Left focus left
@@ -375,7 +391,7 @@ for_window [app_id="vpn-float"] border none
 bindsym $mod+v exec $HOME/.config/sway/scripts/toggle-scratchpad-vpn.sh
 
 # Hop PC RDP launcher (checks VPN/DNS before starting Remmina profile)
-bindsym $mod+Shift+v exec --no-startup-id $HOME/.local/bin/rdp-hop
+bindsym $mod+Shift+o exec --no-startup-id $HOME/.local/bin/rdp-hop
 
 # spotify scratchpad
 # not supported anymore as using browser based apps like apple.music, amazon.music, spotify.com, ...
@@ -417,12 +433,13 @@ mode "move" {
 
 set $mode_display \
       Display Profiles — Wayland-native (kanshi + swaymsg) \
-  (k) kanshi auto, (l) laptop-only, (h) home-office, (u) ulm-office, (m) manual-ui
+  (k) kanshi auto, (l) laptop-only, (h) home-office, (u) ulm-office, (b) beamer, (m) manual-ui
 mode "$mode_display" {
     bindsym k exec --no-startup-id kanshctl switch-profile home-office, mode "default"
   bindsym l exec --no-startup-id sh -c 'command -v monitor-laptop-only >/dev/null && monitor-laptop-only || "$HOME/.local/bin/monitor-laptop-only"', mode "default"
   bindsym h exec --no-startup-id sh -c 'command -v monitor-home-office >/dev/null && monitor-home-office || "$HOME/.local/bin/monitor-home-office"', mode "default"
   bindsym u exec --no-startup-id sh -c 'command -v kanshctl >/dev/null && kanshctl switch-profile ulm-office || "$HOME/.local/bin/monitor-ulm-office"', mode "default"
+  bindsym b exec --no-startup-id sh -c 'command -v monitor-beamer >/dev/null && monitor-beamer || "$HOME/.local/bin/monitor-beamer"', mode "default"
     bindsym m exec --no-startup-id sh -c 'command -v monitor-layout-ui >/dev/null && monitor-layout-ui || { [ -x "$HOME/.local/bin/monitor-layout-ui" ] && "$HOME/.local/bin/monitor-layout-ui"; } || "$HOME/dotfiles/shell/monitor-layout-ui"', mode "default"
 
     # back to normal: Enter or Escape
