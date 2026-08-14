@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  dps-fetch-release-swu --version <tag> [options]
+
+Download a linux-dps SWU artifact from Nexus into the local release folder and
+verify checksums from checksum.txt.
+
+Required:
+  --version <tag>              Release tag, for example: v1.6.1
+
+Options:
+  --machine <name>             Machine name (default: imx6qleg-mcg)
+  --image <name>               Image name (default: dps-image)
+  --repo <name>                Nexus repository (default: iot-linux-dps)
+  --base-url <url>             Nexus base URL
+                               (default: https://nexus.ldc-dev.liebherr.com)
+  --dest-root <path>           Local release root
+                               (default: $HOME/document/linux-dps/release/tags)
+  --checksum-file <path>       Checksum file path
+                               (default: <dest-dir>/checksum.txt)
+  --skip-download              Do not download; only verify local file
+  --force                      Re-download artifact even if file exists
+  -h, --help                   Show help
+
+Expected local layout:
+  <dest-root>/<version>/<image>/<machine>/
+    - dps-image-imx6qleg-mcg.swu
+    - checksum.txt
+
+Checksum file format:
+  md5 <hex>
+  sha1 <hex>
+  sha256 <hex>
+  sha512 <hex>
+
+Example:
+  dps-fetch-release-swu --version v1.6.1
+
+Verify only (already downloaded):
+  dps-fetch-release-swu --version v1.6.1 --skip-download
+EOF
+}
+
+VERSION=""
+MACHINE="imx6qleg-mcg"
+IMAGE="dps-image"
+REPO="iot-linux-dps"
+BASE_URL="https://nexus.ldc-dev.liebherr.com"
+DEST_ROOT="${HOME}/document/linux-dps/release/tags"
+CHECKSUM_FILE=""
+SKIP_DOWNLOAD=0
+FORCE=0
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --version)
+      VERSION="${2:-}"
+      shift 2
+      ;;
+    --machine)
+      MACHINE="${2:-}"
+      shift 2
+      ;;
+    --image)
+      IMAGE="${2:-}"
+      shift 2
+      ;;
+    --repo)
+      REPO="${2:-}"
+      shift 2
+      ;;
+    --base-url)
+      BASE_URL="${2:-}"
+      shift 2
+      ;;
+    --dest-root)
+      DEST_ROOT="${2:-}"
+      shift 2
+      ;;
+    --checksum-file)
+      CHECKSUM_FILE="${2:-}"
+      shift 2
+      ;;
+    --skip-download)
+      SKIP_DOWNLOAD=1
+      shift
+      ;;
+    --force)
+      FORCE=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Error: unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [ -z "$VERSION" ]; then
+  echo "Error: --version is required" >&2
+  usage
+  exit 2
+fi
+
+for cmd in curl awk tr; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "Error: required command not found: $cmd" >&2
+    exit 1
+  fi
+done
+
+DEST_DIR="${DEST_ROOT}/${VERSION}/${IMAGE}/${MACHINE}"
+ARTIFACT_NAME="${IMAGE}-${MACHINE}.swu"
+ARTIFACT_PATH="${DEST_DIR}/${ARTIFACT_NAME}"
+URL="${BASE_URL}/repository/${REPO}/tags/${VERSION}/${IMAGE}/${MACHINE}/${ARTIFACT_NAME}"
+
+if [ -z "$CHECKSUM_FILE" ]; then
+  CHECKSUM_FILE="${DEST_DIR}/checksum.txt"
+fi
+
+mkdir -p "$DEST_DIR"
+
+if [ "$SKIP_DOWNLOAD" -eq 0 ]; then
+  if [ -f "$ARTIFACT_PATH" ] && [ "$FORCE" -eq 0 ]; then
+    echo "Artifact already exists: $ARTIFACT_PATH"
+    echo "Use --force to download again."
+  else
+    echo "Downloading: $URL"
+    # Resume partial downloads and retry transient network failures.
+    curl -fL --retry 5 --retry-all-errors --connect-timeout 20 -C - -o "$ARTIFACT_PATH" "$URL"
+    echo "Download complete: $ARTIFACT_PATH"
+  fi
+else
+  echo "Skipping download as requested."
+fi
+
+if [ ! -f "$ARTIFACT_PATH" ]; then
+  echo "Error: artifact file not found: $ARTIFACT_PATH" >&2
+  exit 1
+fi
+
+if [ ! -f "$CHECKSUM_FILE" ]; then
+  echo "Error: checksum file not found: $CHECKSUM_FILE" >&2
+  exit 1
+fi
+
+declare -A EXPECTED
+while IFS= read -r line; do
+  clean="$(printf '%s' "$line" | tr -d '\r')"
+  [ -z "$clean" ] && continue
+
+  key="$(printf '%s' "$clean" | awk '{print tolower($1)}')"
+  value="$(printf '%s' "$clean" | awk '{print tolower($2)}')"
+
+  key="${key%:}"
+  if [ -n "$key" ] && [ -n "$value" ]; then
+    case "$key" in
+      md5|sha1|sha256|sha512)
+        EXPECTED[$key]="$value"
+        ;;
+    esac
+  fi
+done < "$CHECKSUM_FILE"
+
+if [ "${#EXPECTED[@]}" -eq 0 ]; then
+  echo "Error: no supported checksums found in $CHECKSUM_FILE" >&2
+  exit 1
+fi
+
+verify_one() {
+  algo="$1"
+  expected="$2"
+  tool="${algo}sum"
+
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "Error: required checksum tool not found: $tool" >&2
+    exit 1
+  fi
+
+  actual="$($tool "$ARTIFACT_PATH" | awk '{print tolower($1)}')"
+  if [ "$actual" != "$expected" ]; then
+    echo "FAILED: $algo checksum mismatch" >&2
+    echo "  expected: $expected" >&2
+    echo "  actual:   $actual" >&2
+    exit 1
+  fi
+
+  echo "OK: $algo $actual"
+}
+
+echo "Verifying checksums from: $CHECKSUM_FILE"
+for algo in md5 sha1 sha256 sha512; do
+  if [ -n "${EXPECTED[$algo]:-}" ]; then
+    verify_one "$algo" "${EXPECTED[$algo]}"
+  fi
+done
+
+echo "Success: artifact download/checksum verification complete"
+echo "Artifact: $ARTIFACT_PATH"

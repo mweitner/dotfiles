@@ -1,0 +1,210 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  swupdate-ssh-stream --host <user@host> [options]
+
+Stream an SWU artifact over SSH into a target SWUpdate socket endpoint.
+
+Required:
+  --host <user@host>           SSH target, for example: root@192.168.3.88
+
+SWU source (pick one):
+  --swu <path>                 Path to SWU artifact
+  --find-latest                Auto-discover newest SWU in deploy/images
+
+Options:
+  --machine <name>             Filter auto-discovery by machine folder name
+  --build-dir <path>           Build root used with --find-latest
+                               (default: ./build-docker)
+  --socket <path>              Remote SWUpdate IPC socket
+                               (default: /run/swupdate/sockinstctrl)
+  --check-only                 Run remote precheck and exit
+  --dry-run                    Print resolved command and exit
+  --ssh-opt <arg>              Extra ssh option (repeatable)
+  -h, --help                   Show help
+
+Examples:
+  swupdate-ssh-stream --host root@192.168.3.88 --swu /tmp/dps-image.swu
+  swupdate-ssh-stream --host root@192.168.3.88 --find-latest --machine imx6s-mcg
+  swupdate-ssh-stream --host root@192.168.3.88 --check-only
+EOF
+}
+
+HOST=""
+SWU_PATH=""
+FIND_LATEST=0
+MACHINE=""
+BUILD_DIR="./build-docker"
+SOCKET_PATH="/run/swupdate/sockinstctrl"
+CHECK_ONLY=0
+DRY_RUN=0
+SSH_OPTS=()
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --host)
+      HOST="${2:-}"
+      shift 2
+      ;;
+    --swu)
+      SWU_PATH="${2:-}"
+      shift 2
+      ;;
+    --find-latest)
+      FIND_LATEST=1
+      shift
+      ;;
+    --machine)
+      MACHINE="${2:-}"
+      shift 2
+      ;;
+    --build-dir)
+      BUILD_DIR="${2:-}"
+      shift 2
+      ;;
+    --socket)
+      SOCKET_PATH="${2:-}"
+      shift 2
+      ;;
+    --check-only)
+      CHECK_ONLY=1
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    --ssh-opt)
+      SSH_OPTS+=("${2:-}")
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Error: unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [ -z "$HOST" ]; then
+  echo "Error: --host is required" >&2
+  usage
+  exit 2
+fi
+
+if [ -n "$SWU_PATH" ] && [ "$FIND_LATEST" -eq 1 ]; then
+  echo "Error: use either --swu or --find-latest, not both" >&2
+  exit 2
+fi
+
+if [ -z "$SWU_PATH" ] && [ "$FIND_LATEST" -eq 0 ]; then
+  echo "Error: provide --swu or --find-latest" >&2
+  exit 2
+fi
+
+if ! command -v ssh >/dev/null 2>&1; then
+  echo "Error: ssh command not found" >&2
+  exit 1
+fi
+
+if [ "$FIND_LATEST" -eq 1 ]; then
+  SEARCH_ROOTS=(
+    "$BUILD_DIR/tmp/deploy/images"
+    "./build/tmp/deploy/images"
+    "./tmp/deploy/images"
+  )
+
+  CANDIDATES=()
+  for root in "${SEARCH_ROOTS[@]}"; do
+    if [ ! -d "$root" ]; then
+      continue
+    fi
+    if [ -n "$MACHINE" ]; then
+      while IFS= read -r f; do
+        CANDIDATES+=("$f")
+      done < <(find "$root/$MACHINE" -type f -name '*.swu' 2>/dev/null || true)
+    else
+      while IFS= read -r f; do
+        CANDIDATES+=("$f")
+      done < <(find "$root" -type f -name '*.swu' 2>/dev/null || true)
+    fi
+  done
+
+  if [ "${#CANDIDATES[@]}" -eq 0 ]; then
+    echo "Error: no SWU files found for auto-discovery" >&2
+    echo "  build-dir: $BUILD_DIR" >&2
+    if [ -n "$MACHINE" ]; then
+      echo "  machine: $MACHINE" >&2
+    fi
+    exit 1
+  fi
+
+  SWU_PATH="$(ls -1t "${CANDIDATES[@]}" | head -n 1)"
+fi
+
+if [ ! -f "$SWU_PATH" ]; then
+  echo "Error: SWU artifact not found: $SWU_PATH" >&2
+  exit 1
+fi
+
+if [ ! -r "$SWU_PATH" ]; then
+  echo "Error: SWU artifact is not readable: $SWU_PATH" >&2
+  exit 1
+fi
+
+ssh_cmd=(ssh)
+for opt in "${SSH_OPTS[@]}"; do
+  ssh_cmd+=("$opt")
+done
+ssh_cmd+=("$HOST")
+
+echo "Resolved values:"
+echo "  host: $HOST"
+echo "  swu: $SWU_PATH"
+echo "  socket: $SOCKET_PATH"
+
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo "DRY RUN: precheck target and stream SWU skipped"
+  exit 0
+fi
+
+"${ssh_cmd[@]}" /bin/sh -s -- "$SOCKET_PATH" <<'REMOTE'
+set -eu
+sock="$1"
+
+echo "==> Target: $(hostname)"
+
+if ! command -v swupdate-client >/dev/null 2>&1; then
+  echo "Error: swupdate-client not found on target" >&2
+  exit 11
+fi
+
+if [ ! -S "$sock" ]; then
+  echo "Error: SWUpdate socket missing: $sock" >&2
+  ls -ld "$(dirname "$sock")" 2>/dev/null || true
+  exit 12
+fi
+
+if command -v systemctl >/dev/null 2>&1; then
+  state="$(systemctl is-active swupdate 2>/dev/null || true)"
+  echo "swupdate service state: ${state:-unknown}"
+fi
+
+echo "Precheck OK"
+REMOTE
+
+if [ "$CHECK_ONLY" -eq 1 ]; then
+  echo "Done (check-only)."
+  exit 0
+fi
+
+echo "Streaming SWU to target..."
+"${ssh_cmd[@]}" "swupdate-client -s '$SOCKET_PATH' -v -p" < "$SWU_PATH"
+echo "Done."

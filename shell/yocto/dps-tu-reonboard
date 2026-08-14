@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  dps-tu-reonboard --host <user@host> [options]
+
+Prepare a TU for re-onboarding before Hawkbit update by removing
+cmcontrol runtime state and generated CMS systemd units.
+
+Required:
+  --host <user@host>           SSH target, for example: root@192.168.3.101
+
+Options:
+  --mode <hard|soft|prepare>   hard: remove + reboot (default)
+                               soft: remove + restart cmcontrol
+                               prepare: remove only
+  --yes                        Execute destructive actions
+  --dry-run                    Print what would run and exit
+  --ssh-opt <arg>              Extra ssh option (repeatable)
+  -h, --help                   Show help
+
+Examples:
+  dps-tu-reonboard --host root@192.168.3.101 --dry-run
+  dps-tu-reonboard --host root@192.168.3.101 --mode hard --yes
+  dps-tu-reonboard --host root@192.168.3.101 --mode soft --yes
+EOF
+}
+
+HOST=""
+MODE="hard"
+CONFIRM=0
+DRY_RUN=0
+SSH_OPTS=()
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --host)
+      HOST="${2:-}"
+      shift 2
+      ;;
+    --mode)
+      MODE="${2:-}"
+      shift 2
+      ;;
+    --yes)
+      CONFIRM=1
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    --ssh-opt)
+      SSH_OPTS+=("${2:-}")
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Error: unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [ -z "$HOST" ]; then
+  echo "Error: --host is required" >&2
+  usage
+  exit 2
+fi
+
+if [ "$MODE" != "hard" ] && [ "$MODE" != "soft" ] && [ "$MODE" != "prepare" ]; then
+  echo "Error: invalid --mode '$MODE' (use hard|soft|prepare)" >&2
+  exit 2
+fi
+
+if [ "$DRY_RUN" -eq 0 ] && [ "$CONFIRM" -ne 1 ]; then
+  echo "Refusing to run destructive actions without --yes" >&2
+  echo "Tip: run with --dry-run first." >&2
+  exit 2
+fi
+
+if ! command -v ssh >/dev/null 2>&1; then
+  echo "Error: ssh command not found" >&2
+  exit 1
+fi
+
+ssh_cmd=(ssh)
+for opt in "${SSH_OPTS[@]}"; do
+  ssh_cmd+=("$opt")
+done
+ssh_cmd+=("$HOST")
+
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo "DRY RUN"
+  echo "  host: $HOST"
+  echo "  mode: $MODE"
+  echo "  remote actions:"
+  echo "    rm -rf /data/cmcontrol"
+  echo "    rm -f /etc/systemd/system/cms-setup-mining-excavator.target"
+  echo "    rm -f /etc/systemd/system/mnt-nas1-telemetry.*"
+  if [ "$MODE" = "hard" ]; then
+    echo "    reboot"
+  elif [ "$MODE" = "soft" ]; then
+    echo "    systemctl restart cmcontrol"
+  else
+    echo "    (no restart/reboot)"
+  fi
+  exit 0
+fi
+
+"${ssh_cmd[@]}" /bin/sh -s -- "$MODE" <<'REMOTE'
+set -eu
+mode="$1"
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Error: remote user must be root" >&2
+  exit 1
+fi
+
+echo "==> Target: $(hostname)"
+echo "==> Before cleanup:"
+systemctl list-dependencies cms-setup-mining-excavator.target || true
+
+echo "==> Removing cmcontrol runtime and generated units"
+rm -rf /data/cmcontrol
+rm -f /etc/systemd/system/cms-setup-mining-excavator.target
+rm -f /etc/systemd/system/mnt-nas1-telemetry.*
+systemctl daemon-reload || true
+
+echo "==> After cleanup check"
+ls -ld /data/cmcontrol 2>/dev/null || echo "/data/cmcontrol removed"
+ls -1 /etc/systemd/system/cms-setup-mining-excavator.target /etc/systemd/system/mnt-nas1-telemetry.* 2>/dev/null || echo "generated units removed"
+
+case "$mode" in
+  hard)
+    echo "==> Rebooting target to trigger hard re-onboarding"
+    reboot
+    ;;
+  soft)
+    echo "==> Restarting cmcontrol for soft re-onboarding"
+    systemctl restart cmcontrol
+    systemctl is-active cmcontrol || true
+    ;;
+  prepare)
+    echo "==> Prepare mode complete. Trigger update flow manually."
+    ;;
+esac
+REMOTE
+
+if [ "$MODE" = "hard" ]; then
+  echo "Info: SSH disconnect during reboot is expected."
+fi
+
+echo "Done."

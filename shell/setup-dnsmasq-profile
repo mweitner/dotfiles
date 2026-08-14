@@ -9,6 +9,26 @@ STATE_FILE="/var/lib/dnsmasq-dotfiles/active-profile"
 PROFILE=""
 SHOW_ONLY=false
 LIST_ONLY=false
+NFS_EXPORT_FILE="/etc/exports.d/50-dotfiles-netboot.exports"
+NFS_EXPORT_LINES=(
+  "/opt/netboot/linux-dps-scarthgap/root/imx6s-mcg 192.168.3.0/24(rw,no_root_squash,no_subtree_check)"
+  "/opt/netboot/linux-dps-scarthgap/image/imx6s-mcg 192.168.3.0/24(rw,no_root_squash,no_subtree_check)"
+)
+NETBOOT_PROFILE="imx6s-mcg-netboot"
+
+is_netboot_profile() {
+  [[ "$PROFILE" == "$NETBOOT_PROFILE" ]]
+}
+
+has_systemd_unit() {
+  local unit="$1"
+
+  if systemctl cat "$unit" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  [[ -f "/usr/lib/systemd/system/$unit" ]] || [[ -f "/etc/systemd/system/$unit" ]]
+}
 
 usage() {
   cat <<'EOF'
@@ -27,6 +47,10 @@ Examples:
   setup-dnsmasq-profile --list
   setup-dnsmasq-profile --profile ulm-nas
   setup-dnsmasq-profile --show
+
+Notes:
+  - This helper is implemented in Bash and is shell-agnostic when executed as a command.
+  - Keep shared docs/examples in Bash/POSIX syntax; when using fish interactively, run Bash snippets via: bash -lc '<command>'.
 EOF
 }
 
@@ -54,6 +78,75 @@ show_status() {
   echo "Active dnsmasq profile: ${active:-unknown}"
   echo "Active config file: $ACTIVE_FILE"
   systemctl --no-pager --full status dnsmasq | sed -n '1,15p' || true
+
+  if [[ -f "$NFS_EXPORT_FILE" ]]; then
+    echo "Active NFS export file: $NFS_EXPORT_FILE"
+    sudo cat "$NFS_EXPORT_FILE" 2>/dev/null || true
+  else
+    echo "Active NFS export file: none"
+  fi
+
+  if has_systemd_unit nfs-server.service; then
+    systemctl --no-pager --full status rpcbind nfs-server 2>/dev/null | sed -n '1,20p' || true
+  fi
+}
+
+activate_netboot_nfs() {
+  sudo mkdir -p /etc/exports.d
+  sudo tee "$NFS_EXPORT_FILE" >/dev/null <<EOF
+$(printf '%s\n' "${NFS_EXPORT_LINES[@]}")
+EOF
+
+  if has_systemd_unit rpcbind.socket; then
+    sudo systemctl enable --now rpcbind.socket
+  fi
+
+  if has_systemd_unit rpcbind.service; then
+    sudo systemctl enable --now rpcbind
+  fi
+
+  if ! has_systemd_unit nfs-server.service; then
+    echo "ERROR: nfs-server.service not found. Install nfs-utils and rerun." >&2
+    return 1
+  fi
+
+  sudo systemctl enable --now nfs-server
+  sudo exportfs -rav
+
+  if ! sudo rpcinfo -p localhost 2>/dev/null | grep -qE '[[:space:]](nfs|mountd)$'; then
+    echo "ERROR: NFS RPC programs are not registered (nfs/mountd missing)." >&2
+    echo "Run: sudo systemctl status rpcbind.socket rpcbind nfs-server nfs-mountd" >&2
+    return 1
+  fi
+}
+
+deactivate_netboot_nfs() {
+  if [[ -f "$NFS_EXPORT_FILE" ]]; then
+    sudo rm -f "$NFS_EXPORT_FILE"
+    if has_systemd_unit nfs-server.service; then
+      sudo exportfs -rav 2>/dev/null || true
+    fi
+  fi
+}
+
+ensure_nfs_stack() {
+  if ! has_systemd_unit nfs-server.service || ! command -v rpcinfo >/dev/null 2>&1; then
+    if command -v dnf >/dev/null 2>&1; then
+      echo "==> Installing nfs-utils..."
+      sudo dnf install -y nfs-utils
+      sudo systemctl daemon-reload
+    fi
+  fi
+
+  if ! has_systemd_unit nfs-server.service; then
+    echo "ERROR: nfs-server.service not found after nfs-utils install." >&2
+    return 1
+  fi
+
+  if ! command -v rpcinfo >/dev/null 2>&1; then
+    echo "ERROR: rpcinfo command not found after nfs-utils install." >&2
+    return 1
+  fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -116,9 +209,19 @@ if ! command -v dnsmasq >/dev/null 2>&1; then
   sudo dnf install -y dnsmasq
 fi
 
+if is_netboot_profile; then
+  ensure_nfs_stack
+fi
+
 sudo mkdir -p /etc/dnsmasq.d
 sudo mkdir -p /var/lib/dnsmasq-dotfiles
 sudo install -m 0644 "$SRC_FILE" "$ACTIVE_FILE"
+
+if is_netboot_profile; then
+  activate_netboot_nfs
+else
+  deactivate_netboot_nfs
+fi
 
 echo "$PROFILE" | sudo tee "$STATE_FILE" >/dev/null
 

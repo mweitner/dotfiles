@@ -3,20 +3,58 @@
 #
 # llp_provide_netboot.sh - Provide netboot artifacts of current llp project
 #
+# MACHINE=imx6sleg-mcg llp_provide_netboot.sh
 # MACHINE=imx6sleg-mcg source llp_provide_netboot.sh
 #
 
-if [ "${BASH_SOURCE}" = "${0}" ]; then
-	printf "\\n[llp_provide_netboot] Error: This script must to be sourced\\n\\n"
-  #safe to exit as script is not sourced
-  #exit 254
-  return 254
+is_sourced=0
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  is_sourced=1
 fi
 
-if [ -z "${BBPATH}" ]; then
-  echo "[llp_provide_netboot] Error: bitbake environment not loaded"
-  return 253
-fi
+finish() {
+  local rc="$1"
+  if [[ ${is_sourced} -eq 1 ]]; then
+    return "${rc}"
+  fi
+  exit "${rc}"
+}
+
+bootstrap_bitbake_env() {
+  local env_script oldpwd
+
+  if [[ -n "${BBPATH:-}" ]] && command -v bitbake >/dev/null 2>&1; then
+    return 0
+  fi
+
+  env_script="${project_root}/layers/poky/oe-init-build-env"
+  if [[ ! -f "${env_script}" ]]; then
+    echo "[llp_provide_netboot] Error oe-init-build-env not found at ${env_script}"
+    return 253
+  fi
+
+  if [[ ! -d "${build_root}/conf" ]]; then
+    echo "[llp_provide_netboot] Error build root has no conf directory: ${build_root}"
+    return 253
+  fi
+
+  oldpwd="$PWD"
+  # shellcheck disable=SC1090
+  . "${env_script}" "${build_root}" >/dev/null
+  cd "${oldpwd}" || true
+  return 0
+}
+
+resolve_first_existing() {
+  local candidate
+  for candidate in "$@"; do
+    if [[ -e "${candidate}" ]]; then
+      echo "${candidate}"
+      return 0
+    fi
+  done
+  return 1
+}
 
 function cdn() {
   # cd n levels up
@@ -26,7 +64,8 @@ function cdn() {
 }
 
 function print_usage() {
-  echo "Usage: MACHINE=<machine> source llp_provide_netboot <image> <project>"
+  echo "Usage: MACHINE=<machine> llp_provide_netboot.sh <image> <project>"
+  echo "   or: MACHINE=<machine> source llp_provide_netboot.sh <image> <project>"
   echo " <image> (optional) := the image recipe (default liebherr-image-base)"
   echo " <project> (optional) := the project name (default dev-llp)"
   echo " <machine> (mandatory) := the yp machine identifier like imx6sleg-mcg, ..."
@@ -38,7 +77,7 @@ bb_machine="$MACHINE"
 if [[ -z "$bb_machine" ]]; then
   echo "[llp_provide_netboot] Error bb_machine not set"
   print_usage
-  return 252
+  finish 252
 fi
 
 # replaced old project_root var setting using cdn 1 by pwd
@@ -56,12 +95,12 @@ if [[ -h "${project_root}" ]]; then
   # workspace. See project_name usage at keys folder etc.
   project_name=$(basename $(readlink -f "${project_root}"))
 fi
-build_root=${BBPATH}
+build_root="${BUILD_ROOT:-${BBPATH:-}}"
 echo "args:$# $0 $1 $*"
 if [[ $# -gt 0 ]]; then
     if [[ "$1" = "-h" ]]; then
       print_usage
-      return 0
+      finish 0
     fi
 
   if [[ $# -eq 1 ]]; then
@@ -72,9 +111,23 @@ if [[ $# -gt 0 ]]; then
   else
     echo "[llp_provide_netboot] Error illegal number of params"
     print_usage
-    return 251
+    finish 251
   fi
 fi
+
+if [[ -z "${build_root}" ]]; then
+  if [[ -d "/opt/yocto/build/${project_name}/conf" ]]; then
+    build_root="/opt/yocto/build/${project_name}"
+  else
+    build_root="${project_root}/build-docker"
+  fi
+fi
+
+if ! bootstrap_bitbake_env; then
+  finish $?
+fi
+
+build_root="${BBPATH:-${build_root}}"
 netboot_root=/opt/netboot
 netboot_project_root="${netboot_root}/${project_name}"
 netboot_project_root_name=$(basename ${netboot_project_root})
@@ -87,14 +140,11 @@ echo "[llp_provide_netboot] Netboot project root name: ${netboot_project_root_na
 echo "[llp_provide_netboot] Netboot root: ${netboot_project_root}"
 echo "[llp_provide_netboot] Netboot project root: ${netboot_project_root}"
 
-if [[ ! -d "${netboot_root}" ]]; then
-  echo "[llp_provide_netboot] Error netboot_root does not exist..."
-  return 251
-fi
-if [[ ! -d "${netboot_project_root}" ]]; then
-  echo "[llp_provide_netboot] Error netboot_project_root does not exist..."
-  return 251
-fi
+echo "[llp_provide_netboot] Ensure netboot root layout exists"
+sudo mkdir -p "${netboot_root}"
+sudo mkdir -p "${netboot_root}/boot" "${netboot_root}/image" "${netboot_root}/root"
+sudo mkdir -p "${netboot_project_root}"
+sudo mkdir -p "${netboot_project_root}/boot" "${netboot_project_root}/image" "${netboot_project_root}/root"
 
 build_images_root="${build_root}/tmp/deploy/images/${bb_machine}"
 nb_boot="${netboot_project_root}/boot/${bb_machine}"
@@ -106,17 +156,49 @@ nb_image_bak="${netboot_project_root}/image/${bb_machine}.bak"
 nb_root="${netboot_project_root}/root/${bb_machine}"
 nb_root_tmp="${netboot_project_root}/root/${bb_machine}.tmp"
 nb_root_bak="${netboot_project_root}/root/${bb_machine}.bak"
+
+wic_gz_path=""
+wic_path=""
+wic_export_name=""
+wic_export_path=""
+rootfs_tar_gz_path=""
+swu_path=""
 #if [[ "${bb_machine}" = "imx6sleg-mcg" ]]; then
 #  nb_root="${netboot_project_root}/root/${bb_machine}/UCM-C2-6SOLO"
 #  nb_root_tmp="${netboot_project_root}/root/${bb_machine}/UCM-C2-6SOLO.tmp"
 #  nb_root_bak="${netboot_project_root}/root/${bb_machine}/UCM-C2-6SOLO.bak"
 #fi
 
-kpi_distro_features=$(MACHINE="${bb_machine}" bitbake -e "${bb_image_recipe}" |grep "^DISTRO_FEATURES=")
-kpi_image_rootfs_size=$(MACHINE="${bb_machine}" bitbake -e "${bb_image_recipe}" |grep "^IMAGE_ROOTFS_SIZE=")
-kpi_image_rootfs_extra_space=$(MACHINE="${bb_machine}" bitbake -e "${bb_image_recipe}" |grep "^IMAGE_ROOTFS_EXTRA_SPACE=")
-kpi_image_rootfs_alignment=$(MACHINE="${bb_machine}" bitbake -e "${bb_image_recipe}" |grep "^IMAGE_ROOTFS_ALIGNMENT=")
-kpi_image_overhead_factor=$(MACHINE="${bb_machine}" bitbake -e "${bb_image_recipe}" |grep "^IMAGE_OVERHEAD_FACTOR=")
+kpi_distro_features=$(MACHINE="${bb_machine}" bitbake -e "${bb_image_recipe}" |grep "^DISTRO_FEATURES=" || true)
+kpi_image_rootfs_size=$(MACHINE="${bb_machine}" bitbake -e "${bb_image_recipe}" |grep "^IMAGE_ROOTFS_SIZE=" || true)
+kpi_image_rootfs_extra_space=$(MACHINE="${bb_machine}" bitbake -e "${bb_image_recipe}" |grep "^IMAGE_ROOTFS_EXTRA_SPACE=" || true)
+kpi_image_rootfs_alignment=$(MACHINE="${bb_machine}" bitbake -e "${bb_image_recipe}" |grep "^IMAGE_ROOTFS_ALIGNMENT=" || true)
+kpi_image_overhead_factor=$(MACHINE="${bb_machine}" bitbake -e "${bb_image_recipe}" |grep "^IMAGE_OVERHEAD_FACTOR=" || true)
+
+wic_gz_path=$(resolve_first_existing \
+  "${build_images_root}/${bb_image_recipe}-${bb_machine}.rootfs.wic.gz" \
+  "${build_images_root}/${bb_image_recipe}-${bb_machine}.wic.gz") || true
+wic_path=$(resolve_first_existing \
+  "${build_images_root}/${bb_image_recipe}-${bb_machine}.rootfs.wic" \
+  "${build_images_root}/${bb_image_recipe}-${bb_machine}.wic") || true
+rootfs_tar_gz_path=$(resolve_first_existing \
+  "${build_images_root}/${bb_image_recipe}-${bb_machine}.rootfs.tar.gz" \
+  "${build_images_root}/${bb_image_recipe}-${bb_machine}.tar.gz") || true
+swu_path=$(resolve_first_existing \
+  "${build_images_root}/${bb_image_recipe}-${bb_machine}.rootfs.swu" \
+  "${build_images_root}/${bb_image_recipe}-${bb_machine}.swu") || true
+
+if [[ -z "${rootfs_tar_gz_path}" ]]; then
+  echo "[llp_provide_netboot] Error rootfs tarball not found for ${bb_image_recipe}/${bb_machine}"
+  finish 248
+fi
+if [[ -z "${wic_gz_path}" && -z "${wic_path}" ]]; then
+  echo "[llp_provide_netboot] Error wic image not found for ${bb_image_recipe}/${bb_machine}"
+  finish 247
+fi
+
+wic_export_name="${bb_image_recipe}-${bb_machine}.wic"
+wic_export_path="${nb_image_tmp}/${wic_export_name}"
 
 echo "[llp_provide_netboot] 1/4. create tmp provider"
 if [[ ! -d "${nb_boot_tmp}" ]]; then
@@ -131,24 +213,28 @@ fi
 
 #kpi swu image
 kpi_swu_image=""
-if [[ -f "${build_images_root}/${bb_image_recipe}-${bb_machine}.swu" ]]; then
-  kpi_swu_image=$(du -Lh "${build_images_root}/${bb_image_recipe}-${bb_machine}.swu")
+if [[ -n "${swu_path}" && -f "${swu_path}" ]]; then
+  kpi_swu_image=$(du -Lh "${swu_path}")
 fi
 
 #provide image
 kpi_size_image=""
 kpi_size_image_compressed=""
 kpi_size_uboot=""
-if [[ -f "${build_images_root}/${bb_image_recipe}-${bb_machine}.wic.gz" ]]; then
-  if [[ -f "${build_images_root}/${bb_image_recipe}-${bb_machine}.wic" ]]; then
-    sudo rm "${build_images_root}/${bb_image_recipe}-${bb_machine}.wic"
+if [[ -n "${wic_gz_path}" && -f "${wic_gz_path}" ]]; then
+  if [[ -z "${wic_path}" ]]; then
+    wic_path="${wic_gz_path%.gz}"
   fi
-  kpi_size_image_compressed=$(du -Lh "${build_images_root}/${bb_image_recipe}-${bb_machine}.wic.gz")
-  gunzip -k "${build_images_root}/${bb_image_recipe}-${bb_machine}.wic.gz" \
-    --stdout > "${build_images_root}/${bb_image_recipe}-${bb_machine}.wic"
-  kpi_size_image=$(du -Lh "${build_images_root}/${bb_image_recipe}-${bb_machine}.wic")
+  if [[ -f "${wic_path}" ]]; then
+    sudo rm -f "${wic_path}"
+  fi
+  kpi_size_image_compressed=$(du -Lh "${wic_gz_path}")
+  gunzip -k "${wic_gz_path}" --stdout > "${wic_path}"
+  kpi_size_image=$(du -Lh "${wic_path}")
+elif [[ -n "${wic_path}" && -f "${wic_path}" ]]; then
+  kpi_size_image=$(du -Lh "${wic_path}")
 fi
-sudo cp "${build_images_root}/${bb_image_recipe}-${bb_machine}.wic" "${nb_image_tmp}"
+sudo cp "${wic_path}" "${wic_export_path}"
 if [[ -f "${build_images_root}/imx-boot" ]];then
   sudo cp "${build_root}/tmp/deploy/images/${bb_machine}/imx-boot" "${nb_image_tmp}"
   kpi_size_uboot=$(du -Lh "${build_root}/tmp/deploy/images/${bb_machine}/imx-boot")
@@ -170,7 +256,7 @@ elif [[ -f "${build_images_root}/Image" ]];then
   kpi_size_dtb=$(sudo du -Lh "${build_root}/tmp/deploy/images/${bb_machine}/${bb_machine}.dtb")
 else
   echo "[llp_provide_netboot] Error no kernel, etc. build"
-  return 249
+  finish 249
 fi
 
 #temporarely handle specific dtb for dc5 display
@@ -185,9 +271,9 @@ fi
 
 #provide root
 kpi_size_rootfs=""
-sudo tar --same-owner -pxzf "${build_images_root}/${bb_image_recipe}-${bb_machine}.tar.gz" \
+sudo tar --same-owner -pxzf "${rootfs_tar_gz_path}" \
   -C "${nb_root_tmp}"
-kpi_size_rootfs_targz=$(sudo du -Lh "${build_images_root}/${bb_image_recipe}-${bb_machine}.tar.gz")
+kpi_size_rootfs_targz=$(sudo du -Lh "${rootfs_tar_gz_path}")
 kpi_size_rootfs=$(sudo du -sLh "${nb_root_tmp}" 2> /dev/null)
 
 echo "[llp_provide_netboot] 2/4. remove old provider backup"
@@ -234,4 +320,4 @@ echo $kpi_size_uboot |awk '{ print "uboot: " $1 }'
 echo $kpi_swu_image |awk '{ print "swu: " $1 }'
 
 
-return 0
+finish 0

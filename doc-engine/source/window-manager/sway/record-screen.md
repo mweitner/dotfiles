@@ -84,3 +84,48 @@ ffmpeg -i raw.mp4 -an -c:v libx264 -preset veryfast -crf 24 upload-no-audio.mp4
 - `wf-recorder` records until stopped. There is no fixed duration unless you wrap it yourself.
 - `region-audio` and `full-audio` depend on PipeWire or PulseAudio audio capture being available.
 - Use screencasts only for internal or permitted sharing. Do not republish protected match footage.
+
+## Teams Session Integration
+
+For end-to-end Teams session processing (multi-part recordings, separate audio extraction,
+transcription, and merged markdown meeting minutes), see:
+
+- `~/dotfiles/ai/teams-session-integration-workflow.md`
+
+If your own headset microphone is missing in the recording, use a combined audio source (preferred)
+or record mic separately and merge tracks before transcription.
+
+## Troubleshooting Audio (Desktop + Headset Mic)
+
+`wf-record.sh` can capture desktop audio and add microphone side-capture for audio modes.
+
+Quick source diagnostic:
+
+```bash
+bash ~/dotfiles/ai/wf-record-audio-selftest.sh --duration 3
+```
+
+Detection only (no recording):
+
+```bash
+bash ~/dotfiles/ai/wf-record-audio-selftest.sh --no-capture
+```
+
+If auto-detection chooses the wrong source, set explicit overrides before recording:
+
+```bash
+export WF_RECORD_AUDIO_DEVICE="<sink.monitor>"
+export WF_RECORD_MIC_DEVICE="<mic.source>"
+```
+
+Optional behavior toggles:
+
+- disable mic side-capture: `export WF_RECORD_INCLUDE_MIC=0`
+- keep temporary mic wav track: `export WF_RECORD_KEEP_MIC_TRACK=1`
+
+Suggested pre-call checklist:
+
+1. run `wf-record-audio-selftest.sh` and verify both output wav files contain expected audio
+2. start a 5-10 second `full-audio` recording
+3. stop and replay output MP4
+4. confirm remote audio and your own voice are both audible

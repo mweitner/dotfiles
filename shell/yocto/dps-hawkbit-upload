@@ -1,0 +1,230 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  dps-hawkbit-upload --version <tag> [options]
+
+Verify a linux-dps release SWU and upload it to Hawkbit via hbc.
+
+Required:
+  --version <tag>              Release tag, for example: v1.6.1
+
+Options:
+  --machine <name>             Machine name (default: imx6qleg-mcg)
+  --image <name>               Image name (default: dps-image)
+  --release-root <path>        Local release root
+                               (default: $HOME/document/linux-dps/release/tags)
+  --env-file <path>            hbc env file (default: auto-discover)
+  --hbc-bin <path>             hbc binary (default: hbc in PATH)
+  --start                      Start deployment after upload
+  --skip-verify                Skip local checksum verification step
+  --dry-run                    Print resolved values and exit
+  -h, --help                   Show help
+
+Default env file search order:
+  1. $DOTFILES/tools/hbc/stable-<machine>-env
+  2. $HOME/cot-ft-dev/tools/hbc/stable-<machine>-env
+  3. $HOME/ems-dev/tools/hbc/stable-<machine>-env
+  4. $HOME/dps-dev-old/linux-dps/tools/hbc/stable-<machine>-env
+
+Example:
+  dps-hawkbit-upload --version v1.6.1
+EOF
+}
+
+REQUESTED_VERSION=""
+REQUESTED_MACHINE="imx6qleg-mcg"
+REQUESTED_IMAGE="dps-image"
+REQUESTED_RELEASE_ROOT="${HOME}/document/linux-dps/release/tags"
+ENV_FILE=""
+HBC_BIN="hbc"
+START=0
+SKIP_VERIFY=0
+DRY_RUN=0
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --version)
+      REQUESTED_VERSION="${2:-}"
+      shift 2
+      ;;
+    --machine)
+      REQUESTED_MACHINE="${2:-}"
+      shift 2
+      ;;
+    --image)
+      REQUESTED_IMAGE="${2:-}"
+      shift 2
+      ;;
+    --release-root)
+      REQUESTED_RELEASE_ROOT="${2:-}"
+      shift 2
+      ;;
+    --env-file)
+      ENV_FILE="${2:-}"
+      shift 2
+      ;;
+    --hbc-bin)
+      HBC_BIN="${2:-}"
+      shift 2
+      ;;
+    --start)
+      START=1
+      shift
+      ;;
+    --skip-verify)
+      SKIP_VERIFY=1
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Error: unknown argument: $1" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [ -z "$REQUESTED_VERSION" ]; then
+  echo "Error: --version is required" >&2
+  usage
+  exit 2
+fi
+
+MACHINE="$REQUESTED_MACHINE"
+IMAGE="$REQUESTED_IMAGE"
+VERSION="$REQUESTED_VERSION"
+RELEASE_ROOT="$REQUESTED_RELEASE_ROOT"
+
+RELEASE_DIR="${RELEASE_ROOT}/${VERSION}/${IMAGE}/${MACHINE}"
+ARTIFACT_PATH="${RELEASE_DIR}/${IMAGE}-${MACHINE}.swu"
+
+if [ -z "$ENV_FILE" ]; then
+  for candidate in \
+    "${DOTFILES:-$HOME/dotfiles}/tools/hbc/stable-${MACHINE}-env" \
+    "$HOME/cot-ft-dev/tools/hbc/stable-${MACHINE}-env" \
+    "$HOME/ems-dev/tools/hbc/stable-${MACHINE}-env" \
+    "$HOME/dps-dev-old/linux-dps/tools/hbc/stable-${MACHINE}-env"
+  do
+    if [ -f "$candidate" ]; then
+      ENV_FILE="$candidate"
+      break
+    fi
+  done
+fi
+
+if [ -n "$ENV_FILE" ] && [ ! -f "$ENV_FILE" ]; then
+  echo "Error: env file not found: $ENV_FILE" >&2
+  exit 1
+fi
+
+if [ "$SKIP_VERIFY" -eq 0 ]; then
+  verify_helper="$(command -v dps-fetch-release-swu 2>/dev/null || true)"
+  if [ -z "$verify_helper" ]; then
+    verify_helper="${DOTFILES:-$HOME/dotfiles}/shell/yocto/dps-fetch-release-swu"
+  fi
+
+  if [ ! -x "$verify_helper" ]; then
+    echo "Error: dps-fetch-release-swu helper not found: $verify_helper" >&2
+    exit 1
+  fi
+
+  "$verify_helper" --version "$VERSION" --machine "$MACHINE" --image "$IMAGE" --dest-root "$RELEASE_ROOT" --skip-download
+fi
+
+if [ -n "$ENV_FILE" ]; then
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+fi
+
+MACHINE="$REQUESTED_MACHINE"
+IMAGE="$REQUESTED_IMAGE"
+VERSION="$REQUESTED_VERSION"
+RELEASE_ROOT="$REQUESTED_RELEASE_ROOT"
+RELEASE_DIR="${RELEASE_ROOT}/${VERSION}/${IMAGE}/${MACHINE}"
+ARTIFACT_PATH="${RELEASE_DIR}/${IMAGE}-${MACHINE}.swu"
+
+PROJECT_NAME="${PROJECT_NAME:-dps-mcg-quad-cmsg}"
+PROJECT_DESCRIPTION="Linux DPS (${MACHINE}, ${VERSION})"
+HB_URL="${HB_URL:-https://cotcms-v1-admin.fota.iotdevices.liebherr.com}"
+HB_OAUTH2_ISSUER_URL="${HB_OAUTH2_ISSUER_URL:-https://login.microsoftonline.com/3336d6b0-b132-47ee-a49b-3ab470a5336e/v2.0}"
+HB_OAUTH2_CLIENT_ID="${HB_OAUTH2_CLIENT_ID:-063f3fc9-1308-4c82-8b52-a73b224029be}"
+HB_OAUTH2_SCOPES="${HB_OAUTH2_SCOPES:-openid profile email api://cotcms-v1.fota.iotdevices.liebherr.com/user_impersonation}"
+
+IMAGE="$IMAGE"
+MACHINE="$MACHINE"
+VERSION="$VERSION"
+ARTIFACT="$ARTIFACT_PATH"
+
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo "Resolved values:"
+  echo "  ENV_FILE=${ENV_FILE:-<none>}"
+  echo "  IMAGE=$IMAGE"
+  echo "  MACHINE=$MACHINE"
+  echo "  VERSION=$VERSION"
+  echo "  ARTIFACT=$ARTIFACT"
+  echo "  PROJECT_NAME=$PROJECT_NAME"
+  echo "  PROJECT_DESCRIPTION=$PROJECT_DESCRIPTION"
+  echo "  HB_URL=$HB_URL"
+  echo "  HB_OAUTH2_CLIENT_ID=$HB_OAUTH2_CLIENT_ID"
+  echo "  HB_OAUTH2_SCOPES=$HB_OAUTH2_SCOPES"
+  echo "  HBC_BIN=$HBC_BIN"
+  echo "  START=$START"
+  exit 0
+fi
+
+if [ ! -f "$ARTIFACT" ]; then
+  echo "Error: artifact file not found: $ARTIFACT" >&2
+  exit 1
+fi
+
+if ! command -v "$HBC_BIN" >/dev/null 2>&1; then
+  echo "Error: hbc binary not found: $HBC_BIN" >&2
+  exit 1
+fi
+
+tmp_config="$(mktemp)"
+trap 'rm -f "$tmp_config"' EXIT
+
+cat > "$tmp_config" <<EOF
+hawkBitBaseUrl: $HB_URL
+authType: oidc
+
+oidcAuth:
+  issuerUri: $HB_OAUTH2_ISSUER_URL
+  grantType: device_code
+  clientId: $HB_OAUTH2_CLIENT_ID
+  scope: $HB_OAUTH2_SCOPES
+
+softwareModules:
+  - name: $PROJECT_NAME $IMAGE $MACHINE
+    vendor: LH
+    description: $PROJECT_DESCRIPTION Software Module
+    type: os
+    version: $VERSION
+    artifactUrls:
+      - $ARTIFACT
+
+distributionSets:
+  - name: $PROJECT_NAME $IMAGE $MACHINE
+    description: $PROJECT_DESCRIPTION Distribution-Set
+    type: os
+    version: $VERSION
+    requiredMigrationStep: false
+EOF
+
+args=(-config "$tmp_config")
+if [ "$START" -eq 1 ]; then
+  args=(-start "${args[@]}")
+fi
+
+"$HBC_BIN" "${args[@]}"

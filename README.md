@@ -38,6 +38,34 @@ sway
 - VPN, DNS, and remote-access helpers
 - Personal documentation built with Sphinx
 
+For the current linux-dps Scarthgap release work, the host-side helpers stay
+generic and project-specific validation still lives in the wiki. The main entry
+points remain `setup-yocto-project`, `llp-yocto-build`, and the Yocto helper
+wrappers under `shell/yocto`, which are used for rc2 validation of the build,
+WIC generation, and boot-related workflow.
+
+## Cross-Repo Documentation Contract
+
+This repository is intentionally host-focused and automation-focused.
+
+- dotfiles repo owns host setup, helper scripts, wrappers, and local tooling
+- project wiki repos own process, architecture, target behavior, and runbooks
+- product development repos own implementation (layers, recipes, manifests, CI)
+
+Use this split during updates:
+
+1. If a dotfiles helper changes, update the matching wiki usage docs.
+2. If project workflow docs change, verify helper names and options still match dotfiles.
+3. If product behavior changes, refresh both wiki process docs and dotfiles examples.
+
+For Yocto topics, keep instructions generic in dotfiles and move project-specific
+details to the corresponding wiki collection.
+
+Example pattern:
+
+- dotfiles: document generic helper usage (setup, build wrapper, key switching)
+- wiki: document a specific project flow (for example LLP, LPO, DPS)
+
 ## German Umlauts on US Keyboard (Fedora + Sway)
 
 This setup keeps an English keyboard layout and English system settings, while still allowing fast
@@ -112,7 +140,8 @@ Optional development tooling bootstrap that can be run independently from the ba
 Includes:
 
 - Neovim, git-delta, meld, and general editor tooling
-- Go, pre-commit, GitHub CLI, PlantUML, pandoc, and PDF build support for Sphinx
+- Go, Rust toolchain, pre-commit, GitHub CLI, PlantUML, pandoc, and PDF build support for Sphinx
+- `cross` for Windows release builds of the SAT600 field backup tool
 - MQTT tools such as mosquitto clients and MQTT Explorer
 - Yocto host build dependencies
 - VS Code installation with version pinning support
@@ -123,6 +152,8 @@ Example:
 ```bash
 VSCODE_VERSION=1.115 bash install-fedora-dev.sh
 VSCODE_VERSION="" bash install-fedora-dev.sh
+cargo build --release
+cross build --release --target x86_64-pc-windows-gnu
 ```
 
 PDF output for the local documentation workspace is available after the dev
@@ -238,6 +269,26 @@ switch-yocto-keys-profile llp prod
 switch-yocto-keys-profile lpo dev
 ```
 
+### Stream SWU update over SSH (cross-project)
+
+```bash
+# Use explicit SWU path
+swupdate-ssh-stream --host root@192.168.3.88 \
+    --swu ~/ems-dev/linux-dps-scarthgap/build-docker/tmp/deploy/images/imx6s-mcg/dps-image-imx6s-mcg.swu
+
+# Or auto-discover newest SWU from build output
+swupdate-ssh-stream --host root@192.168.3.88 --find-latest --machine imx6s-mcg
+
+# Preflight-only check (no update transfer)
+swupdate-ssh-stream --host root@192.168.3.88 --check-only --find-latest --machine imx6s-mcg
+```
+
+The helper validates target-side prerequisites before streaming:
+
+- `swupdate-client` must exist on target
+- `/run/swupdate/sockinstctrl` must be present as a socket
+- `swupdate` service state is printed when systemd is available
+
 ### Open remote desktop profiles
 
 ```bash
@@ -315,6 +366,10 @@ Re-run the repair helpers and confirm the expected target resolves through the V
 ```bash
 setup-yocto-project --help
 yocto-prefetch-source --help
+dps-fetch-release-swu --help
+dps-hawkbit-upload --help
+dps-tu-reonboard --help
+swupdate-ssh-stream --help
 ```
 
 ## References

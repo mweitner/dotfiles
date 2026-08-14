@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DOTFILES="${DOTFILES:-$HOME/dotfiles}"
+DNS_HELPER="${DNS_HELPER:-$DOTFILES/shell/setup-dnsmasq-profile}"
+PROFILE="${1:-imx6s-mcg-netboot}"
+TARGET_TAG="${TARGET_TAG:-imx6s-mcg}"
+
+fail() {
+  printf 'FAIL: %s\n' "$1" >&2
+  exit 1
+}
+
+info() {
+  printf 'INFO: %s\n' "$1"
+}
+
+if [[ ! -x "$DNS_HELPER" ]]; then
+  fail "dnsmasq profile helper not found or not executable: $DNS_HELPER"
+fi
+
+info "Activating profile: $PROFILE"
+"$DNS_HELPER" --profile "$PROFILE"
+
+if ! systemctl is-active --quiet dnsmasq; then
+  fail "dnsmasq service is not active"
+fi
+
+RPCINFO_OUT="$(sudo rpcinfo -p localhost 2>/dev/null || true)"
+if ! grep -qE '[[:space:]](nfs|mountd)$' <<<"$RPCINFO_OUT"; then
+  fail "NFS RPC programs not registered (nfs/mountd missing)"
+fi
+
+if command -v timeout >/dev/null 2>&1; then
+  if ! SHOWMOUNT_OUT="$(timeout 8s sudo showmount -e localhost 2>/dev/null || true)"; then
+    fail "showmount failed"
+  fi
+else
+  SHOWMOUNT_OUT="$(sudo showmount -e localhost 2>/dev/null || true)"
+fi
+
+if [[ -z "$SHOWMOUNT_OUT" ]]; then
+  fail "showmount returned no exports"
+fi
+
+if ! grep -q "$TARGET_TAG" <<<"$SHOWMOUNT_OUT"; then
+  printf '%s\n' "$SHOWMOUNT_OUT"
+  fail "expected export containing '$TARGET_TAG' not found"
+fi
+
+info "RPC services registered:"
+printf '%s\n' "$RPCINFO_OUT" | sed -n '1,120p'
+
+echo "INFO: NFS exports:"
+printf '%s\n' "$SHOWMOUNT_OUT"
+
+echo "PASS: netboot host profile is ready"

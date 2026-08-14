@@ -61,6 +61,55 @@ setup_fedora_docker() {
   "$docker_setup_script" "${docker_args[@]}"
 }
 
+# Keep system time stable across VPN/non-VPN environments.
+# - RTC must be in UTC to avoid DST and timezone drift issues.
+# - chrony keeps internal sources and adds public pools as fallback.
+configure_time_sync() {
+  local chrony_conf marker
+
+  chrony_conf="/etc/chrony.conf"
+  marker="# Public fallback NTP servers (added by install-fedora.sh)"
+
+  if ! command -v timedatectl >/dev/null 2>&1; then
+    echo "WARN: timedatectl not found; skipping RTC/NTP setup."
+    return 0
+  fi
+
+  sudo timedatectl set-local-rtc 0 --adjust-system-clock
+  sudo timedatectl set-ntp true
+
+  if [[ -f "$chrony_conf" ]]; then
+    if ! grep -Fxq "$marker" "$chrony_conf"; then
+      sudo tee -a "$chrony_conf" >/dev/null <<'EOF'
+# Public fallback NTP servers (added by install-fedora.sh)
+pool 0.pool.ntp.org iburst
+pool 1.pool.ntp.org iburst
+pool 2.pool.ntp.org iburst
+pool 3.pool.ntp.org iburst
+EOF
+      echo "==> Added public fallback NTP pools to $chrony_conf"
+    else
+      echo "==> Public fallback NTP pools already configured in $chrony_conf"
+    fi
+  else
+    echo "WARN: $chrony_conf not found; skipping fallback pool setup."
+  fi
+
+  if systemctl list-unit-files 2>/dev/null | grep -q '^chronyd\.service'; then
+    sudo systemctl enable --now chronyd 2>/dev/null || true
+    sudo systemctl restart chronyd 2>/dev/null || true
+    if command -v chronyc >/dev/null 2>&1; then
+      chronyc burst 4/4 >/dev/null 2>&1 || true
+      chronyc makestep >/dev/null 2>&1 || true
+    fi
+  else
+    echo "WARN: chronyd service not found; install chrony package to enable NTP fallback."
+  fi
+
+  echo "==> Time sync baseline configured (RTC in UTC, NTP enabled)."
+  timedatectl | sed -n '1,12p'
+}
+
 # ── Paths ──────────────────────────────────────────────────────────────────────
 DOTFILES="${DOTFILES:-$HOME/dotfiles}"
 XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -399,6 +448,12 @@ if [[ "$SKIP_PACKAGES" == false ]]; then
   # Lightweight DNS/DHCP server for machine-network profiles
   sudo dnf install -y dnsmasq
 
+  # NFS server/client utilities for netboot root exports and verification
+  sudo dnf install -y nfs-utils
+
+  # NTP client/server used for stable clock sync on/off VPN
+  sudo dnf install -y chrony
+
   # Fonts
   sudo dnf install -y \
     google-noto-sans-fonts \
@@ -535,6 +590,7 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/setup-machine-network-profiles.sh" ]] && ln -sf "$DOTFILES/shell/setup-machine-network-profiles.sh" "$HOME/.local/bin/setup-machine-network-profiles"
   [[ -f "$DOTFILES/shell/setup-adapters.sh" ]] && ln -sf "$DOTFILES/shell/setup-adapters.sh" "$HOME/.local/bin/setup-adapters"
   [[ -f "$DOTFILES/shell/setup-dnsmasq-profile" ]] && ln -sf "$DOTFILES/shell/setup-dnsmasq-profile" "$HOME/.local/bin/setup-dnsmasq-profile"
+  [[ -f "$DOTFILES/shell/setup-netboot-profile" ]] && ln -sf "$DOTFILES/shell/setup-netboot-profile" "$HOME/.local/bin/setup-netboot-profile"
   [[ -f "$DOTFILES/shell/setup-ulm-office-mode" ]] && ln -sf "$DOTFILES/shell/setup-ulm-office-mode" "$HOME/.local/bin/setup-ulm-office-mode"
   [[ -f "$DOTFILES/shell/setup-machine-internet-sharing" ]] && ln -sf "$DOTFILES/shell/setup-machine-internet-sharing" "$HOME/.local/bin/setup-machine-internet-sharing"
   [[ -f "$DOTFILES/shell/setup-nas-ssh-key" ]] && ln -sf "$DOTFILES/shell/setup-nas-ssh-key" "$HOME/.local/bin/setup-nas-ssh-key"
@@ -548,6 +604,10 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/yocto/llp_doc_local.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_doc_local.sh" "$HOME/.local/bin/llp-doc-local"
   [[ -f "$DOTFILES/shell/yocto/yocto-prefetch-source" ]] && ln -sf "$DOTFILES/shell/yocto/yocto-prefetch-source" "$HOME/.local/bin/yocto-prefetch-source"
   [[ -f "$DOTFILES/shell/yocto/yocto-prefetch-recipe-source" ]] && ln -sf "$DOTFILES/shell/yocto/yocto-prefetch-recipe-source" "$HOME/.local/bin/yocto-prefetch-recipe-source"
+  [[ -f "$DOTFILES/shell/yocto/dps-fetch-release-swu" ]] && ln -sf "$DOTFILES/shell/yocto/dps-fetch-release-swu" "$HOME/.local/bin/dps-fetch-release-swu"
+  [[ -f "$DOTFILES/shell/yocto/dps-hawkbit-upload" ]] && ln -sf "$DOTFILES/shell/yocto/dps-hawkbit-upload" "$HOME/.local/bin/dps-hawkbit-upload"
+  [[ -f "$DOTFILES/shell/yocto/swupdate-ssh-stream" ]] && ln -sf "$DOTFILES/shell/yocto/swupdate-ssh-stream" "$HOME/.local/bin/swupdate-ssh-stream"
+  [[ -f "$DOTFILES/shell/yocto/dps-tu-reonboard" ]] && ln -sf "$DOTFILES/shell/yocto/dps-tu-reonboard" "$HOME/.local/bin/dps-tu-reonboard"
   [[ -f "$DOTFILES/shell/yocto/switch-yocto-keys-profile.sh" ]] && ln -sf "$DOTFILES/shell/yocto/switch-yocto-keys-profile.sh" "$HOME/.local/bin/switch-yocto-keys-profile"
   [[ -f "$DOTFILES/shell/yocto/switch-llp-keys-profile.sh" ]] && ln -sf "$DOTFILES/shell/yocto/switch-llp-keys-profile.sh" "$HOME/.local/bin/switch-llp-keys-profile"
   [[ -f "$DOTFILES/shell/yocto/lpo-build" ]] && ln -sf "$DOTFILES/shell/yocto/lpo-build" "$HOME/.local/bin/lpo-build"
@@ -636,6 +696,10 @@ EOF
   echo "==> NetworkManager GUI tools available: nm-applet, nm-connection-editor."
 
   echo ""
+  echo "── Phase 3a0: Time sync (RTC UTC + chrony fallback) ────────────────────"
+  configure_time_sync
+
+  echo ""
   echo "── Phase 3a1: Configuring dnsmasq profile ───────────────────────────────"
   DNSMASQ_DEFAULT_PROFILE="${DNSMASQ_DEFAULT_PROFILE:-ulm-nas}"
   if [[ -x "$DOTFILES/shell/setup-dnsmasq-profile" ]]; then
@@ -650,7 +714,33 @@ EOF
   fi
 
   echo ""
-  echo "── Phase 3a2: Setting up NAS SSH key ──────────────────────────────────────"
+  echo "── Phase 3a2: Configuring NFS root export ───────────────────────────────"
+  sudo mkdir -p /etc/exports.d
+  sudo tee /etc/exports.d/50-dotfiles-netboot.exports >/dev/null <<'EOF'
+/opt/netboot/root/imx6s-mcg 192.168.3.0/24(rw,no_root_squash,no_subtree_check)
+EOF
+
+  if systemctl list-unit-files 2>/dev/null | grep -q '^rpcbind\.service'; then
+    sudo systemctl enable --now rpcbind 2>/dev/null || true
+  else
+    echo "WARN: rpcbind.service not found; install nfs-utils to provide the RPC port mapper."
+  fi
+
+  if systemctl list-unit-files 2>/dev/null | grep -q '^nfs-server\.service'; then
+    sudo systemctl enable --now nfs-server 2>/dev/null || true
+    sudo exportfs -rav 2>/dev/null || true
+  else
+    echo "WARN: nfs-server.service not found; install nfs-utils to provide the NFS server."
+  fi
+
+  if command -v showmount >/dev/null 2>&1; then
+    showmount -e localhost 2>/dev/null || true
+  fi
+
+  echo "==> NFS export ready for /opt/netboot/root/imx6s-mcg"
+
+  echo ""
+  echo "── Phase 3a3: Setting up NAS SSH key ──────────────────────────────────────"
   echo "⚠️  NAS SSH key setup is required for git repository access."
   echo "Run these commands when ready (ULM office flow):"
   echo "  setup-ulm-office-mode --site auto"
@@ -873,6 +963,10 @@ EOF
   echo "INFO: lpo-build is linked to ~/.local/bin/lpo-build"
   echo "INFO: yocto-prefetch-source is linked to ~/.local/bin/yocto-prefetch-source"
   echo "INFO: yocto-prefetch-recipe-source is linked to ~/.local/bin/yocto-prefetch-recipe-source"
+  echo "INFO: dps-fetch-release-swu is linked to ~/.local/bin/dps-fetch-release-swu"
+  echo "INFO: dps-hawkbit-upload is linked to ~/.local/bin/dps-hawkbit-upload"
+  echo "INFO: swupdate-ssh-stream is linked to ~/.local/bin/swupdate-ssh-stream"
+  echo "INFO: dps-tu-reonboard is linked to ~/.local/bin/dps-tu-reonboard"
   echo "INFO: switch-yocto-keys-profile is linked to ~/.local/bin/switch-yocto-keys-profile"
   echo "      Example bootstrap: setup-yocto-project --project linux-dps"
   echo "      Default /opt/yocto/keys/<project> links prefer <project>/dev when present"
@@ -887,6 +981,8 @@ EOF
   echo "      yocto-prefetch-source --url https://downloads.yoctoproject.org/mirror/sources/libjpeg-turbo-3.0.1.tar.gz --sha256 22429507714ae147b3acacd299e82099fce5d9f456882fc28e252e4579ba2a75"
   echo "      Recipe-aware prefetch helper example:"
   echo "      yocto-prefetch-recipe-source --recipe ~/lpo-dev/linux-lpo/layers/poky/meta/recipes-graphics/jpeg/libjpeg-turbo_3.0.1.bb"
+  echo "      Local SWUpdate stream helper example:"
+  echo "      swupdate-ssh-stream --host root@192.168.3.88 --find-latest --machine imx6s-mcg"
 
   echo ""
   echo "── Phase 3j: Docker engine (Fedora native) ─────────────────────────────"

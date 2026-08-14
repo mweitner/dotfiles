@@ -13,12 +13,20 @@ and changes are grouped using a Semantic Versioning style when tagged releases a
 - Added `shell/gh-account` helper to set up and switch GitHub CLI auth across
     personal (`github.com`) and enterprise hosts.
 - Added `gh-account list` subcommand for a compact host-to-user overview.
+- Added `shell/yocto/swupdate-ssh-stream` helper to precheck and stream SWU
+    artifacts over SSH into target `swupdate-client` socket mode.
 
 ### Changed (Unreleased)
 
 - Placeholder for updates to existing setup scripts, configuration defaults, and docs.
 - `install-fedora.sh` now links `gh-account` into `~/.local/bin`.
 - `README.md` now documents multi-account GitHub/GitHub Enterprise CLI authentication.
+- `install-fedora.sh` now links `swupdate-ssh-stream` into `~/.local/bin` and
+    prints a usage example in the Yocto helper summary.
+- `README.md` now documents SSH-based SWU streaming examples and precheck-only
+    usage for cross-project local update workflows.
+- `README.md` now reflects the current linux-dps Scarthgap rc2 validation flow
+    using the Yocto helper wrappers for build and WIC-focused verification.
 
 ### Fixed (Unreleased)
 

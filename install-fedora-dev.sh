@@ -49,6 +49,39 @@ echo "── Dev: Languages ─────────────────�
 sudo dnf install -y golang
 
 echo ""
+echo "── Dev: Rust toolchain ──────────────────────────────────────────────────"
+
+if ! command -v cargo >/dev/null 2>&1 || ! command -v rustup >/dev/null 2>&1; then
+  if command -v curl >/dev/null 2>&1; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+      sh -s -- -y --profile minimal --default-toolchain stable
+  else
+    echo "WARN: curl is not available; skipping rustup installation."
+  fi
+fi
+
+if [[ -f "$HOME/.cargo/env" ]]; then
+  # shellcheck source=/dev/null
+  source "$HOME/.cargo/env"
+fi
+
+if command -v rustup >/dev/null 2>&1; then
+  rustup toolchain install stable --profile minimal >/dev/null
+  rustup default stable >/dev/null
+  rustup component add rustfmt clippy >/dev/null 2>&1 || true
+  rustup target add x86_64-pc-windows-gnu >/dev/null 2>&1 || true
+fi
+
+if command -v cargo >/dev/null 2>&1; then
+  echo "==> Rust toolchain installed: $(cargo --version)"
+fi
+
+if command -v cargo >/dev/null 2>&1 && ! command -v cross >/dev/null 2>&1; then
+  echo "==> Installing cross for Windows release builds..."
+  cargo install cross --locked
+fi
+
+echo ""
 echo "── Dev: Documentation tools ─────────────────────────────────────────────"
 sudo dnf install -y \
   plantuml \
@@ -58,6 +91,15 @@ sudo dnf install -y \
   texlive-xetex \
   texlive-capt-of \
   texlive-ellipse
+
+echo ""
+echo "── Dev: Embedded / Yocto tooling ───────────────────────────────────────"
+sudo dnf install -y \
+  uboot-tools \
+  nfs-utils
+
+echo "==> U-Boot host tools installed (mkimage, dumpimage, fw_printenv tooling)."
+echo "==> NFS host tools installed (exportfs, showmount, rpcinfo)."
 
 echo "==> PDF documentation support installed (latexmk + XeLaTeX + Sphinx LaTeX helpers)."
 echo "    Use: make -C doc-engine latexpdf"
@@ -280,6 +322,18 @@ echo "── Dev: Yocto host build dependencies ──────────�
 sudo dnf install -y \
   gawk diffstat chrpath rpcgen texinfo socat \
   perl perl-Data-Dumper perl-Thread-Queue perl-Text-ParseWords
+
+echo ""
+echo "── Dev: Yocto helper commands ───────────────────────────────────────────"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+mkdir -p "$HOME/.local/bin"
+if [[ -f "$script_dir/shell/yocto/llp_provide_netboot.sh" ]]; then
+  ln -sfn "$script_dir/shell/yocto/llp_provide_netboot.sh" "$HOME/.local/bin/llp_provide_netboot.sh"
+fi
+if [[ -f "$script_dir/shell/yocto/llp_activate_netboot.sh" ]]; then
+  ln -sfn "$script_dir/shell/yocto/llp_activate_netboot.sh" "$HOME/.local/bin/llp_activate_netboot.sh"
+fi
+echo "==> Yocto netboot helpers linked to ~/.local/bin (llp_provide_netboot.sh, llp_activate_netboot.sh)."
 
 echo ""
 echo "── Dev: VS Code ${VSCODE_VERSION:-(latest)} ─────────────────────────────────────────────────────"

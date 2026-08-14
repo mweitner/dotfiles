@@ -3,6 +3,10 @@
 This workflow captures chat content from Teams Web with a bookmarklet and saves it into
 `docs/ai-context` in your local repository.
 
+For the full meeting pipeline (screen/audio capture, transcript generation, and one merged minutes
+document across multiple recording parts), see
+[teams-session-integration-workflow.md](teams-session-integration-workflow.md).
+
 ## One-Time Setup
 
 1. Open the bookmarklet source in [web-teams-bookmarklet.txt](web-teams-bookmarklet.txt).
