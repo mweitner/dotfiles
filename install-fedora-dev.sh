@@ -96,7 +96,8 @@ echo ""
 echo "── Dev: Embedded / Yocto tooling ───────────────────────────────────────"
 sudo dnf install -y \
   uboot-tools \
-  nfs-utils
+  nfs-utils \
+  protobuf-compiler
 
 echo "==> U-Boot host tools installed (mkimage, dumpimage, fw_printenv tooling)."
 echo "==> NFS host tools installed (exportfs, showmount, rpcinfo)."
@@ -122,6 +123,36 @@ if ! command -v uv >/dev/null 2>&1; then
   fi
 else
   echo "==> uv already installed: $(uv --version)"
+fi
+
+echo ""
+echo "── Dev: Poetry (Python project & dependency manager) ───────────────────"
+# Install poetry as a uv-managed tool so it stays isolated from project venvs.
+# uv tool install is idempotent: re-run upgrades poetry if a newer version exists.
+# https://docs.astral.sh/uv/guides/tools/
+if command -v uv >/dev/null 2>&1; then
+  if uv tool install poetry; then
+    echo "==> poetry installed via uv tool."
+    echo "    Binary: $(uv tool run poetry --version 2>/dev/null || true)"
+    echo "    Usage:  poetry install / poetry run / poetry add"
+    # Disable keyring integration globally.
+    # In Sway/greetd sessions the DBus secrets daemon (gnome-keyring) is not
+    # auto-started, causing a hard DBus error on every `poetry install`.
+    # Disabling keyring is safe for development machines; credentials are not
+    # stored by poetry itself in normal project workflows.
+    if command -v poetry >/dev/null 2>&1 || uv tool run poetry --version >/dev/null 2>&1; then
+      poetry config keyring.enabled false 2>/dev/null \
+        || uv tool run poetry config keyring.enabled false 2>/dev/null \
+        || true
+      echo "==> poetry keyring.enabled set to false (avoids DBus error in Sway sessions)."
+    fi
+  else
+    echo "WARN: poetry installation via uv failed."
+    echo "      Fallback: curl -sSL https://install.python-poetry.org | python3 -"
+  fi
+else
+  echo "WARN: uv not found; skipping poetry install."
+  echo "      Install uv first, then: uv tool install poetry"
 fi
 
 echo ""

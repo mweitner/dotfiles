@@ -201,13 +201,44 @@ ffmpeg -i part01-remote.wav -i part01-mic.wav \
 
 ## Step 4: Transcribe Each Part
 
-Example for whisper.cpp CLI:
+### Option A: Local whisper.cpp (automated, offline)
+
+**Prerequisite:** see [ASR Setup: whisper.cpp with GPU acceleration](#asr-setup-whispercpp-with-gpu-acceleration) below.
 
 ```bash
 for f in "$SESSION_DIR"/*.wav; do
   whisper-cli -m "$HOME/models/ggml-large-v3.bin" -f "$f" -of "${f%.wav}"
 done
 ```
+
+### Option B: Gemini web prompt (manual, no setup required)
+
+Use this until whisper.cpp is installed. Steps:
+
+1. Open [aistudio.google.com](https://aistudio.google.com) or Gemini Advanced.
+2. Attach the `.wav` file(s) from the session folder directly.
+3. Prompt:
+
+```text
+This is a recorded meeting audio file.
+Please generate a clean text transcript of the full content.
+Preserve speaker turns if identifiable.
+Language may be German and/or English mixed.
+```
+
+4. Save the raw transcript output as:
+   `<session-dir>/<session-id>-part-NN.txt` (one file per uploaded wav).
+5. Continue with Step 5 (merge) using these files as input.
+
+> Audio files for backlog sessions (already extracted, ready to upload):
+>
+> - `~/ems-dev/organization/meeting-minutes/2026.07.22-ems-reisenbauer/screencast_region_20260722_160220.wav`
+> - `~/ems-dev/organization/meeting-minutes/2026.08.05-ems-reisenbauer/screencast_region_20260805_095647.wav`
+> - `~/ems-dev/organization/meeting-minutes/2026.08.05-ems-reisenbauer/screencast_region_20260805_103027.wav`
+> - `~/ems-dev/organization/meeting-minutes/2026.08.05-ems-reisenbauer/screencast_region_20260805_104842.wav`
+> - `~/ems-dev/organization/meeting-minutes/2026.08.05-ems-reisenbauer/screencast_region_20260805_105300.wav`
+> - `~/ems-dev/organization/meeting-minutes/2026.08.05-ems-reisenbauer/screencast_region_20260805_110244.wav`
+> - `~/ems-dev/organization/meeting-minutes/2026.08.05-ems-reisenbauer/screencast_region_20260805_110812.wav`
 
 ## Step 5: Merge Raw Transcript Parts
 
@@ -289,3 +320,91 @@ Output sections:
 - confirm transcript exists for each part
 - confirm merged transcript contains your own spoken contributions
 - confirm final markdown minutes include owners and action items
+
+---
+
+## ASR Setup: whisper.cpp with GPU acceleration
+
+### Hardware status (as of 2026-08-19)
+
+| Component | Status | Notes |
+|---|---|---|
+| GPU | NVIDIA RTX PRO 2000 Blackwell (GB206GLM) | Laptop, physically present |
+| Proprietary NVIDIA driver | **not installed** | Required for CUDA and NVIDIA Vulkan |
+| CUDA runtime | **not available** | Blocked by missing driver |
+| NVIDIA Vulkan | **not available** | Blocked by missing driver |
+| Intel iGPU Vulkan | available | `libvulkan_intel.so` present via Mesa |
+| Nouveau Vulkan | available | open-source, compute not practical |
+
+**Current state:** CPU-only ASR execution or Intel iGPU Vulkan fallback only.
+**Target state:** CUDA-accelerated NVIDIA RTX (30–50x faster than CPU-only).
+
+### Expected performance once NVIDIA driver is installed
+
+| Model | CPU-only | RTX 2000 (CUDA) |
+|---|---|---|
+| `large-v3` | ~0.2x realtime (~160 min for 33 min recording) | ~15–20x realtime (~2 min) |
+| `medium` | ~0.5x realtime | ~40x realtime |
+| `small` | ~2x realtime | fast |
+
+### TODO: whisper.cpp setup (tracked here until moved to install script)
+
+Priority 1: Install NVIDIA proprietary driver (required for CUDA)
+
+```bash
+# Fedora: install via RPM Fusion
+sudo dnf install akmod-nvidia xorg-x11-drv-nvidia-cuda
+# reboot and verify:
+nvidia-smi
+```
+
+> BIOS note: on some Lenovo/ASUS laptops, the dGPU may be disabled via
+> "Hybrid Mode" in BIOS. Verify it is enabled or set to "Discrete GPU" if
+> you want always-on CUDA availability.
+
+Priority 2: Build and install whisper.cpp with CUDA support
+
+```bash
+git clone https://github.com/ggerganov/whisper.cpp ~/tools/whisper.cpp
+cd ~/tools/whisper.cpp
+# CUDA build:
+make GGML_CUDA=1
+# install binary into PATH:
+sudo cp build/bin/whisper-cli /usr/local/bin/whisper-cli
+# download model (large-v3, ~3 GB):
+bash models/download-ggml-model.sh large-v3
+mkdir -p ~/models
+cp models/ggml-large-v3.bin ~/models/
+```
+
+Priority 3: Validate end-to-end pipeline
+
+```bash
+# quick smoke test with a short wav:
+whisper-cli -m ~/models/ggml-large-v3.bin -f <some-test.wav> -of /tmp/test-out
+cat /tmp/test-out.txt
+```
+
+Priority 4: Add whisper-cli to install-fedora.sh
+
+Add a section under `# AI tooling` in `~/dotfiles/install-fedora.sh`:
+
+```bash
+# whisper.cpp - local ASR for meeting transcript generation
+# Build: see ~/dotfiles/ai/teams-session-integration-workflow.md
+# Requires: NVIDIA driver + CUDA (akmod-nvidia xorg-x11-drv-nvidia-cuda)
+```
+
+### Vulkan fallback path (Intel iGPU, no NVIDIA driver required)
+
+If you want to use whisper.cpp before the NVIDIA driver is set up, the Intel
+iGPU Vulkan path is available today. Performance is roughly 2–5x CPU speed
+(not as fast as RTX but workable for short recordings):
+
+```bash
+# Vulkan build (uses available Intel iGPU Vulkan via Mesa):
+make GGML_VULKAN=1
+```
+
+This is a useful interim option for short sessions (\<15 min) while waiting
+for the NVIDIA driver setup window.
