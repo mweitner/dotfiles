@@ -1,9 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+APP_NAME="ai-session-manager"
+CONFIG_BASE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
+STATE_BASE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}"
+CACHE_BASE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}"
+RUNTIME_BASE_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+
+CONFIG_DIR="$CONFIG_BASE_DIR/$APP_NAME"
+STATE_DIR="$STATE_BASE_DIR/$APP_NAME"
+CACHE_DIR="$CACHE_BASE_DIR/$APP_NAME"
+RUNTIME_DIR="$RUNTIME_BASE_DIR/$APP_NAME"
+
+STATE_FILE_DEFAULT="$STATE_DIR/session.state"
+SESSION_STATE_FILE="${AI_SESSION_STATE_FILE:-$STATE_FILE_DEFAULT}"
+
 usage() {
   cat <<'EOF'
 Usage: run-session-postprocess.sh <session-dir> <session-id> <repo-root> [options]
+       run-session-postprocess.sh --from-active <repo-root> [options]
+       run-session-postprocess.sh paths|doctor
 
 Run session post-processing in one command:
 1) extract audio from mp4 parts
@@ -11,6 +27,7 @@ Run session post-processing in one command:
 3) create meeting minutes skeleton markdown
 
 Options:
+  --from-active               Resolve <session-dir> and <session-id> from active state file
   --audio-format <wav|mp3>      Output audio format (default: wav)
   --sample-rate <hz>            Audio sample rate (default: 16000)
   --channels <count>            Audio channels (default: 1)
@@ -27,6 +44,7 @@ Options:
   --overwrite-audio             Overwrite extracted audio files
   --overwrite-merge             Overwrite merged transcript file
   --force-minutes               Overwrite meeting minutes skeleton file
+  --state-file <path>           Override active-session state file path
   -h, --help                    Show help
 
 Example:
@@ -34,6 +52,8 @@ Example:
     teams-2026-08-13-lpo ~/dps-dev \
     --chat-md ~/dps-dev/docs/ai-context/teams-sync-2026-08-13-teams-2026-08-13-lpo.md \
     --owner "Michael Weitner"
+
+  run-session-postprocess.sh --from-active ~/dps-dev --overwrite-merge --force-minutes
 EOF
 }
 
@@ -44,15 +64,105 @@ require_cmd() {
   fi
 }
 
-if [[ $# -lt 3 ]]; then
+print_paths() {
+  echo "APP_NAME=$APP_NAME"
+  echo "CONFIG_DIR=$CONFIG_DIR"
+  echo "STATE_DIR=$STATE_DIR"
+  echo "CACHE_DIR=$CACHE_DIR"
+  echo "RUNTIME_DIR=$RUNTIME_DIR"
+  echo "SESSION_STATE_FILE=$SESSION_STATE_FILE"
+}
+
+doctor() {
+  local errors=0
+  echo "run-session-postprocess doctor"
+  echo "-----------------------------"
+  print_paths
+  echo
+
+  for d in "$CONFIG_DIR" "$STATE_DIR" "$CACHE_DIR" "$RUNTIME_DIR"; do
+    if [[ -d "$d" ]]; then
+      if [[ -w "$d" ]]; then
+        echo "[OK] writable dir: $d"
+      else
+        echo "[ERR] not writable: $d"
+        errors=$((errors + 1))
+      fi
+    else
+      if mkdir -p "$d" 2>/dev/null; then
+        echo "[OK] created dir: $d"
+      else
+        echo "[ERR] cannot create dir: $d"
+        errors=$((errors + 1))
+      fi
+    fi
+  done
+
+  if [[ -f "$SESSION_STATE_FILE" ]]; then
+    if [[ -r "$SESSION_STATE_FILE" ]]; then
+      echo "[OK] state file readable: $SESSION_STATE_FILE"
+    else
+      echo "[ERR] state file not readable: $SESSION_STATE_FILE"
+      errors=$((errors + 1))
+    fi
+  else
+    echo "[INFO] state file not found yet: $SESSION_STATE_FILE"
+  fi
+
+  echo
+  if [[ $errors -eq 0 ]]; then
+    echo "Doctor result: healthy"
+  else
+    echo "Doctor result: $errors issue(s) found"
+    return 1
+  fi
+}
+
+load_active_state() {
+  [[ -f "$SESSION_STATE_FILE" ]] || {
+    echo "Active session state file not found: $SESSION_STATE_FILE" >&2
+    exit 1
+  }
+
+  # shellcheck disable=SC1090
+  source "$SESSION_STATE_FILE"
+
+  : "${CURRENT_PROJECT:=}"
+  : "${CURRENT_AI_SESSION:=}"
+  : "${SESSION_FOLDER:=}"
+
+  [[ -n "$CURRENT_PROJECT" ]] || { echo "State file has no CURRENT_PROJECT" >&2; exit 1; }
+  [[ -n "$CURRENT_AI_SESSION" ]] || { echo "State file has no CURRENT_AI_SESSION" >&2; exit 1; }
+  [[ -n "$SESSION_FOLDER" ]] || { echo "State file has no SESSION_FOLDER" >&2; exit 1; }
+
+  session_dir="$SESSION_FOLDER"
+  session_id="${CURRENT_PROJECT}-${CURRENT_AI_SESSION}"
+}
+
+if [[ $# -lt 1 ]]; then
   usage
   exit 1
 fi
 
-session_dir="$1"
-session_id="$2"
-repo_root="$3"
-shift 3
+case "${1:-}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  paths)
+    print_paths
+    exit 0
+    ;;
+  doctor)
+    doctor
+    exit 0
+    ;;
+esac
+
+session_dir=""
+session_id=""
+repo_root=""
+from_active="false"
 
 audio_format="wav"
 sample_rate="16000"
@@ -73,8 +183,26 @@ overwrite_audio="false"
 overwrite_merge="false"
 force_minutes="false"
 
+if [[ "${1:-}" == "--from-active" ]]; then
+  from_active="true"
+  shift
+  repo_root="${1:-}"
+  [[ -n "$repo_root" ]] || { echo "Missing <repo-root> after --from-active" >&2; usage; exit 1; }
+  shift
+else
+  [[ $# -ge 3 ]] || { usage; exit 1; }
+  session_dir="$1"
+  session_id="$2"
+  repo_root="$3"
+  shift 3
+fi
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --from-active)
+      from_active="true"
+      shift
+      ;;
     --audio-format)
       audio_format="${2:-}"
       shift 2
@@ -139,6 +267,10 @@ while [[ $# -gt 0 ]]; do
       force_minutes="true"
       shift
       ;;
+    --state-file)
+      SESSION_STATE_FILE="${2:-}"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -150,6 +282,10 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "$from_active" == "true" ]]; then
+  load_active_state
+fi
 
 [[ -d "$session_dir" ]] || { echo "Session dir not found: $session_dir" >&2; exit 1; }
 [[ -d "$repo_root" ]] || { echo "Repo root not found: $repo_root" >&2; exit 1; }
@@ -218,4 +354,5 @@ fi
 
 echo
 echo "Session post-processing complete."
-echo "Next: run ASR transcription before merge if transcript parts are not generated yet."
+prompt_file="$script_dir/teams-session-meeting-minutes-prompt.md"
+echo "Next: generate transcripts for all audio sources, then use $prompt_file"

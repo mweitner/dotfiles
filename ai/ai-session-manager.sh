@@ -17,16 +17,33 @@ Commands:
   screencast next [project] [session]
                                   Stop current recording and start next
   status [project] [session]      Show active context and recording state
+  create-minutes [options]        Extract audio, create transcript placeholders, generate minutes
+  update-minutes [options]        Alias for create-minutes (idempotent re-run)
+  paths                            Show resolved config/state/cache/runtime paths
+  doctor                           Check writable directories and state file health
   project activate <name> [session]
                                   Activate project context (session optional)
   project clear                    Clear persisted context
   session activate [name]          Activate session within active project
 
+create-minutes / update-minutes options:
+  --title <text>                  Meeting title (default: "<project> <session>")
+  --owner <name>                  Default owner in minutes skeleton
+  --date <YYYY-MM-DD>             Meeting date (default: today)
+  --asr                           Use whisper-cli for transcripts instead of placeholders
+                                  (requires whisper-cli and ~/models/ggml-large-v3.bin)
+  --overwrite                     Overwrite existing audio and transcript files
+  --force-minutes                 Overwrite existing minutes skeleton file
+
 Environment:
-  AI_SESSION_DIR                  Override project base directory (default: ~/.ai-sessions)
-  AI_SESSION_CONFIG               Override config file location
+  AI_SESSION_DIR                  Override session artifacts directory (default: ~/.ai-sessions)
+  AI_SESSION_STATE_FILE           Override state file path
   AI_PROJECT                      Shell-level active project context override
   AI_SESSION                      Shell-level active session context override
+  XDG_CONFIG_HOME                 Config base dir (default: ~/.config)
+  XDG_STATE_HOME                  State base dir (default: ~/.local/state)
+  XDG_CACHE_HOME                  Cache base dir (default: ~/.cache)
+  XDG_RUNTIME_DIR                 Runtime base dir (default: /tmp)
 
 Defaults:
   project: current month (yyyy.MM)
@@ -51,13 +68,25 @@ require_cmd() {
 }
 
 SESSION_BASE_DIR="${AI_SESSION_DIR:-$HOME/.ai-sessions}"
-CONFIG_DIR="${XDG_RUNTIME_DIR:-/tmp}/ai-session"
-CONFIG_FILE="${AI_SESSION_CONFIG:-$CONFIG_DIR/session.state}"
+APP_NAME="ai-session-manager"
+CONFIG_BASE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
+STATE_BASE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}"
+CACHE_BASE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}"
+RUNTIME_BASE_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+
+CONFIG_DIR="$CONFIG_BASE_DIR/$APP_NAME"
+STATE_DIR="$STATE_BASE_DIR/$APP_NAME"
+CACHE_DIR="$CACHE_BASE_DIR/$APP_NAME"
+RUNTIME_DIR="$RUNTIME_BASE_DIR/$APP_NAME"
+
+STATE_FILE_DEFAULT="$STATE_DIR/session.state"
+SESSION_STATE_FILE="${AI_SESSION_STATE_FILE:-$STATE_FILE_DEFAULT}"
+
 RECORDER_SCRIPT="$HOME/.config/sway/scripts/wf-record.sh"
 RECORDER_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
 RECORDER_PID_FILE="$RECORDER_RUNTIME_DIR/wf-record.pid"
 
-mkdir -p "$CONFIG_DIR"
+mkdir -p "$CONFIG_DIR" "$STATE_DIR" "$CACHE_DIR" "$RUNTIME_DIR"
 
 default_project_name() {
   date +%Y.%m
@@ -68,18 +97,9 @@ default_session_name() {
 }
 
 load_session_state() {
-  if [[ -f "$CONFIG_FILE" ]]; then
-    source "$CONFIG_FILE"
-  fi
-
-  # Backward compatibility with legacy variable names.
-  if [[ -z "${CURRENT_PROJECT:-}" && -n "${CURRENT_SESSION:-}" ]]; then
-    CURRENT_PROJECT="$CURRENT_SESSION"
-  fi
-
-  # Legacy SESSION_FOLDER used to point to project folder.
-  if [[ -z "${PROJECT_FOLDER:-}" && -n "${SESSION_FOLDER:-}" ]]; then
-    PROJECT_FOLDER="$SESSION_FOLDER"
+  if [[ -f "$SESSION_STATE_FILE" ]]; then
+    # shellcheck disable=SC1090
+    source "$SESSION_STATE_FILE"
   fi
 
   : "${CURRENT_PROJECT:=}"
@@ -93,7 +113,14 @@ load_session_state() {
 }
 
 save_session_state() {
-  cat > "$CONFIG_FILE" <<EOF
+  local state_target_dir
+  state_target_dir="$(dirname "$SESSION_STATE_FILE")"
+  mkdir -p "$state_target_dir"
+
+  local tmp_file
+  tmp_file="$(mktemp "$state_target_dir/session.state.XXXXXX")"
+
+  cat > "$tmp_file" <<EOF
 CURRENT_PROJECT="$CURRENT_PROJECT"
 CURRENT_AI_SESSION="$CURRENT_AI_SESSION"
 PROJECT_FOLDER="$PROJECT_FOLDER"
@@ -102,14 +129,70 @@ OUTPUT_NAMING="$OUTPUT_NAMING"
 CURRENT_PART="$CURRENT_PART"
 RECORDING_PID="${RECORDING_PID:-}"
 LAST_OUTPUT_FILE="${LAST_OUTPUT_FILE:-}"
-
-# Legacy aliases for compatibility
-CURRENT_SESSION="$CURRENT_PROJECT"
 EOF
+
+  chmod 600 "$tmp_file"
+  mv "$tmp_file" "$SESSION_STATE_FILE"
 }
 
 clear_session_state() {
-  rm -f "$CONFIG_FILE"
+  rm -f "$SESSION_STATE_FILE"
+}
+
+print_paths() {
+  echo "APP_NAME=$APP_NAME"
+  echo "SESSION_BASE_DIR=$SESSION_BASE_DIR"
+  echo "CONFIG_DIR=$CONFIG_DIR"
+  echo "STATE_DIR=$STATE_DIR"
+  echo "CACHE_DIR=$CACHE_DIR"
+  echo "RUNTIME_DIR=$RUNTIME_DIR"
+  echo "SESSION_STATE_FILE=$SESSION_STATE_FILE"
+  echo "RECORDER_PID_FILE=$RECORDER_PID_FILE"
+}
+
+doctor() {
+  local errors=0
+  echo "AI Session Manager Doctor"
+  echo "-------------------------"
+  print_paths
+  echo
+
+  for d in "$SESSION_BASE_DIR" "$CONFIG_DIR" "$STATE_DIR" "$CACHE_DIR" "$RUNTIME_DIR"; do
+    if [[ -d "$d" ]]; then
+      if [[ -w "$d" ]]; then
+        echo "[OK] writable dir: $d"
+      else
+        echo "[ERR] not writable: $d"
+        errors=$((errors + 1))
+      fi
+    else
+      if mkdir -p "$d" 2>/dev/null; then
+        echo "[OK] created dir: $d"
+      else
+        echo "[ERR] cannot create dir: $d"
+        errors=$((errors + 1))
+      fi
+    fi
+  done
+
+  if [[ -f "$SESSION_STATE_FILE" ]]; then
+    if [[ -r "$SESSION_STATE_FILE" && -w "$SESSION_STATE_FILE" ]]; then
+      echo "[OK] state file readable+writable: $SESSION_STATE_FILE"
+    else
+      echo "[ERR] state file permission issue: $SESSION_STATE_FILE"
+      errors=$((errors + 1))
+    fi
+  else
+    echo "[INFO] state file does not exist yet: $SESSION_STATE_FILE"
+  fi
+
+  echo
+  if [[ $errors -eq 0 ]]; then
+    echo "Doctor result: healthy"
+  else
+    echo "Doctor result: $errors issue(s) found"
+    return 1
+  fi
 }
 
 recorder_status() {
@@ -398,12 +481,319 @@ project_clear() {
   echo "Project/session context cleared"
 }
 
+# ---------------------------------------------------------------------------
+# create_minutes / update_minutes
+# Both commands are identical – update-minutes is a robust idempotent re-run.
+# ---------------------------------------------------------------------------
+
+create_minutes() {
+  local mode="${1:-create-minutes}"
+  shift || true
+
+  # ---- parse options -------------------------------------------------------
+  local opt_title=""
+  local opt_owner=""
+  local opt_date=""
+  local opt_asr="false"
+  local opt_overwrite="false"
+  local opt_force_minutes="false"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --title)        opt_title="${2:-}";    shift 2 ;;
+      --owner)        opt_owner="${2:-}";    shift 2 ;;
+      --date)         opt_date="${2:-}";     shift 2 ;;
+      --asr)          opt_asr="true";        shift   ;;
+      --overwrite)    opt_overwrite="true";  shift   ;;
+      --force-minutes) opt_force_minutes="true"; shift ;;
+      -h|--help)
+        echo "Usage: ai-session-manager.sh create-minutes [--title <t>] [--owner <n>]"
+        echo "       [--date <YYYY-MM-DD>] [--asr] [--overwrite] [--force-minutes]"
+        return 0 ;;
+      *) echo "error: unknown option: $1" >&2; return 1 ;;
+    esac
+  done
+
+  # ---- resolve active session context -------------------------------------
+  load_session_state
+  [[ -n "$CURRENT_PROJECT" ]]    || { echo "error: no active project (run prepare first)" >&2; return 1; }
+  [[ -n "$CURRENT_AI_SESSION" ]] || { echo "error: no active session (run prepare first)" >&2; return 1; }
+
+  local session_dir="$SESSION_FOLDER"
+  local session_id="${CURRENT_PROJECT}-${CURRENT_AI_SESSION}"
+  local meeting_date="${opt_date:-$(date +%Y-%m-%d)}"
+  local title="${opt_title:-${CURRENT_PROJECT} ${CURRENT_AI_SESSION}}"
+  local owner="${opt_owner:-TBD}"
+
+  transcript_marker_path() {
+    local transcript_file="$1"
+    local transcript_dir base marker_name
+    transcript_dir="$(dirname "$transcript_file")"
+    base="$(basename "$transcript_file")"
+    if [[ "$base" =~ -part([0-9]+)\.txt$ ]]; then
+      marker_name=".part${BASH_REMATCH[1]}"
+    else
+      marker_name=".${base%.txt}"
+    fi
+    printf '%s/%s' "$transcript_dir" "$marker_name"
+  }
+
+  transcript_is_legacy_placeholder() {
+    local transcript_file="$1"
+    [[ -s "$transcript_file" ]] || return 1
+    grep -q '^TODO: raw text transcript' "$transcript_file" 2>/dev/null
+  }
+
+  sync_transcript_marker() {
+    local transcript_file="$1"
+    local marker_file
+    marker_file="$(transcript_marker_path "$transcript_file")"
+
+    if [[ -s "$transcript_file" ]]; then
+      : > "$marker_file"
+      return 0
+    fi
+  }
+
+  ensure_transcript_placeholder() {
+    local wav_file="$1"
+    local transcript_file="${wav_file%.wav}.txt"
+    local marker_file
+    marker_file="$(transcript_marker_path "$transcript_file")"
+
+    if [[ ! -e "$transcript_file" ]]; then
+      : > "$transcript_file"
+      echo "      Placeholder: $(basename "$transcript_file")"
+    else
+      echo "      Empty transcript placeholder: $(basename "$transcript_file")"
+    fi
+
+    : > "$marker_file"
+  }
+
+  transcript_is_real() {
+    local transcript_file="$1"
+    [[ -s "$transcript_file" ]] && ! transcript_is_legacy_placeholder "$transcript_file"
+  }
+
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local extract_script="$script_dir/extract-session-audio.sh"
+  local merge_script="$script_dir/merge-session-transcripts.sh"
+  local skeleton_script="$script_dir/create-meeting-minutes-skeleton.sh"
+
+  for s in "$extract_script" "$merge_script" "$skeleton_script"; do
+    [[ -x "$s" ]] || { echo "error: helper not executable: $s" >&2; return 1; }
+  done
+
+  echo "=== create-minutes ==================================================="
+  echo "Project  : $CURRENT_PROJECT"
+  echo "Session  : $CURRENT_AI_SESSION"
+  echo "Folder   : $session_dir"
+  echo "Session ID: $session_id"
+  echo "Date     : $meeting_date"
+  echo "ASR mode : $opt_asr"
+  echo "Run mode  : $mode"
+  echo "======================================================================"
+
+  # ---- Step 1: collect video parts -----------------------------------------
+  shopt -s nullglob
+  local mp4_files=("$session_dir"/*part*.mp4)
+  shopt -u nullglob
+
+  if [[ ${#mp4_files[@]} -eq 0 ]]; then
+    echo "warning: no *part*.mp4 files found in $session_dir"
+    echo "         Continuing – audio/transcript/minutes steps may produce empty results."
+  else
+    echo
+    echo "[1/4] Video parts (${#mp4_files[@]} found):"
+    for f in "${mp4_files[@]}"; do
+      echo "      $(basename "$f")  ($(du -sh "$f" | cut -f1))"
+    done
+  fi
+
+  # ---- Step 2: extract audio -----------------------------------------------
+  echo
+  echo "[2/4] Audio extraction"
+  if [[ ${#mp4_files[@]} -gt 0 ]]; then
+    require_cmd ffmpeg
+    local extract_args=("$session_dir" --format wav --sample-rate 16000 --channels 1 --pattern '*part*.mp4')
+    [[ "$opt_overwrite" == "true" ]] && extract_args+=(--overwrite)
+    bash "$extract_script" "${extract_args[@]}"
+  else
+    echo "      Skipped – no mp4 parts."
+  fi
+
+  # ---- Step 3: transcripts --------------------------------------------------
+  echo
+  echo "[3/4] Transcripts"
+
+  shopt -s nullglob
+  local wav_files=("$session_dir"/*part*.wav)
+  shopt -u nullglob
+
+  if [[ ${#wav_files[@]} -eq 0 ]]; then
+    echo "      No wav files found – skipping transcript step."
+  elif [[ "$opt_asr" == "true" ]]; then
+    # --- ASR path (whisper-cli) ---------------------------------------------
+    local model="$HOME/models/ggml-large-v3.bin"
+    if ! command -v whisper-cli >/dev/null 2>&1; then
+      echo "      TODO: whisper-cli is not installed."
+      echo "      Install steps (see dotfiles runbook for full details):"
+      echo "        1. Install NVIDIA driver: sudo dnf install akmod-nvidia xorg-x11-drv-nvidia-cuda"
+      echo "        2. Build whisper.cpp with CUDA: cd ~/tools/whisper.cpp && make GGML_CUDA=1"
+      echo "        3. Install: sudo cp build/bin/whisper-cli /usr/local/bin/whisper-cli"
+      echo "        4. Download model: bash models/download-ggml-model.sh large-v3"
+      echo "        5. mkdir -p ~/models && cp models/ggml-large-v3.bin ~/models/"
+      echo "      Falling back to manual-placeholder mode for now."
+      opt_asr="false"
+    elif [[ ! -f "$model" ]]; then
+      echo "      TODO: model not found at $model"
+      echo "      Run: bash ~/tools/whisper.cpp/models/download-ggml-model.sh large-v3"
+      echo "      Then: mkdir -p ~/models && cp ~/tools/whisper.cpp/models/ggml-large-v3.bin ~/models/"
+      echo "      Falling back to manual-placeholder mode for now."
+      opt_asr="false"
+    fi
+
+    if [[ "$opt_asr" == "true" ]]; then
+      for wav in "${wav_files[@]}"; do
+        local txt="${wav%.wav}.txt"
+        if transcript_is_legacy_placeholder "$txt"; then
+          : > "$txt"
+          echo "      Reset legacy placeholder: $(basename "$txt")"
+        fi
+        if transcript_is_real "$txt" && [[ "$opt_overwrite" != "true" ]]; then
+          echo "      Skip existing: $(basename "$txt")"
+          continue
+        fi
+        echo "      Transcribing: $(basename "$wav")"
+        whisper-cli -m "$model" -f "$wav" -of "${wav%.wav}" -l auto
+        echo "      Created: $(basename "$txt")"
+      done
+    fi
+
+    for wav in "${wav_files[@]}"; do
+      sync_transcript_marker "${wav%.wav}.txt"
+    done
+  fi
+
+  # manual-placeholder mode (also the fallback when ASR is requested but unavailable)
+  if [[ "$opt_asr" == "false" ]]; then
+    local placeholder_count=0
+    for wav in "${wav_files[@]}"; do
+      local txt="${wav%.wav}.txt"
+      if transcript_is_legacy_placeholder "$txt"; then
+        : > "$txt"
+        echo "      Reset legacy placeholder: $(basename "$txt")"
+      fi
+      if transcript_is_real "$txt"; then
+        echo "      Keep existing transcript: $(basename "$txt")"
+        continue
+      fi
+
+      if [[ ! -e "$txt" || "$opt_overwrite" == "true" ]]; then
+        : > "$txt"
+        placeholder_count=$((placeholder_count + 1))
+        echo "      Placeholder: $(basename "$txt")"
+      else
+        echo "      Empty transcript placeholder: $(basename "$txt")"
+      fi
+
+      ensure_transcript_placeholder "$wav"
+    done
+    if [[ $placeholder_count -gt 0 ]]; then
+      echo
+      echo "      $placeholder_count placeholder(s) created."
+      echo "      Fill them with real transcripts, then rerun: ai-session-manager.sh update-minutes"
+    fi
+
+    for wav in "${wav_files[@]}"; do
+      sync_transcript_marker "${wav%.wav}.txt"
+    done
+  fi
+
+  # ---- Step 4: merge + skeleton --------------------------------------------
+  echo
+  echo "[4/4] Transcript merge and minutes skeleton"
+
+  shopt -s nullglob
+  local txt_files=("$session_dir"/*part*.txt)
+  shopt -u nullglob
+
+  # Only merge when at least one transcript file has actual content.
+  local real_transcripts=0
+  for t in "${txt_files[@]}"; do
+    if transcript_is_real "$t"; then
+      real_transcripts=$((real_transcripts + 1))
+    fi
+  done
+
+  local merged_transcript="$session_dir/$session_id-merged-transcript.txt"
+  local merge_overwrite="$opt_overwrite"
+  local force_minutes="$opt_force_minutes"
+
+  if [[ "$mode" == "update-minutes" ]]; then
+    merge_overwrite="true"
+    force_minutes="true"
+  fi
+
+  if [[ ${#txt_files[@]} -eq 0 ]]; then
+    echo "      No transcript files found – skipping merge."
+  elif [[ $real_transcripts -eq 0 ]]; then
+    : > "$merged_transcript"
+    echo "      All transcript files are empty placeholders – created empty merged transcript."
+    echo "      Fill transcripts, then rerun: ai-session-manager.sh update-minutes"
+  else
+    echo "      Merging $real_transcripts real transcript(s) of ${#txt_files[@]} total."
+    local merge_args=("$session_dir" "$session_id" --pattern '*part*.txt')
+    [[ "$merge_overwrite" == "true" ]] && merge_args+=(--overwrite)
+    bash "$merge_script" "${merge_args[@]}"
+  fi
+
+  # Minutes skeleton: always create/update so the source inventory is current.
+  local minutes_output="$session_dir/$session_id-meeting-minutes.md"
+  local skeleton_args=("$session_dir" "$session_id"
+    --title "$title"
+    --owner "$owner"
+    --date "$meeting_date"
+    --output "$minutes_output"
+  )
+  [[ -f "$merged_transcript" ]] && skeleton_args+=(--transcript "$merged_transcript")
+  [[ "$force_minutes" == "true" ]] && skeleton_args+=(--force)
+
+  if [[ -f "$minutes_output" && "$force_minutes" != "true" ]]; then
+    echo "      Minutes skeleton already exists: $(basename "$minutes_output")"
+    echo "      Use --force-minutes to overwrite."
+  else
+    bash "$skeleton_script" "${skeleton_args[@]}"
+  fi
+
+  echo
+  echo "=== Summary ==========================================================="
+  echo "Session folder: $session_dir"
+  echo
+  echo "Artifacts:"
+  ls -lh "$session_dir" | awk 'NR>1 {print "  " $0}'
+  echo
+  if [[ $real_transcripts -gt 0 && -f "$merged_transcript" ]]; then
+    echo "Next: open ~/dotfiles/ai/teams-session-meeting-minutes-prompt.md"
+    echo "      Fill the placeholders and submit to your AI assistant."
+    echo "      Save the output into: $(basename "$minutes_output")"
+  else
+    echo "Next: fill the transcript placeholder .txt files in $session_dir"
+    echo "      Then rerun: ai-session-manager.sh update-minutes"
+  fi
+  echo "======================================================================="
+}
+
 if [[ $# -lt 1 ]]; then
   usage
   exit 1
 fi
 
-case "${1:-}" in
+command_name="${1:-}"
+
+case "$command_name" in
   prepare)
     prepare_project "${2:-}" "${3:-}"
     ;;
@@ -462,6 +852,16 @@ case "${1:-}" in
   -h|--help)
     usage
     exit 0
+    ;;
+  create-minutes|update-minutes)
+    shift
+    create_minutes "$command_name" "$@"
+    ;;
+  paths)
+    print_paths
+    ;;
+  doctor)
+    doctor
     ;;
   *)
     echo "error: unknown command: $1" >&2

@@ -111,9 +111,13 @@ Status: draft
 ## Session Metadata
 
 - Meeting date: $meeting_date
+- Moderator:
 - Facilitator:
 - Participants:
 - Recording parts:
+- Audio sources:
+- Transcript sources:
+- Teams chat source:
 
 ## Decisions
 
@@ -142,11 +146,13 @@ Status: draft
 - Risk:
 - Assumption:
 
-## Sources
+## Source Inventory
 
 - Transcript: ${transcript_path:-TBD}
 - Teams chat markdown: ${chat_md_path:-TBD}
 - Related requirements:
+- Recording parts:
+- Audio captures:
 
 EOF
 

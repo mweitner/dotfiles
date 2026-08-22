@@ -8,6 +8,8 @@ This runbook covers Teams session capture when tenant APIs for recording/Copilot
 - local audio extraction independent from video recording
 - transcript generation from extracted audio
 - one merged meeting minutes output from multiple recording parts
+- moderator-friendly capture of headset audio plus participant audio
+- one canonical markdown minutes prompt for live deep-dive sessions
 
 ## Inputs and Existing Helpers
 
@@ -20,6 +22,18 @@ This runbook covers Teams session capture when tenant APIs for recording/Copilot
 - meeting skeleton helper: `~/dotfiles/ai/create-meeting-minutes-skeleton.sh`
 - one-command wrapper: `~/dotfiles/ai/run-session-postprocess.sh`
 - pre-call audio diagnostic: `~/dotfiles/ai/wf-record-audio-selftest.sh`
+- canonical minutes prompt: `~/dotfiles/ai/teams-session-meeting-minutes-prompt.md`
+
+## Moderator Protocol for Live Deep-Dive Sessions
+
+Use this flow when you are moderating a live technical deep dive and cannot take notes manually.
+
+1. Prepare the active project and session before the call so every artifact lands in one folder.
+2. Run the audio self-test and confirm both your headset mic and participant audio are audible.
+3. Start the screencast and record as many parts as needed during the session.
+4. Keep per-part audio extraction and transcript generation separate from the live call.
+5. Merge transcript parts after the call, then generate one markdown minutes file from the canonical prompt.
+6. Preserve moderator remarks, decisions, and unresolved items explicitly instead of trying to reconstruct them later.
 
 ## Quick Start: AI Project + Session Workflow (Recommended)
 
@@ -280,6 +294,14 @@ Prompt your AI assistant with:
 - Teams chat markdown export
 - project context links
 
+Canonical prompt file:
+
+- `~/dotfiles/ai/teams-session-meeting-minutes-prompt.md`
+
+Use the prompt file as the baseline when the session includes multiple video parts, multiple audio
+sources, or a moderated speaker flow where your own headset audio must be captured alongside the
+participants.
+
 Prompt template:
 
 ```text
@@ -289,15 +311,20 @@ Requirements:
 - Merge duplicated statements across parts.
 - Keep decisions, constraints, open questions, and action items.
 - Include owners and due dates when available.
+- Preserve moderator remarks when they affect decisions or scope.
+- Mark uncertain speaker attribution as unclear instead of guessing.
+- Note gaps in headset or participant audio when they affect interpretation.
 - Mark unclear points explicitly.
 
 Output sections:
 1. Session Metadata
-2. Decisions
-3. Requirement / Architecture Impact
-4. Action Items
-5. Open Questions
-6. Sources
+2. Recording and Audio Inventory
+3. Decisions
+4. Requirement / Architecture Impact
+5. Action Items
+6. Open Questions
+7. Risks and Assumptions
+8. Sources
 ```
 
 ## Recommended Output Paths
@@ -318,6 +345,7 @@ Output sections:
 
 - confirm all `mp4` parts were processed into `wav`
 - confirm transcript exists for each part
+- confirm participant audio is present in the capture chain
 - confirm merged transcript contains your own spoken contributions
 - confirm final markdown minutes include owners and action items
 
