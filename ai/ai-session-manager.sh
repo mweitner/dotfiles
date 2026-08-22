@@ -25,6 +25,7 @@ Commands:
                                   Activate project context (session optional)
   project clear                    Clear persisted context
   session activate [name]          Activate session within active project
+  list [project]                   List all projects and sessions, or one project
 
 create-minutes / update-minutes options:
   --title <text>                  Meeting title (default: "<project> <session>")
@@ -137,6 +138,109 @@ EOF
 
 clear_session_state() {
   rm -f "$SESSION_STATE_FILE"
+}
+
+render_prompt_template() {
+  local template_path="$1"
+  local output_path="$2"
+  local project_name="$3"
+  local session_name="$4"
+  local transcript_path="$5"
+  local notes_path="$6"
+
+  local template_text
+  template_text="$(cat "$template_path")"
+
+  template_text="${template_text//\{\{project_name\}\}/$project_name}"
+  template_text="${template_text//\{\{session_name\}\}/$session_name}"
+  template_text="${template_text//\{\{transcript_path\}\}/$transcript_path}"
+  template_text="${template_text//\{\{notes_path\}\}/$notes_path}"
+
+  printf '%s' "$template_text" > "$output_path"
+}
+
+populate_prompt_templates() {
+  local project_name="$1"
+  local session_name="$2"
+  local prompt_dir="$SESSION_FOLDER/ai-prompt-engineering"
+  local template_dir="${AI_SESSION_TEMPLATE_DIR:-$HOME/.ai-sessions/templates}"
+  local transcript_path="$SESSION_FOLDER/${project_name}-${session_name}-merged-transcript.txt"
+  local notes_path="$SESSION_FOLDER/${project_name}-${session_name}-meeting-minutes.md"
+
+  mkdir -p "$prompt_dir"
+
+  if [[ -f "$template_dir/meeting-minutes-refine.long.md" ]]; then
+    render_prompt_template \
+      "$template_dir/meeting-minutes-refine.long.md" \
+      "$prompt_dir/${project_name}-${session_name}-minutes-refine.long.md" \
+      "$project_name" "$session_name" "$transcript_path" "$notes_path"
+  fi
+
+  if [[ -f "$template_dir/meeting-minutes-refine.short.md" ]]; then
+    render_prompt_template \
+      "$template_dir/meeting-minutes-refine.short.md" \
+      "$prompt_dir/${project_name}-${session_name}-minutes-refine.short.md" \
+      "$project_name" "$session_name" "$transcript_path" "$notes_path"
+  fi
+
+  echo "Prompt templates generated in: $prompt_dir"
+  echo "  - ${project_name}-${session_name}-minutes-refine.long.md"
+  echo "  - ${project_name}-${session_name}-minutes-refine.short.md"
+}
+
+list_projects() {
+  local project_filter="${1:-}"
+  local project_dir
+  local found=0
+
+  shopt -s nullglob
+  local project_dirs=("$SESSION_BASE_DIR"/*)
+  shopt -u nullglob
+
+  if [[ ${#project_dirs[@]} -eq 0 ]]; then
+    echo "No projects found under $SESSION_BASE_DIR"
+    return 0
+  fi
+
+  for project_dir in "${project_dirs[@]}"; do
+    [[ -d "$project_dir" ]] || continue
+    local project_name
+    project_name="$(basename "$project_dir")"
+
+    if [[ "$project_name" == "templates" ]]; then
+      continue
+    fi
+
+    if [[ -n "$project_filter" && "$project_name" != "$project_filter" ]]; then
+      continue
+    fi
+
+    found=1
+    echo "Project: $project_name"
+
+    shopt -s nullglob
+    local session_dirs=("$project_dir"/*)
+    shopt -u nullglob
+
+    if [[ ${#session_dirs[@]} -eq 0 ]]; then
+      echo "  (no sessions)"
+      continue
+    fi
+
+    for session_dir in "${session_dirs[@]}"; do
+      [[ -d "$session_dir" ]] || continue
+      echo "  - $(basename "$session_dir")"
+    done
+  done
+
+  if [[ $found -eq 0 ]]; then
+    if [[ -n "$project_filter" ]]; then
+      echo "Project not found: $project_filter"
+      return 1
+    fi
+    echo "No projects found under $SESSION_BASE_DIR"
+    return 1
+  fi
 }
 
 print_paths() {
@@ -306,6 +410,7 @@ prepare_project() {
   echo "Mode: $OUTPUT_NAMING"
 
   cd "$SESSION_FOLDER"
+  populate_prompt_templates "$CURRENT_PROJECT" "$CURRENT_AI_SESSION"
   echo "Now in session folder: $SESSION_FOLDER"
   echo "Use: ai-session-manager.sh screencast start"
 }
@@ -848,6 +953,14 @@ case "$command_name" in
         exit 1
         ;;
     esac
+    ;;
+  list)
+    shift
+    if [[ $# -gt 0 ]]; then
+      list_projects "$1"
+    else
+      list_projects
+    fi
     ;;
   -h|--help)
     usage
