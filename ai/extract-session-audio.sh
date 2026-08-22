@@ -45,11 +45,6 @@ pattern="*.mp4"
 output_dir=""
 overwrite="false"
 
-if [[ "${1:-}" != -* ]]; then
-  session_dir="$1"
-  shift
-fi
-
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --format)
@@ -80,10 +75,32 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
-    *)
+    --)
+      shift
+      if [[ $# -gt 0 ]]; then
+        if [[ -n "$session_dir" ]]; then
+          echo "Multiple session directories provided." >&2
+          usage
+          exit 1
+        fi
+        session_dir="$1"
+        shift
+      fi
+      break
+      ;;
+    -*)
       echo "Unknown option: $1" >&2
       usage
       exit 1
+      ;;
+    *)
+      if [[ -n "$session_dir" ]]; then
+        echo "Multiple session directories provided." >&2
+        usage
+        exit 1
+      fi
+      session_dir="$1"
+      shift
       ;;
   esac
 done
