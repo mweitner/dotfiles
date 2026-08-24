@@ -311,6 +311,34 @@ recorder_is_running() {
   [[ "$(recorder_status)" == "running" ]]
 }
 
+cleanup_orphan_mic_capture() {
+  local mic_pid_file="$RECORDER_RUNTIME_DIR/wf-record-mic.pid"
+  local mic_meta_file="$RECORDER_RUNTIME_DIR/wf-record-mic.path"
+  local mic_pid=""
+  local orphan_mic_file=""
+
+  if [[ -f "$mic_meta_file" ]]; then
+    orphan_mic_file="$(cat "$mic_meta_file")"
+  fi
+
+  if [[ -f "$mic_pid_file" ]]; then
+    mic_pid="$(cat "$mic_pid_file")"
+    if [[ -n "$mic_pid" ]] && kill -0 "$mic_pid" 2>/dev/null; then
+      kill -INT "$mic_pid" 2>/dev/null || true
+      for _ in {1..30}; do
+        kill -0 "$mic_pid" 2>/dev/null || break
+        sleep 0.1
+      done
+    fi
+  fi
+
+  rm -f "$mic_pid_file" "$mic_meta_file"
+
+  if [[ -n "$orphan_mic_file" && -f "$orphan_mic_file" ]]; then
+    echo "warning: recovered orphan mic track: $orphan_mic_file" >&2
+  fi
+}
+
 next_part_number() {
   local session_folder="$1"
   local project_name="$2"
@@ -418,6 +446,7 @@ prepare_project() {
 start_screencast() {
   local project_name="${1:-}"
   local session_name="${2:-}"
+  local start_profile="region-audio"
 
   load_session_state
   resolve_context "$project_name" "$session_name"
@@ -435,6 +464,23 @@ start_screencast() {
 
   # Recorder writes directly into the active session folder.
   WF_RECORD_OUTPUT_DIR="$SESSION_FOLDER" bash "$RECORDER_SCRIPT" region-audio >/dev/null
+  sleep 1
+
+  # Detect immediate recorder failure and auto-fallback to full output capture.
+  if ! recorder_is_running; then
+    cleanup_orphan_mic_capture
+    echo "warning: region-audio failed to start; retrying with full-audio" >&2
+    WF_RECORD_OUTPUT_DIR="$SESSION_FOLDER" bash "$RECORDER_SCRIPT" full-audio >/dev/null
+    sleep 1
+    start_profile="full-audio"
+  fi
+
+  if ! recorder_is_running; then
+    cleanup_orphan_mic_capture
+    echo "error: recording failed to start (region-audio and full-audio)" >&2
+    echo "hint: check $RECORDER_RUNTIME_DIR/wf-record.log" >&2
+    exit 1
+  fi
 
   # Persist real recorder PID when available.
   if [[ -f "$RECORDER_PID_FILE" ]]; then
@@ -453,6 +499,7 @@ start_screencast() {
   if [[ "$OUTPUT_NAMING" == "named" ]]; then
     echo "Part: $CURRENT_PART"
   fi
+  echo "Recorder profile: $start_profile"
   echo "Session folder: $SESSION_FOLDER"
 }
 
@@ -595,6 +642,9 @@ create_minutes() {
   local mode="${1:-create-minutes}"
   shift || true
 
+  local gemini_max_bytes=$((100 * 1024 * 1024))
+  local gemini_max_seconds=$((3 * 60 * 60))
+
   # ---- parse options -------------------------------------------------------
   local opt_title=""
   local opt_owner=""
@@ -681,6 +731,122 @@ create_minutes() {
     [[ -s "$transcript_file" ]] && ! transcript_is_legacy_placeholder "$transcript_file"
   }
 
+  is_master_part_wav() {
+    local wav_file="$1"
+    [[ "$wav_file" =~ -part[0-9]+\.wav$ ]]
+  }
+
+  split_part_wav_for_gemini() {
+    local wav_file="$1"
+    local overwrite_mode="$2"
+    local session_folder="$3"
+    local base_name
+    local chunk_pattern
+    local split_dir
+    local split_gitignore
+    local size_bytes
+    local sample_rate
+    local channels
+    local bits_per_sample
+    local bytes_per_second
+    local max_seconds_by_size
+    local segment_seconds
+    local tmp_dir
+    local generated=0
+    local idx=1
+
+    base_name="$(basename "${wav_file%.wav}")"
+    split_dir="$session_folder/.audio-split"
+    split_gitignore="$split_dir/.gitignore"
+    chunk_pattern="$split_dir/${base_name}-index*.wav"
+
+    mkdir -p "$split_dir"
+    if [[ ! -f "$split_gitignore" ]]; then
+      cat > "$split_gitignore" <<'EOF'
+*
+!.gitignore
+EOF
+    fi
+
+    if [[ "$overwrite_mode" != "true" ]]; then
+      shopt -s nullglob
+      local existing_chunks=("$split_dir"/${base_name}-index*.wav)
+      shopt -u nullglob
+      if [[ ${#existing_chunks[@]} -gt 0 ]]; then
+        for c in "${existing_chunks[@]}"; do
+          echo "$c"
+        done
+        return 0
+      fi
+    else
+      rm -f "$split_dir"/${base_name}-index*.wav
+    fi
+
+    size_bytes=$(stat -c '%s' "$wav_file" 2>/dev/null || echo 0)
+    sample_rate=$(ffprobe -v error -select_streams a:0 -show_entries stream=sample_rate -of csv=p=0 "$wav_file" 2>/dev/null | head -1)
+    channels=$(ffprobe -v error -select_streams a:0 -show_entries stream=channels -of csv=p=0 "$wav_file" 2>/dev/null | head -1)
+    bits_per_sample=$(ffprobe -v error -select_streams a:0 -show_entries stream=bits_per_sample -of csv=p=0 "$wav_file" 2>/dev/null | head -1)
+
+    if [[ -z "$sample_rate" || -z "$channels" || -z "$bits_per_sample" ]]; then
+      echo "$wav_file"
+      return 0
+    fi
+
+    bytes_per_second=$((sample_rate * channels * bits_per_sample / 8))
+    if (( bytes_per_second <= 0 )); then
+      echo "$wav_file"
+      return 0
+    fi
+
+    max_seconds_by_size=$((gemini_max_bytes / bytes_per_second))
+    segment_seconds=$gemini_max_seconds
+    if (( max_seconds_by_size > 0 && max_seconds_by_size < segment_seconds )); then
+      segment_seconds=$max_seconds_by_size
+    fi
+
+    if (( segment_seconds <= 0 )); then
+      echo "$wav_file"
+      return 0
+    fi
+
+    if (( size_bytes <= gemini_max_bytes && segment_seconds >= gemini_max_seconds )); then
+      echo "$wav_file"
+      return 0
+    fi
+
+    tmp_dir=$(mktemp -d)
+    ffmpeg -hide_banner -loglevel error -y \
+      -i "$wav_file" \
+      -f segment -segment_time "$segment_seconds" -reset_timestamps 1 -c copy \
+      "$tmp_dir/chunk_%03d.wav"
+
+    shopt -s nullglob
+    local raw_chunks=("$tmp_dir"/chunk_*.wav)
+    shopt -u nullglob
+
+    if [[ ${#raw_chunks[@]} -eq 0 ]]; then
+      rm -rf "$tmp_dir"
+      echo "$wav_file"
+      return 0
+    fi
+
+    for raw_chunk in "${raw_chunks[@]}"; do
+      local out_chunk
+      out_chunk=$(printf '%s/%s-index%02d.wav' "$split_dir" "$base_name" "$idx")
+      mv "$raw_chunk" "$out_chunk"
+      echo "$out_chunk"
+      idx=$((idx + 1))
+      generated=$((generated + 1))
+    done
+
+    rm -rf "$tmp_dir"
+
+    if (( generated > 1 )); then
+      echo "" >&2
+      echo "      Partitioned $(basename "$wav_file") into $generated chunk(s) for Gemini limits." >&2
+    fi
+  }
+
   local script_dir
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   local extract_script="$script_dir/extract-session-audio.sh"
@@ -734,8 +900,33 @@ create_minutes() {
   echo "[3/4] Transcripts"
 
   shopt -s nullglob
-  local wav_files=("$session_dir"/*part*.wav)
+  local wav_candidates=("$session_dir"/*part*.wav)
   shopt -u nullglob
+
+  local wav_files=()
+  local effective_wav_files=()
+  if [[ ${#wav_candidates[@]} -gt 0 ]]; then
+    require_cmd ffprobe
+    for wav in "${wav_candidates[@]}"; do
+      if is_master_part_wav "$wav"; then
+        wav_files+=("$wav")
+      fi
+    done
+
+    if [[ ${#wav_files[@]} -gt 0 ]]; then
+      for wav in "${wav_files[@]}"; do
+        while IFS= read -r chunk_file; do
+          [[ -n "$chunk_file" ]] && effective_wav_files+=("$chunk_file")
+        done < <(split_part_wav_for_gemini "$wav" "$opt_overwrite" "$session_dir")
+      done
+    fi
+
+    if [[ ${#effective_wav_files[@]} -gt 0 ]]; then
+      IFS=$'\n' effective_wav_files=($(printf '%s\n' "${effective_wav_files[@]}" | sort -u))
+      unset IFS
+      wav_files=("${effective_wav_files[@]}")
+    fi
+  fi
 
   if [[ ${#wav_files[@]} -eq 0 ]]; then
     echo "      No wav files found – skipping transcript step."
@@ -821,9 +1012,25 @@ create_minutes() {
   echo
   echo "[4/4] Transcript merge and minutes skeleton"
 
-  shopt -s nullglob
-  local txt_files=("$session_dir"/*part*.txt)
-  shopt -u nullglob
+  local txt_files=()
+  local transcript_dirs=("$session_dir")
+  if [[ -d "$session_dir/.audio-split" ]]; then
+    transcript_dirs+=("$session_dir/.audio-split")
+  fi
+
+  for d in "${transcript_dirs[@]}"; do
+    shopt -s nullglob
+    local part_txt=($d/*part*.txt)
+    shopt -u nullglob
+    if [[ ${#part_txt[@]} -gt 0 ]]; then
+      txt_files+=("${part_txt[@]}")
+    fi
+  done
+
+  if [[ ${#txt_files[@]} -gt 0 ]]; then
+    IFS=$'\n' txt_files=($(printf '%s\n' "${txt_files[@]}" | sort -uV))
+    unset IFS
+  fi
 
   # Only merge when at least one transcript file has actual content.
   local real_transcripts=0
@@ -850,9 +1057,18 @@ create_minutes() {
     echo "      Fill transcripts, then rerun: ai-session-manager.sh update-minutes"
   else
     echo "      Merging $real_transcripts real transcript(s) of ${#txt_files[@]} total."
-    local merge_args=("$session_dir" "$session_id" --pattern '*part*.txt')
-    [[ "$merge_overwrite" == "true" ]] && merge_args+=(--overwrite)
-    bash "$merge_script" "${merge_args[@]}"
+    : > "$merged_transcript"
+    for t in "${txt_files[@]}"; do
+      {
+        echo
+        echo "---"
+        echo "SourcePart: $(basename "$t")"
+        echo
+      } >> "$merged_transcript"
+      cat "$t" >> "$merged_transcript"
+      echo >> "$merged_transcript"
+    done
+    echo "Merged ${#txt_files[@]} parts into: $merged_transcript"
   fi
 
   # Minutes skeleton: always create/update so the source inventory is current.
@@ -876,6 +1092,9 @@ create_minutes() {
   echo
   echo "=== Summary ==========================================================="
   echo "Session folder: $session_dir"
+  if [[ -d "$session_dir/.audio-split" ]]; then
+    echo "Split folder  : $session_dir/.audio-split"
+  fi
   echo
   echo "Artifacts:"
   ls -lh "$session_dir" | awk 'NR>1 {print "  " $0}'
@@ -885,7 +1104,7 @@ create_minutes() {
     echo "      Fill the placeholders and submit to your AI assistant."
     echo "      Save the output into: $(basename "$minutes_output")"
   else
-    echo "Next: fill the transcript placeholder .txt files in $session_dir"
+    echo "Next: fill transcript placeholder .txt files in $session_dir and (if present) $session_dir/.audio-split"
     echo "      Then rerun: ai-session-manager.sh update-minutes"
   fi
   echo "======================================================================="
