@@ -17,7 +17,7 @@ Commands:
   screencast next [project] [session]
                                   Stop current recording and start next
   status [project] [session]      Show active context and recording state
-  create-minutes [options]        Extract audio, create transcript placeholders, generate minutes
+  create-minutes [options]        Extract audio, transcribe parts, generate minutes
   update-minutes [options]        Alias for create-minutes (idempotent re-run)
   paths                            Show resolved config/state/cache/runtime paths
   doctor                           Check writable directories and state file health
@@ -31,8 +31,12 @@ create-minutes / update-minutes options:
   --title <text>                  Meeting title (default: "<project> <session>")
   --owner <name>                  Default owner in minutes skeleton
   --date <YYYY-MM-DD>             Meeting date (default: today)
-  --asr                           Use whisper-cli for transcripts instead of placeholders
-                                  (requires whisper-cli and ~/models/ggml-large-v3.bin)
+  --asr                           Force whisper-cli transcript mode (default)
+  --diarize                       Use WhisperX diarization (timestamp + speaker labels)
+                                  (requires whisperx CLI and HF_TOKEN)
+  --speaker-roster <file>         TSV file with known speakers (alias, display, role)
+  --speaker-map <file>            TSV file mapping diarized speaker IDs to aliases
+  --manual-transcripts            Disable ASR and create transcript placeholders
   --overwrite                     Overwrite existing audio and transcript files
   --force-minutes                 Overwrite existing minutes skeleton file
 
@@ -41,6 +45,13 @@ Environment:
   AI_SESSION_STATE_FILE           Override state file path
   AI_PROJECT                      Shell-level active project context override
   AI_SESSION                      Shell-level active session context override
+  AI_ASR_MODEL                    Whisper model path (default: ~/models/ggml-large-v3.bin)
+  AI_ASR_SPEAKER_LABEL            Speaker label for ASR transcript lines
+                                  (default: speaker-unknown)
+  HF_TOKEN                        Hugging Face token for diarization models (WhisperX)
+  AI_ASR_DIARIZE_MODEL            WhisperX model name (default: large-v3)
+  AI_ASR_DEVICE                   ASR device for WhisperX (default: cuda)
+  AI_ASR_BATCH_SIZE               WhisperX batch size (default: 8)
   XDG_CONFIG_HOME                 Config base dir (default: ~/.config)
   XDG_STATE_HOME                  State base dir (default: ~/.local/state)
   XDG_CACHE_HOME                  Cache base dir (default: ~/.cache)
@@ -649,7 +660,10 @@ create_minutes() {
   local opt_title=""
   local opt_owner=""
   local opt_date=""
-  local opt_asr="false"
+  local opt_asr="true"
+  local opt_diarize="false"
+  local opt_speaker_roster=""
+  local opt_speaker_map=""
   local opt_overwrite="false"
   local opt_force_minutes="false"
 
@@ -659,11 +673,19 @@ create_minutes() {
       --owner)        opt_owner="${2:-}";    shift 2 ;;
       --date)         opt_date="${2:-}";     shift 2 ;;
       --asr)          opt_asr="true";        shift   ;;
+      --diarize)      opt_diarize="true"; opt_asr="true"; shift ;;
+      --speaker-roster)
+              opt_speaker_roster="${2:-}"; shift 2 ;;
+      --speaker-map)
+              opt_speaker_map="${2:-}"; shift 2 ;;
+      --manual-transcripts|--no-asr)
+                      opt_asr="false"; opt_diarize="false"; shift ;;
       --overwrite)    opt_overwrite="true";  shift   ;;
       --force-minutes) opt_force_minutes="true"; shift ;;
       -h|--help)
         echo "Usage: ai-session-manager.sh create-minutes [--title <t>] [--owner <n>]"
-        echo "       [--date <YYYY-MM-DD>] [--asr] [--overwrite] [--force-minutes]"
+        echo "       [--date <YYYY-MM-DD>] [--asr|--diarize|--manual-transcripts]"
+        echo "       [--speaker-roster <file>] [--speaker-map <file>] [--overwrite] [--force-minutes]"
         return 0 ;;
       *) echo "error: unknown option: $1" >&2; return 1 ;;
     esac
@@ -679,6 +701,9 @@ create_minutes() {
   local meeting_date="${opt_date:-$(date +%Y-%m-%d)}"
   local title="${opt_title:-${CURRENT_PROJECT} ${CURRENT_AI_SESSION}}"
   local owner="${opt_owner:-TBD}"
+  local speaker_roster_file="${opt_speaker_roster:-$session_dir/$session_id-speaker-roster.tsv}"
+  local speaker_map_file="${opt_speaker_map:-$session_dir/$session_id-speaker-map.tsv}"
+  local speaker_stats_file="$session_dir/$session_id-speaker-stats.md"
 
   transcript_marker_path() {
     local transcript_file="$1"
@@ -731,6 +756,287 @@ create_minutes() {
     [[ -s "$transcript_file" ]] && ! transcript_is_legacy_placeholder "$transcript_file"
   }
 
+  format_whisper_srt_to_timestamped_txt() {
+    local srt_file="$1"
+    local txt_file="$2"
+    local speaker_label="${AI_ASR_SPEAKER_LABEL:-speaker-unknown}"
+    local tmp_file
+
+    tmp_file="$(mktemp)"
+    awk -v speaker="$speaker_label" '
+      function flush_line() {
+        gsub(/^[ \t]+|[ \t]+$/, "", text)
+        if (start != "" && text != "") {
+          printf("[%s][%s] %s\n", start, speaker, text)
+        }
+        start = ""
+        text = ""
+      }
+      {
+        gsub(/\r/, "", $0)
+      }
+      $0 ~ /^[0-9]+$/ {
+        next
+      }
+      $0 ~ / --> / {
+        split($0, ts, " --> ")
+        start = ts[1]
+        sub(/,.*/, "", start)
+        next
+      }
+      $0 == "" {
+        flush_line()
+        next
+      }
+      {
+        if (text == "") {
+          text = $0
+        } else {
+          text = text " " $0
+        }
+      }
+      END {
+        flush_line()
+      }
+    ' "$srt_file" > "$tmp_file"
+
+    if [[ -s "$tmp_file" ]]; then
+      mv "$tmp_file" "$txt_file"
+    else
+      rm -f "$tmp_file"
+    fi
+  }
+
+  format_whisperx_json_to_timestamped_txt() {
+    local json_file="$1"
+    local txt_file="$2"
+    local tmp_file
+
+    require_cmd python3
+    tmp_file="$(mktemp)"
+
+    python3 - "$json_file" > "$tmp_file" <<'PY'
+import json
+import re
+import sys
+
+json_file = sys.argv[1]
+
+with open(json_file, "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+segments = data.get("segments", [])
+
+def hhmmss(seconds: float) -> str:
+    total = max(0, int(seconds))
+    h = total // 3600
+    m = (total % 3600) // 60
+    s = total % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+def normalize_speaker(raw: str) -> str:
+    value = (raw or "speaker-unknown").strip()
+    if not value:
+        value = "speaker-unknown"
+    value = value.replace(" ", "-")
+    value = re.sub(r"[^A-Za-z0-9_-]", "", value)
+    if not value:
+        value = "speaker-unknown"
+    return value.lower()
+
+for seg in segments:
+    start = seg.get("start")
+    text = (seg.get("text") or "").replace("\n", " ").strip()
+    speaker = normalize_speaker(seg.get("speaker", "speaker-unknown"))
+    if start is None or not text:
+        continue
+    print(f"[{hhmmss(float(start))}][{speaker}] {text}")
+PY
+
+    if [[ -s "$tmp_file" ]]; then
+      mv "$tmp_file" "$txt_file"
+    else
+      rm -f "$tmp_file"
+    fi
+  }
+
+    ensure_speaker_roster_template() {
+    local roster_file="$1"
+    if [[ -f "$roster_file" ]]; then
+      return 0
+    fi
+
+    printf '%s\n' \
+      '# alias<TAB>display_name<TAB>role' \
+      $'short-unique-name1\tfull-name1\tname1-context1, name1-context2' \
+      $'short-unique-name2\tfull-name2\tname2-context1, name2-context2' \
+      > "$roster_file"
+    echo "      Created speaker roster template: $(basename "$roster_file")"
+    }
+
+    refresh_speaker_map_and_stats() {
+    local roster_file="$1"
+    local map_file="$2"
+    local stats_file="$3"
+    shift 3
+    local json_files=("$@")
+
+    [[ ${#json_files[@]} -gt 0 ]] || return 0
+
+    require_cmd python3
+    python3 - "$roster_file" "$map_file" "$stats_file" "${json_files[@]}" <<'PY'
+  import json
+  import pathlib
+  import re
+  import sys
+  from collections import defaultdict
+
+  roster_file = pathlib.Path(sys.argv[1])
+  map_file = pathlib.Path(sys.argv[2])
+  stats_file = pathlib.Path(sys.argv[3])
+  json_files = [pathlib.Path(p) for p in sys.argv[4:]]
+
+  def read_roster(path: pathlib.Path):
+    roster = {}
+    if not path.exists():
+      return roster
+    for line in path.read_text(encoding="utf-8").splitlines():
+      s = line.strip()
+      if not s or s.startswith("#"):
+        continue
+      parts = [p.strip() for p in line.split("\t")]
+      if len(parts) < 1 or not parts[0]:
+        continue
+      alias = parts[0]
+      display = parts[1] if len(parts) > 1 else ""
+      role = parts[2] if len(parts) > 2 else ""
+      roster[alias] = {"display": display, "role": role}
+    return roster
+
+  def read_map(path: pathlib.Path):
+    mapping = {}
+    if not path.exists():
+      return mapping
+    for line in path.read_text(encoding="utf-8").splitlines():
+      s = line.strip()
+      if not s or s.startswith("#"):
+        continue
+      parts = [p.strip() for p in line.split("\t")]
+      if len(parts) >= 2 and parts[0]:
+        mapping[parts[0]] = parts[1]
+    return mapping
+
+  def norm_speaker(value: str) -> str:
+    value = (value or "speaker-unknown").strip().replace(" ", "-")
+    value = re.sub(r"[^A-Za-z0-9_-]", "", value)
+    return value.lower() if value else "speaker-unknown"
+
+  roster = read_roster(roster_file)
+  mapping = read_map(map_file)
+  totals = defaultdict(float)
+
+  for json_path in json_files:
+    if not json_path.exists():
+      continue
+    data = json.loads(json_path.read_text(encoding="utf-8"))
+    for seg in data.get("segments", []):
+      spk = norm_speaker(seg.get("speaker", "speaker-unknown"))
+      start = seg.get("start")
+      end = seg.get("end")
+      dur = 0.0
+      try:
+        if start is not None and end is not None:
+          dur = max(0.0, float(end) - float(start))
+      except Exception:
+        dur = 0.0
+      totals[spk] += dur
+
+  all_speakers = sorted(totals.keys())
+
+  for spk in all_speakers:
+    mapping.setdefault(spk, "")
+
+  lines = [
+    "# detected_speaker<TAB>alias",
+    "# Fill alias from roster. Keep empty if unresolved.",
+    "#",
+    "# Available aliases from roster:",
+  ]
+  for alias, meta in sorted(roster.items()):
+    lines.append(f"# - {alias}\t{meta['display']}\t{meta['role']}")
+  lines.append("")
+
+  for spk in sorted(mapping.keys()):
+    lines.append(f"{spk}\t{mapping.get(spk, '')}")
+
+  map_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+  total_sec = sum(totals.values())
+  stats = [
+    "# Diarization Speaker Stats",
+    "",
+    "| Detected Speaker | Seconds | Share % | Alias | Display Name | Role |",
+    "| --- | ---: | ---: | --- | --- | --- |",
+  ]
+  for spk, sec in sorted(totals.items(), key=lambda kv: kv[1], reverse=True):
+    pct = (sec / total_sec * 100.0) if total_sec > 0 else 0.0
+    alias = mapping.get(spk, "")
+    display = roster.get(alias, {}).get("display", "") if alias else ""
+    role = roster.get(alias, {}).get("role", "") if alias else ""
+    stats.append(f"| {spk} | {sec:.1f} | {pct:.1f} | {alias} | {display} | {role} |")
+
+  stats_file.write_text("\n".join(stats) + "\n", encoding="utf-8")
+PY
+    }
+
+    apply_speaker_alias_map_to_transcript() {
+    local map_file="$1"
+    local txt_file="$2"
+
+    [[ -f "$map_file" ]] || return 0
+    [[ -f "$txt_file" ]] || return 0
+
+    require_cmd python3
+    python3 - "$map_file" "$txt_file" <<'PY'
+  import pathlib
+  import re
+  import sys
+
+  map_file = pathlib.Path(sys.argv[1])
+  txt_file = pathlib.Path(sys.argv[2])
+
+  mapping = {}
+  for line in map_file.read_text(encoding="utf-8").splitlines():
+    s = line.strip()
+    if not s or s.startswith("#"):
+      continue
+    parts = [p.strip() for p in line.split("\t")]
+    if len(parts) >= 2 and parts[0] and parts[1]:
+      mapping[parts[0].lower()] = parts[1]
+
+  content = txt_file.read_text(encoding="utf-8")
+  out = []
+  pat = re.compile(r"^\[(\d{2}:\d{2}:\d{2})\]\[([^\]]+)\]\s?(.*)$")
+  changed = False
+  for line in content.splitlines():
+    m = pat.match(line)
+    if not m:
+      out.append(line)
+      continue
+    ts, speaker, text = m.groups()
+    mapped = mapping.get(speaker.lower())
+    if mapped:
+      out.append(f"[{ts}][{mapped}] {text}")
+      if mapped != speaker:
+        changed = True
+    else:
+      out.append(line)
+
+  if changed:
+    txt_file.write_text("\n".join(out) + "\n", encoding="utf-8")
+PY
+    }
+
   is_master_part_wav() {
     local wav_file="$1"
     [[ "$wav_file" =~ -part[0-9]+\.wav$ ]]
@@ -762,10 +1068,7 @@ create_minutes() {
 
     mkdir -p "$split_dir"
     if [[ ! -f "$split_gitignore" ]]; then
-      cat > "$split_gitignore" <<'EOF'
-*
-!.gitignore
-EOF
+      printf '*\n!.gitignore\n' > "$split_gitignore"
     fi
 
     if [[ "$overwrite_mode" != "true" ]]; then
@@ -864,6 +1167,11 @@ EOF
   echo "Session ID: $session_id"
   echo "Date     : $meeting_date"
   echo "ASR mode : $opt_asr"
+  echo "Diarize  : $opt_diarize"
+  if [[ "$opt_diarize" == "true" ]]; then
+    echo "Roster   : $speaker_roster_file"
+    echo "Map      : $speaker_map_file"
+  fi
   echo "Run mode  : $mode"
   echo "======================================================================"
 
@@ -913,18 +1221,18 @@ EOF
       fi
     done
 
-    if [[ ${#wav_files[@]} -gt 0 ]]; then
+    if [[ "$opt_asr" == "false" && ${#wav_files[@]} -gt 0 ]]; then
       for wav in "${wav_files[@]}"; do
         while IFS= read -r chunk_file; do
           [[ -n "$chunk_file" ]] && effective_wav_files+=("$chunk_file")
         done < <(split_part_wav_for_gemini "$wav" "$opt_overwrite" "$session_dir")
       done
-    fi
 
-    if [[ ${#effective_wav_files[@]} -gt 0 ]]; then
-      IFS=$'\n' effective_wav_files=($(printf '%s\n' "${effective_wav_files[@]}" | sort -u))
-      unset IFS
-      wav_files=("${effective_wav_files[@]}")
+      if [[ ${#effective_wav_files[@]} -gt 0 ]]; then
+        IFS=$'\n' effective_wav_files=($(printf '%s\n' "${effective_wav_files[@]}" | sort -u))
+        unset IFS
+        wav_files=("${effective_wav_files[@]}")
+      fi
     fi
   fi
 
@@ -932,28 +1240,89 @@ EOF
     echo "      No wav files found – skipping transcript step."
   elif [[ "$opt_asr" == "true" ]]; then
     # --- ASR path (whisper-cli) ---------------------------------------------
-    local model="$HOME/models/ggml-large-v3.bin"
-    if ! command -v whisper-cli >/dev/null 2>&1; then
-      echo "      TODO: whisper-cli is not installed."
-      echo "      Install steps (see dotfiles runbook for full details):"
-      echo "        1. Install NVIDIA driver: sudo dnf install akmod-nvidia xorg-x11-drv-nvidia-cuda"
-      echo "        2. Build whisper.cpp with CUDA: cd ~/tools/whisper.cpp && make GGML_CUDA=1"
-      echo "        3. Install: sudo cp build/bin/whisper-cli /usr/local/bin/whisper-cli"
-      echo "        4. Download model: bash models/download-ggml-model.sh large-v3"
-      echo "        5. mkdir -p ~/models && cp models/ggml-large-v3.bin ~/models/"
-      echo "      Falling back to manual-placeholder mode for now."
-      opt_asr="false"
-    elif [[ ! -f "$model" ]]; then
-      echo "      TODO: model not found at $model"
-      echo "      Run: bash ~/tools/whisper.cpp/models/download-ggml-model.sh large-v3"
-      echo "      Then: mkdir -p ~/models && cp ~/tools/whisper.cpp/models/ggml-large-v3.bin ~/models/"
-      echo "      Falling back to manual-placeholder mode for now."
-      opt_asr="false"
-    fi
+    local model="${AI_ASR_MODEL:-$HOME/models/ggml-large-v3.bin}"
+    if [[ "$opt_diarize" == "true" ]]; then
+      local hf_token="${HF_TOKEN:-${HUGGINGFACE_TOKEN:-}}"
+      local diarize_model="${AI_ASR_DIARIZE_MODEL:-large-v3}"
+      local diarize_device="${AI_ASR_DEVICE:-cuda}"
+      local diarize_batch_size="${AI_ASR_BATCH_SIZE:-8}"
+      local diarize_json_files=()
 
-    if [[ "$opt_asr" == "true" ]]; then
+      ensure_speaker_roster_template "$speaker_roster_file"
+
+      if ! command -v whisperx >/dev/null 2>&1; then
+        echo "error: whisperx is not installed." >&2
+        echo "       Install it first, or rerun without --diarize." >&2
+        echo "       Suggested setup path: bash ~/dotfiles/install-fedora-dev.sh --with-whisperx-diarization" >&2
+        return 1
+      fi
+      if [[ -z "$hf_token" ]]; then
+        echo "error: HF_TOKEN is required for diarization mode." >&2
+        echo "       Export HF_TOKEN and accept pyannote model terms on Hugging Face." >&2
+        echo "       Fallback: rerun without --diarize." >&2
+        return 1
+      fi
+
       for wav in "${wav_files[@]}"; do
         local txt="${wav%.wav}.txt"
+        local json="${wav%.wav}.json"
+        if transcript_is_legacy_placeholder "$txt"; then
+          : > "$txt"
+          echo "      Reset legacy placeholder: $(basename "$txt")"
+        fi
+        if transcript_is_real "$txt" && [[ "$opt_overwrite" != "true" ]]; then
+          echo "      Skip existing: $(basename "$txt")"
+          continue
+        fi
+        echo "      Diarizing+Transcribing: $(basename "$wav")"
+        whisperx "$wav" \
+          --model "$diarize_model" \
+          --output_format json \
+          --output_dir "$(dirname "$wav")" \
+          --diarize \
+          --hf_token "$hf_token" \
+          --device "$diarize_device" \
+          --batch_size "$diarize_batch_size"
+        if [[ -f "$json" ]]; then
+          diarize_json_files+=("$json")
+          format_whisperx_json_to_timestamped_txt "$json" "$txt"
+        else
+          echo "error: whisperx output missing JSON file: $json" >&2
+          return 1
+        fi
+        apply_speaker_alias_map_to_transcript "$speaker_map_file" "$txt"
+        echo "      Created: $(basename "$txt")"
+      done
+
+      if [[ ${#diarize_json_files[@]} -gt 0 ]]; then
+        refresh_speaker_map_and_stats \
+          "$speaker_roster_file" \
+          "$speaker_map_file" \
+          "$speaker_stats_file" \
+          "${diarize_json_files[@]}"
+        for wav in "${wav_files[@]}"; do
+          apply_speaker_alias_map_to_transcript "$speaker_map_file" "${wav%.wav}.txt"
+        done
+        echo "      Speaker map: $(basename "$speaker_map_file")"
+        echo "      Speaker stats: $(basename "$speaker_stats_file")"
+      fi
+    elif ! command -v whisper-cli >/dev/null 2>&1; then
+      echo "error: whisper-cli is not installed." >&2
+      echo "       Install it first, or rerun with --manual-transcripts." >&2
+      echo "       Suggested setup path: bash ~/dotfiles/install-fedora-dev.sh" >&2
+      return 1
+    elif [[ ! -f "$model" ]]; then
+      echo "error: whisper model not found at: $model" >&2
+      echo "       Set AI_ASR_MODEL or install the default model first." >&2
+      echo "       Example: AI_ASR_MODEL=/mnt/data/models/whisper/ggml-large-v3.bin" >&2
+      echo "       You can also rerun with --manual-transcripts." >&2
+      return 1
+    fi
+
+    if [[ "$opt_diarize" != "true" ]]; then
+      for wav in "${wav_files[@]}"; do
+        local txt="${wav%.wav}.txt"
+        local srt="${wav%.wav}.srt"
         if transcript_is_legacy_placeholder "$txt"; then
           : > "$txt"
           echo "      Reset legacy placeholder: $(basename "$txt")"
@@ -963,7 +1332,10 @@ EOF
           continue
         fi
         echo "      Transcribing: $(basename "$wav")"
-        whisper-cli -m "$model" -f "$wav" -of "${wav%.wav}" -l auto
+        whisper-cli -m "$model" -f "$wav" -of "${wav%.wav}" -l auto -osrt
+        if [[ -f "$srt" ]]; then
+          format_whisper_srt_to_timestamped_txt "$srt" "$txt"
+        fi
         echo "      Created: $(basename "$txt")"
       done
     fi
@@ -973,7 +1345,7 @@ EOF
     done
   fi
 
-  # manual-placeholder mode (also the fallback when ASR is requested but unavailable)
+  # manual-placeholder mode
   if [[ "$opt_asr" == "false" ]]; then
     local placeholder_count=0
     for wav in "${wav_files[@]}"; do

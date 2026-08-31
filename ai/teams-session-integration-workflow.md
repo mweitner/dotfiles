@@ -215,19 +215,60 @@ ffmpeg -i part01-remote.wav -i part01-mic.wav \
 
 ## Step 4: Transcribe Each Part
 
-### Option A: Local whisper.cpp (automated, offline)
+### Option A: Local whisper.cpp (default automated mode, offline)
 
 **Prerequisite:** see [ASR Setup: whisper.cpp with GPU acceleration](#asr-setup-whispercpp-with-gpu-acceleration) below.
 
 ```bash
 for f in "$SESSION_DIR"/*.wav; do
-  whisper-cli -m "$HOME/models/ggml-large-v3.bin" -f "$f" -of "${f%.wav}"
+  whisper-cli -m "$HOME/models/ggml-large-v3.bin" -f "$f" -of "${f%.wav}" -osrt
 done
+
+# Convert SRT-style timestamps to line-based transcript format used in minutes
+# workflows:
+# [hh:mm:ss][speaker-unknown] text
+
+For speaker-aware output, use the session manager diarization mode:
+
+```bash
+export HF_TOKEN="<your-huggingface-token>"
+export AI_ASR_MODEL="/mnt/data/models/whisper/ggml-large-v3.bin"
+~/dotfiles/ai/ai-session-manager.sh create-minutes --diarize --overwrite
 ```
 
-### Option B: Gemini web prompt (manual, no setup required)
+Best-practice flow for stable speaker aliases:
 
-Use this until whisper.cpp is installed. Steps:
+1. Before first run, edit roster file in the session folder:
+  `<project>-<session>-speaker-roster.tsv`
+2. Run diarization once (`--diarize`) to detect speakers and create:
+
+- `<project>-<session>-speaker-map.tsv`
+- `<project>-<session>-speaker-stats.md`
+
+3. Map detected speakers (for example `speaker00`) to aliases (for example
+  `short-unique-name1`, `short-unique-name2`) in the speaker-map file.
+
+Roster format example:
+
+```text
+# alias<TAB>display_name<TAB>role
+short-unique-name1\tfull-name1\tname1-context1, name1-context2
+short-unique-name2\tfull-name2\tname2-context1, name2-context2
+```
+
+4. Rerun `update-minutes --diarize` to re-apply alias mapping and refresh
+  merged transcripts/minutes.
+
+In diarization mode, transcript lines are normalized to:
+
+```text
+[hh:mm:ss][speaker-a] spoken text
+
+```
+
+### Option B: Manual fallback (Gemini/ChatGPT/other)
+
+Use this only when ASR tooling is unavailable. Steps:
 
 1. Open [aistudio.google.com](https://aistudio.google.com) or Gemini Advanced.
 2. Attach the `.wav` file(s) from the session folder directly.
@@ -413,9 +454,9 @@ whisper-cli -m ~/models/ggml-large-v3.bin -f <some-test.wav> -of /tmp/test-out
 cat /tmp/test-out.txt
 ```
 
-Priority 4: Add whisper-cli to install-fedora.sh
+Priority 4: Add whisper-cli to install-fedora-dev.sh
 
-Add a section under `# AI tooling` in `~/dotfiles/install-fedora.sh`:
+Add a section under `# AI tooling` in `~/dotfiles/install-fedora-dev.sh`:
 
 ```bash
 # whisper.cpp - local ASR for meeting transcript generation

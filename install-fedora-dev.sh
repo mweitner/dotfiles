@@ -26,13 +26,15 @@ set -euo pipefail
 # - [Microsoft Build 2026 Day 2 LIVE | GitHub Copilot, VS Code, and more](https://www.youtube.com/live/xDXnWL-Mmz0)
 VSCODE_VERSION="${VSCODE_VERSION:-1.124.2}"
 SKIP_MQTT_TOOLS=false
+WITH_WHISPERX_DIARIZATION=false
 
 for arg in "$@"; do
   case "$arg" in
     --skip-mqtt-tools) SKIP_MQTT_TOOLS=true ;;
+    --with-whisperx-diarization) WITH_WHISPERX_DIARIZATION=true ;;
     --latest) VSCODE_VERSION="" ;;
     *)
-      echo "WARN: unknown argument '$arg' (supported: --skip-mqtt-tools, --latest); ignoring."
+      echo "WARN: unknown argument '$arg' (supported: --skip-mqtt-tools, --with-whisperx-diarization, --latest); ignoring."
       ;;
   esac
 done
@@ -322,6 +324,73 @@ else
   echo ""
   echo "── Dev: MQTT tooling (skipped) ─────────────────────────────────────────"
   echo "INFO: Skipping mosquitto/mosquitto-clients/MQTT Explorer AppImage (--skip-mqtt-tools)."
+fi
+
+echo ""
+echo "── Dev: AI transcription tooling (whisper.cpp) ───────────────────────"
+
+sudo dnf install -y ffmpeg cmake gcc-c++
+
+if [[ ! -d "$HOME/tools/whisper.cpp/.git" ]]; then
+  git clone https://github.com/ggerganov/whisper.cpp "$HOME/tools/whisper.cpp"
+else
+  git -C "$HOME/tools/whisper.cpp" pull --ff-only || true
+fi
+
+if command -v nvidia-smi >/dev/null 2>&1; then
+  (cd "$HOME/tools/whisper.cpp" && make GGML_CUDA=1)
+else
+  (cd "$HOME/tools/whisper.cpp" && make)
+fi
+
+if [[ -x "$HOME/tools/whisper.cpp/build/bin/whisper-cli" ]]; then
+  sudo install -m 0755 "$HOME/tools/whisper.cpp/build/bin/whisper-cli" /usr/local/bin/whisper-cli
+  echo "==> whisper-cli installed at /usr/local/bin/whisper-cli"
+else
+  echo "WARN: whisper-cli build artifact not found; skipping install."
+fi
+
+MODEL_ROOT="${AI_MODEL_ROOT:-/mnt/data/models/whisper}"
+MODEL_FILE="$MODEL_ROOT/ggml-large-v3.bin"
+mkdir -p "$MODEL_ROOT"
+
+if [[ ! -f "$MODEL_FILE" ]]; then
+  if [[ -x "$HOME/tools/whisper.cpp/models/download-ggml-model.sh" ]]; then
+    (cd "$HOME/tools/whisper.cpp" && bash models/download-ggml-model.sh large-v3)
+    if [[ -f "$HOME/tools/whisper.cpp/models/ggml-large-v3.bin" ]]; then
+      cp "$HOME/tools/whisper.cpp/models/ggml-large-v3.bin" "$MODEL_FILE"
+    fi
+  fi
+fi
+
+mkdir -p "$HOME/models"
+if [[ -f "$MODEL_FILE" ]]; then
+  ln -sfn "$MODEL_FILE" "$HOME/models/ggml-large-v3.bin"
+  echo "==> whisper model linked at ~/models/ggml-large-v3.bin"
+else
+  echo "WARN: whisper model not found at $MODEL_FILE"
+  echo "      Set AI_MODEL_ROOT or download manually with whisper.cpp script."
+fi
+
+if [[ "$WITH_WHISPERX_DIARIZATION" == true ]]; then
+  echo ""
+  echo "── Dev: WhisperX diarization tooling (optional) ───────────────────────"
+  if command -v uv >/dev/null 2>&1; then
+    uv tool install whisperx || {
+      echo "WARN: uv tool install whisperx failed."
+      echo "      Try: python3 -m pip install --user whisperx"
+    }
+  else
+    python3 -m pip install --user whisperx || {
+      echo "WARN: whisperx installation failed."
+      echo "      Install uv first, then rerun with --with-whisperx-diarization."
+    }
+  fi
+
+  echo "==> WhisperX setup notes:"
+  echo "    1) Export HF_TOKEN with your Hugging Face access token."
+  echo "    2) Accept pyannote model terms on Hugging Face."
+  echo "    3) Use in session manager: ai-session-manager.sh create-minutes --diarize"
 fi
 
 echo ""
