@@ -375,10 +375,25 @@ fi
 if [[ "$WITH_WHISPERX_DIARIZATION" == true ]]; then
   echo ""
   echo "── Dev: WhisperX diarization tooling (optional) ───────────────────────"
+  export PATH="$HOME/.local/bin:$PATH"
+  WHISPERX_PYTHON="${WHISPERX_PYTHON:-3.11}"
+
+  if ! command -v uv >/dev/null 2>&1; then
+    if curl -fsSL https://astral.sh/uv/install.sh | sh; then
+      export PATH="$HOME/.local/bin:$PATH"
+    else
+      echo "WARN: uv is required for the WhisperX sandbox. Install it manually first."
+    fi
+  fi
+
   if command -v uv >/dev/null 2>&1; then
-    uv tool install whisperx || {
-      echo "WARN: uv tool install whisperx failed."
-      echo "      Try: python3 -m pip install --user whisperx"
+    uv tool install --python "$WHISPERX_PYTHON" whisperx || {
+      echo "WARN: uv tool install whisperx with Python $WHISPERX_PYTHON failed."
+      echo "      Falling back to user-site pip install."
+      python3 -m pip install --user whisperx || {
+        echo "WARN: whisperx installation failed in both uv and pip paths."
+        echo "      Install uv first and rerun with --with-whisperx-diarization."
+      }
     }
   else
     python3 -m pip install --user whisperx || {
@@ -387,10 +402,46 @@ if [[ "$WITH_WHISPERX_DIARIZATION" == true ]]; then
     }
   fi
 
+  if ! command -v huggingface-cli >/dev/null 2>&1; then
+    if command -v uv >/dev/null 2>&1; then
+      uv tool install --python "$WHISPERX_PYTHON" "huggingface_hub[cli]" || {
+        echo "WARN: huggingface_hub[cli] install failed via uv tool."
+      }
+    fi
+  fi
+
+  if command -v huggingface-cli >/dev/null 2>&1; then
+    echo "==> huggingface-cli is available: $(command -v huggingface-cli)"
+  else
+    echo "==> huggingface-cli not found in PATH yet; install via: uv tool install --python 3.11 \"huggingface_hub[cli]\""
+  fi
+
+  NAS_HF_ROOT="/mnt/data/huggingface"
+  mkdir -p "$NAS_HF_ROOT/hub" "$NAS_HF_ROOT/transformers"
+  export HF_HOME="$NAS_HF_ROOT"
+  export HF_HUB_CACHE="$NAS_HF_ROOT/hub"
+  export HUGGINGFACE_HUB_CACHE="$NAS_HF_ROOT/hub"
+  export TRANSFORMERS_CACHE="$NAS_HF_ROOT/transformers"
+  export HF_HUB_DISABLE_SYMLINKS=1
+  export HF_HUB_DISABLE_SYMLINKS_WARNING=1
+  echo "==> WhisperX model cache path: $NAS_HF_ROOT"
+  echo "==> WhisperX model cache mode: no symlinks (NAS-compatible)"
+
+  if command -v whisperx >/dev/null 2>&1; then
+    echo "==> whisperx is available on PATH: $(command -v whisperx)"
+  elif [[ -x "$HOME/.local/bin/whisperx" ]]; then
+    echo "==> whisperx is available in the uv tool sandbox: $HOME/.local/bin/whisperx"
+  else
+    echo "WARN: whisperx CLI still not available in PATH after installation."
+    echo "      The uv tool sandbox should be available at: $HOME/.local/bin/whisperx"
+  fi
+
   echo "==> WhisperX setup notes:"
   echo "    1) Export HF_TOKEN with your Hugging Face access token."
   echo "    2) Accept pyannote model terms on Hugging Face."
   echo "    3) Use in session manager: ai-session-manager.sh create-minutes --diarize"
+  echo "    4) The dedicated sandbox is managed by uv and lives under ~/.local/bin."
+  echo "    5) Place all cacheable Hugging Face assets under /mnt/data/huggingface."
 fi
 
 echo ""

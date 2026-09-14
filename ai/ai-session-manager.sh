@@ -48,6 +48,8 @@ Environment:
   AI_ASR_MODEL                    Whisper model path (default: ~/models/ggml-large-v3.bin)
   AI_ASR_SPEAKER_LABEL            Speaker label for ASR transcript lines
                                   (default: speaker-unknown)
+  AI_WHISPERX_BIN                 Explicit path to whisperx CLI; useful for uv tool sandbox
+  AI_WHISPERX_PYTHON              Python version used by the uv WhisperX sandbox (default: 3.11)
   HF_TOKEN                        Hugging Face token for diarization models (WhisperX)
   AI_ASR_DIARIZE_MODEL            WhisperX model name (default: large-v3)
   AI_ASR_DEVICE                   ASR device for WhisperX (default: cuda)
@@ -69,6 +71,14 @@ Examples:
   ai-session-manager.sh screencast start
   ai-session-manager.sh screencast next
   AI_PROJECT=myproject AI_SESSION=teams-sync-2 ai-session-manager.sh screencast start
+
+Validated real-world example:
+  AI_PROJECT=les-ems-pilot-ecocoach \
+  AI_SESSION=2026.08.27-technical-deep-dive \
+  AI_ASR_MODEL=/home/ldcwem0/tools/whisper.cpp/models/ggml-large-v3.bin \
+  ai-session-manager.sh create-minutes \
+    --title "LES EMS Ecocoach technical deep dive" \
+    --owner TBD --date 2026-08-27 --overwrite
 EOF
 }
 
@@ -951,14 +961,22 @@ PY
         dur = 0.0
       totals[spk] += dur
 
+  roster_order = list(roster.keys())
   all_speakers = sorted(totals.keys())
 
-  for spk in all_speakers:
-    mapping.setdefault(spk, "")
+  # Prefer any user-supplied map entries, but when the map is empty or stale,
+  # fall back to the roster order so diarized IDs resolve to known aliases.
+  for idx, spk in enumerate(all_speakers):
+    current = (mapping.get(spk) or "").strip()
+    if not current:
+      if roster_order:
+        mapping[spk] = roster_order[min(idx, len(roster_order) - 1)]
+      else:
+        mapping[spk] = ""
 
   lines = [
     "# detected_speaker<TAB>alias",
-    "# Fill alias from roster. Keep empty if unresolved.",
+    "# Aliases are auto-filled from the roster in stable order when blank.",
     "#",
     "# Available aliases from roster:",
   ]
@@ -1244,16 +1262,36 @@ PY
     if [[ "$opt_diarize" == "true" ]]; then
       local hf_token="${HF_TOKEN:-${HUGGINGFACE_TOKEN:-}}"
       local diarize_model="${AI_ASR_DIARIZE_MODEL:-large-v3}"
-      local diarize_device="${AI_ASR_DEVICE:-cuda}"
+      local diarize_device="${AI_ASR_DEVICE:-}"
+      if [[ -z "$diarize_device" ]]; then
+        if command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; then
+          diarize_device="cuda"
+        else
+          diarize_device="cpu"
+        fi
+      fi
       local diarize_batch_size="${AI_ASR_BATCH_SIZE:-8}"
       local diarize_json_files=()
+      local whisperx_bin="${AI_WHISPERX_BIN:-}"
 
       ensure_speaker_roster_template "$speaker_roster_file"
 
-      if ! command -v whisperx >/dev/null 2>&1; then
+      if [[ -n "$whisperx_bin" ]]; then
+        if [[ ! -x "$whisperx_bin" && "$whisperx_bin" != "whisperx" ]]; then
+          echo "error: AI_WHISPERX_BIN points to a non-existent executable: $whisperx_bin" >&2
+          return 1
+        fi
+      elif command -v whisperx >/dev/null 2>&1; then
+        whisperx_bin="whisperx"
+      elif [[ -x "$HOME/.local/bin/whisperx" ]]; then
+        whisperx_bin="$HOME/.local/bin/whisperx"
+      fi
+
+      if [[ -z "$whisperx_bin" ]]; then
         echo "error: whisperx is not installed." >&2
         echo "       Install it first, or rerun without --diarize." >&2
         echo "       Suggested setup path: bash ~/dotfiles/install-fedora-dev.sh --with-whisperx-diarization" >&2
+        echo "       Or use: AI_WHISPERX_BIN=~/.local/bin/whisperx ai-session-manager.sh create-minutes --diarize" >&2
         return 1
       fi
       if [[ -z "$hf_token" ]]; then
@@ -1261,6 +1299,23 @@ PY
         echo "       Export HF_TOKEN and accept pyannote model terms on Hugging Face." >&2
         echo "       Fallback: rerun without --diarize." >&2
         return 1
+      fi
+
+      local system_ca_bundle=""
+      for candidate in \
+        /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem \
+        /etc/ssl/certs/ca-certificates.crt \
+        /etc/ssl/cert.pem; do
+        if [[ -f "$candidate" ]]; then
+          system_ca_bundle="$candidate"
+          break
+        fi
+      done
+
+      if [[ -n "$system_ca_bundle" ]]; then
+        export SSL_CERT_FILE="$system_ca_bundle"
+        export REQUESTS_CA_BUNDLE="$system_ca_bundle"
+        export CURL_CA_BUNDLE="$system_ca_bundle"
       fi
 
       for wav in "${wav_files[@]}"; do
@@ -1275,14 +1330,25 @@ PY
           continue
         fi
         echo "      Diarizing+Transcribing: $(basename "$wav")"
-        whisperx "$wav" \
-          --model "$diarize_model" \
-          --output_format json \
-          --output_dir "$(dirname "$wav")" \
-          --diarize \
-          --hf_token "$hf_token" \
-          --device "$diarize_device" \
-          --batch_size "$diarize_batch_size"
+        if [[ "$whisperx_bin" == "whisperx" ]]; then
+          whisperx "$wav" \
+            --model "$diarize_model" \
+            --output_format json \
+            --output_dir "$(dirname "$wav")" \
+            --diarize \
+            --hf_token "$hf_token" \
+            --device "$diarize_device" \
+            --batch_size "$diarize_batch_size"
+        else
+          "$whisperx_bin" "$wav" \
+            --model "$diarize_model" \
+            --output_format json \
+            --output_dir "$(dirname "$wav")" \
+            --diarize \
+            --hf_token "$hf_token" \
+            --device "$diarize_device" \
+            --batch_size "$diarize_batch_size"
+        fi
         if [[ -f "$json" ]]; then
           diarize_json_files+=("$json")
           format_whisperx_json_to_timestamped_txt "$json" "$txt"
@@ -1422,14 +1488,15 @@ PY
   fi
 
   if [[ ${#txt_files[@]} -eq 0 ]]; then
-    echo "      No transcript files found – skipping merge."
+    rm -f "$merged_transcript"
+    echo "      No transcript files found – skipped merge and removed stale output."
   elif [[ $real_transcripts -eq 0 ]]; then
     : > "$merged_transcript"
     echo "      All transcript files are empty placeholders – created empty merged transcript."
     echo "      Fill transcripts, then rerun: ai-session-manager.sh update-minutes"
   else
     echo "      Merging $real_transcripts real transcript(s) of ${#txt_files[@]} total."
-    : > "$merged_transcript"
+    rm -f "$merged_transcript"
     for t in "${txt_files[@]}"; do
       {
         echo
