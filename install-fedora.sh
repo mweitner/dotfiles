@@ -616,6 +616,7 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/yocto/llp_docker_shell.sh" ]] && ln -sf "$HOME/.local/bin/llp_docker_shell.sh" "$HOME/.local/bin/llp_lpo_docker_shell.sh" 2>/dev/null || true
   [[ -f "$DOTFILES/shell/yocto/llp_apply_hostfixes.sh" ]] && ln -sf "$DOTFILES/shell/yocto/llp_apply_hostfixes.sh" "$HOME/.local/bin/llp_apply_hostfixes.sh"
   [[ -f "$DOTFILES/shell/setup-docker-fedora-native.sh" ]] && ln -sf "$DOTFILES/shell/setup-docker-fedora-native.sh" "$HOME/.local/bin/setup-docker-fedora-native"
+  [[ -f "$DOTFILES/shell/software-enginnering/setup-workspace-profile.sh" ]] && ln -sf "$DOTFILES/shell/software-enginnering/setup-workspace-profile.sh" "$HOME/.local/bin/setup-workspace-profile"
 
   # Monitor layout scripts (sway display mode bindings + waybar status module)
   [[ -f "$DOTFILES/shell/monitor-home-office"     ]] && ln -sf "$DOTFILES/shell/monitor-home-office"     "$HOME/.local/bin/monitor-home-office"
