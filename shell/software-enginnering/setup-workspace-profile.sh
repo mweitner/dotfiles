@@ -14,6 +14,9 @@ ROOT_DIR=""
 DRY_RUN="false"
 CLONE_TIMEOUT_SECONDS="0"
 WORKSPACE_CLONED="false"
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "${SCRIPT_PATH}")" && pwd)"
+PROFILE_SCHEMA_FILE="${SCRIPT_DIR}/setup-workspace-profile.schema.json"
 
 usage() {
 cat <<'EOF'
@@ -39,6 +42,7 @@ Options:
   --workspace-repo-url URL   Super-project git remote used only in init command.
   --workspace-branch BRANCH  Optional branch used when cloning --workspace-repo-url.
   --profile-file PATH        Profile file path (absolute or relative to --workspace-root).
+                             Validated against setup-workspace-profile.schema.json.
   --dry-run                  Show planned actions without writing files, creating directories, or cloning.
   --clone-timeout SECONDS    Timeout per git clone operation. Use 0 to disable timeout.
   --root-dir PATH            Root directory used for <root_dir> placeholders in profile paths.
@@ -54,6 +58,130 @@ workspace_dir_name_from_url() {
     name="workspace"
   fi
   printf '%s\n' "${name}"
+}
+
+validate_profile_schema() {
+  local schema_file="$1"
+  local instance_file="$2"
+
+  if [[ ! -f "${schema_file}" ]]; then
+  echo "Missing profile schema file: ${schema_file}" >&2
+  exit 1
+  fi
+
+  python3 - "${schema_file}" "${instance_file}" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+schema_path = Path(sys.argv[1])
+instance_path = Path(sys.argv[2])
+
+with schema_path.open("r", encoding="utf-8") as handle:
+  schema = json.load(handle)
+with instance_path.open("r", encoding="utf-8") as handle:
+  instance = json.load(handle)
+
+errors: list[str] = []
+
+
+def type_matches(expected, value):
+  if isinstance(expected, list):
+    return any(type_matches(item, value) for item in expected)
+  if expected == "object":
+    return isinstance(value, dict)
+  if expected == "array":
+    return isinstance(value, list)
+  if expected == "string":
+    return isinstance(value, str)
+  if expected == "boolean":
+    return isinstance(value, bool)
+  if expected == "integer":
+    return isinstance(value, int) and not isinstance(value, bool)
+  if expected == "number":
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+  if expected == "null":
+    return value is None
+  return True
+
+
+def validate(subschema, value, path):
+  expected_type = subschema.get("type")
+  if expected_type is not None and not type_matches(expected_type, value):
+    errors.append(f"{path}: expected type {expected_type!r}")
+    return
+
+  if "enum" in subschema and value not in subschema["enum"]:
+    errors.append(f"{path}: value {value!r} is not in enum {subschema['enum']!r}")
+
+  if "const" in subschema and value != subschema["const"]:
+    errors.append(f"{path}: value {value!r} does not match const {subschema['const']!r}")
+
+  if isinstance(value, str):
+    if "minLength" in subschema and len(value) < subschema["minLength"]:
+      errors.append(f"{path}: string shorter than minLength {subschema['minLength']}")
+    if "maxLength" in subschema and len(value) > subschema["maxLength"]:
+      errors.append(f"{path}: string longer than maxLength {subschema['maxLength']}")
+    if "pattern" in subschema and re.fullmatch(subschema["pattern"], value) is None:
+      errors.append(f"{path}: value {value!r} does not match pattern {subschema['pattern']!r}")
+
+  if isinstance(value, list):
+    if "minItems" in subschema and len(value) < subschema["minItems"]:
+      errors.append(f"{path}: array shorter than minItems {subschema['minItems']}")
+    items = subschema.get("items")
+    if isinstance(items, dict):
+      for index, item in enumerate(value):
+        validate(items, item, f"{path}[{index}]")
+
+  if isinstance(value, dict):
+    properties = subschema.get("properties", {})
+    required = subschema.get("required", [])
+    for key in required:
+      if key not in value:
+        errors.append(f"{path}: missing required property {key!r}")
+
+    conditional_rules = subschema.get("allOf", [])
+    if isinstance(conditional_rules, list):
+      for rule in conditional_rules:
+        if not isinstance(rule, dict):
+          continue
+        if_schema = rule.get("if")
+        then_schema = rule.get("then")
+        if not isinstance(if_schema, dict) or not isinstance(then_schema, dict):
+          continue
+
+        condition_met = True
+        if_properties = if_schema.get("properties", {})
+        for key, condition_schema in if_properties.items():
+          if key not in value:
+            condition_met = False
+            break
+          if isinstance(condition_schema, dict) and "const" in condition_schema:
+            if value[key] != condition_schema["const"]:
+              condition_met = False
+              break
+
+        if condition_met:
+          validate(then_schema, value, path)
+
+    if subschema.get("additionalProperties") is False:
+      allowed_keys = set(properties.keys())
+      for key in value.keys():
+        if key not in allowed_keys:
+          errors.append(f"{path}: unexpected property {key!r}")
+    for key, child_schema in properties.items():
+      if key in value:
+        validate(child_schema, value[key], f"{path}.{key}")
+
+
+validate(schema, instance, "$")
+
+if errors:
+  for error in errors:
+    print(error, file=sys.stderr)
+  sys.exit(1)
+PY
 }
 
 bootstrap_workspace_repo() {
@@ -456,6 +584,8 @@ if [[ ! -f "${PROFILE_FILE}" ]]; then
   echo "Profile file not found: ${PROFILE_FILE}" >&2
   exit 1
 fi
+
+validate_profile_schema "${PROFILE_SCHEMA_FILE}" "${PROFILE_FILE}"
 
 PROFILE_NAME="$(jq -r '.profile // empty' "${PROFILE_FILE}")"
 if [[ -z "${PROFILE_NAME}" ]]; then

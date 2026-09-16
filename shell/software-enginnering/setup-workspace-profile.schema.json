@@ -1,0 +1,183 @@
+{
+  "$id": "https://example.invalid/setup-workspace-profile.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "description": {
+      "type": "string"
+    },
+    "profile": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "projects": {
+      "items": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "scope": {
+                  "const": "public"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "path": {
+                  "pattern": "^(?!/)(?!.*<root_dir>)(?!.*<user_home>).+$"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "scope": {
+                  "const": "private"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "path": {
+                  "pattern": "^(?!/)(?!.*<root_dir>)(?!.*<user_home>).+$"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "scope": {
+                  "const": "public-external"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "path": {
+                  "pattern": "^(?:/|<root_dir>/|<user_home>/).+$"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "scope": {
+                  "const": "private-external"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "path": {
+                  "pattern": "^(?:/|<root_dir>/|<user_home>/).+$"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "scope": {
+                  "const": "public"
+                },
+                "type": {
+                  "const": "repo"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "clone_url"
+              ]
+            }
+          }
+        ],
+        "properties": {
+          "checkout_branch": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "clone_url": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "scope": {
+            "enum": [
+              "public",
+              "public-external",
+              "private",
+              "private-external"
+            ],
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "repo",
+              "dir",
+              "yocto"
+            ],
+            "type": "string"
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "name",
+          "path",
+          "scope",
+          "visible"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "setup": {
+      "additionalProperties": false,
+      "properties": {
+        "ensure_project_paths": {
+          "type": "boolean"
+        },
+        "manage_submodules": {
+          "type": "boolean"
+        },
+        "workspace_template": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "manage_submodules",
+        "ensure_project_paths",
+        "workspace_template"
+      ],
+      "type": "object"
+    },
+    "workspace_name": {
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._-]+$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "profile",
+    "projects",
+    "setup"
+  ],
+  "title": "Workspace profile schema for setup-workspace-profile",
+  "type": "object"
+}
