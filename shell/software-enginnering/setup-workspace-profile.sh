@@ -623,6 +623,7 @@ case "${MODE}" in
     REGENERATE_WORKSPACE_FILE="true"
     SYNC_PROJECT_PATHS="true"
     SYNC_VISIBLE_FOLDERS="true"
+    SYNC_SUBMODULES="true"
     ;;
   sync)
     REGENERATE_WORKSPACE_FILE="true"
@@ -778,6 +779,10 @@ while IFS=$'\t' read -r project_name project_type project_scope project_path_raw
     continue
   fi
 
+  if [[ "${MODE}" == "init" ]]; then
+    continue
+  fi
+
   if [[ "${ENABLE_GIT_SYNC}" != "true" ]]; then
     CLONE_PENDING_LINES+="- ${project_name}: ${project_path_raw} -> ${clone_url}"$'\n'
     CLONE_PENDING_COUNT=$((CLONE_PENDING_COUNT + 1))
@@ -860,6 +865,10 @@ done < <(
 if [[ "${MODE}" == "status" ]]; then
   META_COMMAND="$(jq -r '.command // "unknown"' "${SUPER_PROJECT_META_FILE}")"
   META_GENERATED_AT="$(jq -r '.generated_at_utc // "unknown"' "${SUPER_PROJECT_META_FILE}")"
+  STATUS_PENDING_SYNC="false"
+  if [[ "${META_COMMAND}" == "init" ]]; then
+    STATUS_PENDING_SYNC="true"
+  fi
   WORKSPACE_GIT_REPO="false"
   if git -C "${WORKSPACE_ROOT}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     WORKSPACE_GIT_REPO="true"
@@ -871,6 +880,7 @@ if [[ "${MODE}" == "status" ]]; then
 cat <<EOF
 Super-project status.
 Profile: ${PROFILE_NAME}
+Workspace name: ${WORKSPACE_NAME}
 Command: ${MODE}
 Last setup command: ${META_COMMAND}
 Last setup timestamp (UTC): ${META_GENERATED_AT}
@@ -907,39 +917,50 @@ Notes:
 EOF
 fi
 
-if [[ -n "${CLONE_PENDING_LINES}" ]]; then
+if [[ ( "${MODE}" == "status" && "${STATUS_PENDING_SYNC:-false}" == "true" ) && -n "${CLONE_PENDING_LINES}" ]]; then
+cat <<EOF
+Public repositories pending sync in this target root:
+${CLONE_PENDING_LINES}
+EOF
+elif [[ "${MODE}" != "init" && -n "${CLONE_PENDING_LINES}" ]]; then
 cat <<EOF
 Public repositories still pending clone in this target root:
 ${CLONE_PENDING_LINES}
 EOF
 fi
 
-if [[ -n "${CLONE_DONE_LINES}" ]]; then
+if [[ "${MODE}" != "init" && -n "${CLONE_DONE_LINES}" ]]; then
 cat <<EOF
 Auto-cloned public repositories:
 ${CLONE_DONE_LINES}
 EOF
 fi
 
-if [[ -n "${CLONE_PRESENT_LINES}" ]]; then
+if [[ "${MODE}" != "init" && -n "${CLONE_PRESENT_LINES}" ]]; then
 cat <<EOF
 Public repositories already present:
 ${CLONE_PRESENT_LINES}
 EOF
 fi
 
-if [[ -n "${CLONE_SKIPPED_LINES}" ]]; then
+if [[ "${MODE}" != "init" && -n "${CLONE_SKIPPED_LINES}" ]]; then
 cat <<EOF
 Auto-clone skipped:
 ${CLONE_SKIPPED_LINES}
 EOF
 fi
 
-if [[ -n "${CLONE_FAILED_LINES}" ]]; then
+if [[ "${MODE}" != "init" && -n "${CLONE_FAILED_LINES}" ]]; then
 cat <<EOF
 Auto-clone failed:
 ${CLONE_FAILED_LINES}
 EOF
 fi
 
-echo "Clone summary: considered=${CLONE_CONSIDERED_COUNT} present=${CLONE_PRESENT_COUNT} cloned=${CLONE_DONE_COUNT} pending=${CLONE_PENDING_COUNT} skipped=${CLONE_SKIPPED_COUNT} failed=${CLONE_FAILED_COUNT}"
+if [[ "${MODE}" == "init" ]]; then
+  echo "Public repo cloning is deferred to sync."
+elif [[ "${MODE}" == "status" && "${STATUS_PENDING_SYNC:-false}" == "true" ]]; then
+  echo "Sync backlog summary: considered=${CLONE_CONSIDERED_COUNT} present=${CLONE_PRESENT_COUNT} pending_sync=${CLONE_PENDING_COUNT} skipped=${CLONE_SKIPPED_COUNT} failed=${CLONE_FAILED_COUNT}"
+else
+  echo "Clone summary: considered=${CLONE_CONSIDERED_COUNT} present=${CLONE_PRESENT_COUNT} cloned=${CLONE_DONE_COUNT} pending=${CLONE_PENDING_COUNT} skipped=${CLONE_SKIPPED_COUNT} failed=${CLONE_FAILED_COUNT}"
+fi
