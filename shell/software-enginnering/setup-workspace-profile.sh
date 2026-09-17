@@ -288,7 +288,6 @@ ensure_super_project_meta() {
     --arg source_root "${WORKSPACE_ROOT}" \
     --arg target_root "${TARGET_ROOT}" \
     --arg profile_file "${PROFILE_FILE}" \
-    --arg template_file "${TEMPLATE}" \
     --arg workspace_repo_url "${WORKSPACE_REPO_URL}" \
     --arg workspace_branch "${WORKSPACE_BRANCH}" \
     --arg root_dir "${ROOT_DIR}" \
@@ -303,7 +302,6 @@ ensure_super_project_meta() {
       source_root: $source_root,
       target_root: $target_root,
       profile_file: $profile_file,
-      template_file: $template_file,
       workspace_repo_url: $workspace_repo_url,
       workspace_branch: $workspace_branch,
       root_dir: $root_dir,
@@ -375,6 +373,270 @@ expand_project_path() {
   expanded="${expanded//<root_dir>/${ROOT_DIR}}"
   expanded="${expanded//<user_home>/\/home\/${USER_NAME}}"
   resolve_path "${TARGET_ROOT}" "${expanded}"
+}
+
+workspace_json_update() {
+  local file_path="$1"
+  local jq_filter="$2"
+  shift 2
+
+  local tmp_file
+  tmp_file="$(mktemp)"
+  jq "$jq_filter" "$@" "${file_path}" > "${tmp_file}"
+  mv "${tmp_file}" "${file_path}"
+}
+
+workspace_json_set_map_entry() {
+  local file_path="$1"
+  local setting_name="$2"
+  local pattern="$3"
+  local bool_value="$4"
+
+  workspace_json_update \
+    "${file_path}" \
+    '.settings[$setting_name] = (.settings[$setting_name] // {}) | .settings[$setting_name][$pattern] = $bool_value' \
+    --arg setting_name "${setting_name}" \
+    --arg pattern "${pattern}" \
+    --argjson bool_value "${bool_value}"
+}
+
+workspace_json_append_array_entry() {
+  local file_path="$1"
+  local setting_name="$2"
+  local pattern="$3"
+
+  workspace_json_update \
+    "${file_path}" \
+    '.settings[$setting_name] = (((.settings[$setting_name] // []) + [$pattern]) | unique)' \
+    --arg setting_name "${setting_name}" \
+    --arg pattern "${pattern}"
+}
+
+workspace_json_add_folder() {
+  local file_path="$1"
+  local folder_name="$2"
+  local folder_path="$3"
+
+  workspace_json_update \
+    "${file_path}" \
+    '.folders = ((.folders // []) | map(select(.name != $folder_name and .path != $folder_path)) + [{"name": $folder_name, "path": $folder_path}])' \
+    --arg folder_name "${folder_name}" \
+    --arg folder_path "${folder_path}"
+}
+
+project_exclude_glob_prefix() {
+  local project_name="$1"
+  local project_path_raw="$2"
+
+  if [[ "${project_path_raw}" == /* || "${project_path_raw}" == \<root_dir\>/* || "${project_path_raw}" == \<user_home\>/* ]]; then
+    printf '%s\n' "${project_name}"
+  else
+    printf '%s\n' "${project_path_raw}"
+  fi
+}
+
+project_full_exclude_glob() {
+  local project_name="$1"
+  local project_path_raw="$2"
+  local prefix=""
+
+  prefix="$(project_exclude_glob_prefix "${project_name}" "${project_path_raw}")"
+  printf '%s/**\n' "${prefix}"
+}
+
+add_yocto_workspace_excludes() {
+  local file_path="$1"
+  local project_path_raw="$2"
+
+  workspace_json_set_map_entry "${file_path}" "files.exclude" "${project_path_raw}/build" true
+  workspace_json_set_map_entry "${file_path}" "files.exclude" "${project_path_raw}/build-docker" true
+  workspace_json_set_map_entry "${file_path}" "files.exclude" "${project_path_raw}/**/tmp" true
+  workspace_json_set_map_entry "${file_path}" "files.exclude" "${project_path_raw}/**/cache" true
+  workspace_json_set_map_entry "${file_path}" "files.exclude" "${project_path_raw}/**/logs" true
+
+  if [[ "${project_path_raw}" == "linux-dps-scarthgap" ]]; then
+    workspace_json_set_map_entry "${file_path}" "files.exclude" "${project_path_raw}/build-docker/tmp/**" false
+  fi
+
+  workspace_json_set_map_entry "${file_path}" "search.exclude" "${project_path_raw}/build" true
+  workspace_json_set_map_entry "${file_path}" "search.exclude" "${project_path_raw}/build-docker" true
+  workspace_json_set_map_entry "${file_path}" "search.exclude" "${project_path_raw}/**/tmp" true
+  workspace_json_set_map_entry "${file_path}" "search.exclude" "${project_path_raw}/**/cache" true
+  workspace_json_set_map_entry "${file_path}" "search.exclude" "${project_path_raw}/**/logs" true
+
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/build/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/build-docker/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/**/tmp/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/**/cache/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/**/logs/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/**/sstate-control/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/**/sysroots/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/**/sysroots-components/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/**/work/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/**/work-shared/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/**/stamps/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/**/pkgdata/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/**/hosttools/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/**/deploy/**" true
+  workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${project_path_raw}/**/buildstats/**" true
+
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/build/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/build-docker/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/**/tmp/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/**/cache/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/**/logs/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/**/sstate-control/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/**/sysroots/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/**/sysroots-components/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/**/work/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/**/work-shared/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/**/stamps/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/**/pkgdata/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/**/hosttools/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/**/deploy/**"
+  workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${project_path_raw}/**/buildstats/**"
+}
+
+apply_project_workspace_settings() {
+  local file_path="$1"
+  local project_name="$2"
+  local project_type="$3"
+  local project_path_raw="$4"
+  local files_exclude="$5"
+  local search_exclude="$6"
+  local files_watcher_exclude="$7"
+  local python_analysis_exclude="$8"
+  local full_exclude_glob=""
+
+  if [[ "${project_type}" == "yocto" ]]; then
+    add_yocto_workspace_excludes "${file_path}" "${project_path_raw}"
+  fi
+
+  full_exclude_glob="$(project_full_exclude_glob "${project_name}" "${project_path_raw}")"
+
+  if [[ "${files_exclude}" == "true" ]]; then
+    workspace_json_set_map_entry "${file_path}" "files.exclude" "${full_exclude_glob}" true
+  fi
+  if [[ "${search_exclude}" == "true" ]]; then
+    workspace_json_set_map_entry "${file_path}" "search.exclude" "${full_exclude_glob}" true
+  fi
+  if [[ "${files_watcher_exclude}" == "true" ]]; then
+    workspace_json_set_map_entry "${file_path}" "files.watcherExclude" "${full_exclude_glob}" true
+  fi
+  if [[ "${python_analysis_exclude}" == "true" ]]; then
+    workspace_json_append_array_entry "${file_path}" "python.analysis.exclude" "${full_exclude_glob}"
+  fi
+}
+
+generate_workspace_file() {
+  local output_file="$1"
+  local tmp_file=""
+
+  tmp_file="$(mktemp)"
+  jq -n '
+    {
+      folders: [
+        {
+          name: "root",
+          path: ".."
+        }
+      ],
+      settings: {
+        "chat.disableAIFeatures": false,
+        "chat.mcp.autostart": "never",
+        "mcp.discovery.enabled": false,
+        "search.followSymlinks": false,
+        "git.autoRepositoryDetection": "subFolders",
+        "files.exclude": {
+          "**/.git": true,
+          "**/.svn": true,
+          "**/.hg": true,
+          "**/CVS": true,
+          "**/.DS_Store": true,
+          "build": true,
+          "**/tmp": true,
+          "**/cache": true,
+          "**/logs": true,
+          "**/bitbake*.log": true,
+          "**/bitbake*.sock": true,
+          "**/bitbake.lock": true,
+          "**/hashserve.sock": true
+        },
+        "search.exclude": {
+          "**/.git": true,
+          "**/node_modules": true,
+          "build/**": true,
+          "build-docker/**": true,
+          "**/tmp/**": true,
+          "**/cache/**": true,
+          "**/logs/**": true,
+          "**/bitbake*.log": true,
+          "**/bitbake*.sock": true,
+          "**/bitbake.lock": true,
+          "**/hashserve.sock": true
+        },
+        "files.watcherExclude": {
+          "**/.git/objects/**": true,
+          "**/.git/subtree-cache/**": true,
+          "**/node_modules/**": true,
+          "build/**": true,
+          "build-docker/**": true,
+          "**/tmp/**": true,
+          "**/cache/**": true,
+          "**/logs/**": true,
+          "**/bitbake-cookerdaemon.log": true,
+          "**/bitbake.sock": true,
+          "**/bitbake.lock": true,
+          "**/hashserve.sock": true
+        },
+        "python.analysis.diagnosticMode": "openFilesOnly",
+        "python.analysis.indexing": false,
+        "python.analysis.exclude": [
+          "**/.git/**",
+          "**/.venv/**",
+          "**/node_modules/**",
+          "build/**",
+          "build-docker/**",
+          "**/tmp/**",
+          "**/cache/**",
+          "**/logs/**",
+          "**/bitbake-cookerdaemon.log",
+          "**/bitbake.sock",
+          "**/bitbake.lock",
+          "**/hashserve.sock"
+        ]
+      }
+    }
+  ' > "${tmp_file}"
+
+  while IFS=$'\t' read -r project_name project_type project_scope project_path_raw files_exclude search_exclude files_watcher_exclude python_analysis_exclude; do
+    if [[ -z "${project_name}" || -z "${project_path_raw}" ]]; then
+      continue
+    fi
+
+    apply_project_workspace_settings \
+      "${tmp_file}" \
+      "${project_name}" \
+      "${project_type}" \
+      "${project_path_raw}" \
+      "${files_exclude}" \
+      "${search_exclude}" \
+      "${files_watcher_exclude}" \
+      "${python_analysis_exclude}"
+  done < <(
+    jq -r '(.projects // [])[]?
+      | [.name,
+         (.type // "repo"),
+         .scope,
+         .path,
+         ((.files_exclude // false) | tostring),
+         ((.search_exclude // false) | tostring),
+         ((.files_watcher_exclude // false) | tostring),
+         ((.python_analysis_exclude // false) | tostring)]
+      | @tsv' "${PROFILE_FILE}"
+  )
+
+  mv "${tmp_file}" "${output_file}"
 }
 
 ensure_checkout() {
@@ -605,10 +867,6 @@ fi
 PROFILE="${PROFILE_NAME}"
 
 DESCRIPTION="$(jq -r '.description // ""' "${PROFILE_FILE}")"
-WORKSPACE_TEMPLATE_REL="$(jq -r '.setup.workspace_template // empty' "${PROFILE_FILE}")"
-if [[ -z "${WORKSPACE_TEMPLATE_REL}" || "${WORKSPACE_TEMPLATE_REL}" == "null" ]]; then
-  WORKSPACE_TEMPLATE_REL=".vscode/workspace-profiles/${PROFILE}.local.code-workspace.template"
-fi
 MANAGE_SUBMODULES="$(jq -r '.setup.manage_submodules // true' "${PROFILE_FILE}")"
 ENSURE_PROJECT_PATHS="$(jq -r '.setup.ensure_project_paths // true' "${PROFILE_FILE}")"
 
@@ -641,13 +899,7 @@ case "${MODE}" in
     ;;
 esac
 
-TEMPLATE="$(resolve_path "${WORKSPACE_ROOT}" "${WORKSPACE_TEMPLATE_REL}")"
 OUTPUT="${TARGET_ROOT}/.vscode/${WORKSPACE_NAME}.local.code-workspace"
-
-if [[ "${MODE}" != "status" && ! -f "${TEMPLATE}" ]]; then
-  echo "Template not found: ${TEMPLATE}" >&2
-  exit 1
-fi
 
 if [[ "${MODE}" != "status" ]]; then
   ensure_super_project_meta
@@ -663,7 +915,7 @@ if [[ "${MODE}" != "status" && "${REGENERATE_WORKSPACE_FILE}" == "true" ]]; then
   if [[ "${DRY_RUN}" == "true" ]]; then
     echo "[DRY-RUN] Would regenerate workspace file: ${OUTPUT}"
   else
-    sed -e "s|/home/<your-user>/|/home/${USER_NAME}/|g" -e "s|<root_dir>|${ROOT_DIR}|g" "${TEMPLATE}" > "${OUTPUT}"
+    generate_workspace_file "${OUTPUT}"
     echo "Regenerated workspace file: ${OUTPUT}"
   fi
 elif [[ "${MODE}" != "status" && -f "${OUTPUT}" ]]; then
@@ -673,7 +925,7 @@ elif [[ "${MODE}" != "status" ]]; then
   if [[ "${DRY_RUN}" == "true" ]]; then
     echo "[DRY-RUN] Would generate workspace file: ${OUTPUT}"
   else
-    sed -e "s|/home/<your-user>/|/home/${USER_NAME}/|g" -e "s|<root_dir>|${ROOT_DIR}|g" "${TEMPLATE}" > "${OUTPUT}"
+    generate_workspace_file "${OUTPUT}"
     echo "Generated workspace file: ${OUTPUT}"
   fi
 fi
@@ -723,12 +975,7 @@ if [[ "${SYNC_VISIBLE_FOLDERS}" == "true" ]]; then
       echo "[DRY-RUN] Would add visible workspace folder: ${project_name} -> ${abs_project_path}"
       continue
     fi
-    tmp_file="$(mktemp)"
-    jq --arg name "${project_name}" --arg path "${abs_project_path}" '
-      .folders = ((.folders // [])
-        | map(select(.name != $name and .path != $path))
-        + [{"name": $name, "path": $path}])' "${OUTPUT}" > "${tmp_file}"
-    mv "${tmp_file}" "${OUTPUT}"
+    workspace_json_add_folder "${OUTPUT}" "${project_name}" "${abs_project_path}"
   done < <(
     jq -r '(.projects // [])[]? | select((.visible // false) == true) | [.name, .path] | @tsv' "${PROFILE_FILE}"
   )

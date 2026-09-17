@@ -105,6 +105,14 @@
             "minLength": 1,
             "type": "string"
           },
+          "files_exclude": {
+            "default": false,
+            "type": "boolean"
+          },
+          "files_watcher_exclude": {
+            "default": false,
+            "type": "boolean"
+          },
           "name": {
             "minLength": 1,
             "type": "string"
@@ -112,6 +120,10 @@
           "path": {
             "minLength": 1,
             "type": "string"
+          },
+          "python_analysis_exclude": {
+            "default": false,
+            "type": "boolean"
           },
           "scope": {
             "enum": [
@@ -121,6 +133,10 @@
               "private-external"
             ],
             "type": "string"
+          },
+          "search_exclude": {
+            "default": false,
+            "type": "boolean"
           },
           "type": {
             "enum": [
@@ -154,16 +170,11 @@
         },
         "manage_submodules": {
           "type": "boolean"
-        },
-        "workspace_template": {
-          "minLength": 1,
-          "type": "string"
         }
       },
       "required": [
         "manage_submodules",
-        "ensure_project_paths",
-        "workspace_template"
+        "ensure_project_paths"
       ],
       "type": "object"
     },
