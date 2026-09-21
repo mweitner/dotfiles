@@ -171,23 +171,21 @@ replace_profile() {
   # Delete first so reruns are deterministic.
   run_nmcli connection delete "$name" >/dev/null 2>&1 || true
 
+  run_nmcli connection add type ethernet con-name "$name" \
+    802-3-ethernet.mac-address "$mac" \
+    ipv4.method manual \
+    ipv4.addresses "$addresses" \
+    ipv4.route-metric 1 \
+    ipv4.never-default yes \
+    connection.autoconnect no
+
   if [ -n "$gateway" ]; then
-    run_nmcli connection add type ethernet con-name "$name" \
-      802-3-ethernet.mac-address "$mac" \
-      ipv4.method manual \
-      ipv4.addresses "$addresses" \
-      ipv4.gateway "$gateway" \
-      ipv4.route-metric 1 \
-      ipv4.never-default yes \
-      connection.autoconnect no
-  else
-    run_nmcli connection add type ethernet con-name "$name" \
-      802-3-ethernet.mac-address "$mac" \
-      ipv4.method manual \
-      ipv4.addresses "$addresses" \
-      ipv4.route-metric 1 \
-      ipv4.never-default yes \
-      connection.autoconnect no
+    # NOTE: nmcli silently drops ipv4.gateway when passed alongside other
+    # properties to "connection add" - it only takes effect via a separate
+    # "connection modify" after the connection exists. Without this follow-up
+    # step, profiles would end up with an empty gateway despite being asked
+    # for one (observed on Machine-concrete-mixing-plant-GW/-TU).
+    run_nmcli connection modify "$name" ipv4.gateway "$gateway"
   fi
 }
 
@@ -235,6 +233,11 @@ apply_profile "crane" "Machine-crane-rope-testrig-TU" "192.168.32.150/23,169.254
 
 apply_profile "concrete" "Machine-concrete-mixing-plant-GW" "192.168.5.120/24" ""
 apply_profile "concrete" "Machine-concrete-mixing-plant-TU" "192.168.5.211/24,169.254.1.211/16,192.168.5.212/24,169.254.1.212/16" "192.168.5.120"
+# Real on-site machine network: the machine's own router occupies 192.168.5.120,
+# so the dev pc joins as a regular client at .214 instead of acting as the GW.
+# Kept never-default (see replace_profile) so it doesn't hijack the default
+# route like the mining-excavator WIFI conflict documented on 19.11.2025.
+apply_profile "concrete" "Machine-concrete-mixing-plant-real" "192.168.5.214/24" "192.168.5.120"
 
 apply_profile "mining" "Machine-mining-excavator-GW" "192.168.3.1/24" ""
 apply_profile "mining" "Machine-mining-excavator-TU" "192.168.3.101/24,169.254.1.41/16,192.168.3.102/24,169.254.1.42/16,192.168.3.103/24,169.254.1.43/16,192.168.3.104/24,169.254.1.44/16" "192.168.3.1"
