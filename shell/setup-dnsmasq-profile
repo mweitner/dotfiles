@@ -10,14 +10,43 @@ PROFILE=""
 SHOW_ONLY=false
 LIST_ONLY=false
 NFS_EXPORT_FILE="/etc/exports.d/50-dotfiles-netboot.exports"
-NFS_EXPORT_LINES=(
-  "/opt/netboot/linux-dps-scarthgap/root/imx6s-mcg 192.168.3.0/24(rw,no_root_squash,no_subtree_check)"
-  "/opt/netboot/linux-dps-scarthgap/image/imx6s-mcg 192.168.3.0/24(rw,no_root_squash,no_subtree_check)"
+NFS_EXPORT_LINES=()
+
+# Netboot profiles export their project's root/image folders via NFS.
+# Add an entry here for every dnsmasq profile that netboots a target machine.
+NETBOOT_PROFILES=(
+  "imx6s-mcg-netboot"
+  "imx6qleg-mcg-netboot"
 )
-NETBOOT_PROFILE="imx6s-mcg-netboot"
 
 is_netboot_profile() {
-  [[ "$PROFILE" == "$NETBOOT_PROFILE" ]]
+  local candidate
+  for candidate in "${NETBOOT_PROFILES[@]}"; do
+    if [[ "$PROFILE" == "$candidate" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+set_nfs_export_lines() {
+  case "$PROFILE" in
+    imx6s-mcg-netboot)
+      NFS_EXPORT_LINES=(
+        "/opt/netboot/linux-dps-scarthgap/root/imx6s-mcg 192.168.3.0/24(rw,no_root_squash,no_subtree_check)"
+        "/opt/netboot/linux-dps-scarthgap/image/imx6s-mcg 192.168.3.0/24(rw,no_root_squash,no_subtree_check)"
+      )
+      ;;
+    imx6qleg-mcg-netboot)
+      NFS_EXPORT_LINES=(
+        "/opt/netboot/linux-dps-kirkstone/root/imx6qleg-mcg 192.168.3.0/24(rw,no_root_squash,no_subtree_check)"
+        "/opt/netboot/linux-dps-kirkstone/image/imx6qleg-mcg 192.168.3.0/24(rw,no_root_squash,no_subtree_check)"
+      )
+      ;;
+    *)
+      NFS_EXPORT_LINES=()
+      ;;
+  esac
 }
 
 has_systemd_unit() {
@@ -92,6 +121,13 @@ show_status() {
 }
 
 activate_netboot_nfs() {
+  set_nfs_export_lines
+
+  if [[ ${#NFS_EXPORT_LINES[@]} -eq 0 ]]; then
+    echo "ERROR: no NFS export lines configured for netboot profile: $PROFILE" >&2
+    return 1
+  fi
+
   sudo mkdir -p /etc/exports.d
   sudo tee "$NFS_EXPORT_FILE" >/dev/null <<EOF
 $(printf '%s\n' "${NFS_EXPORT_LINES[@]}")
