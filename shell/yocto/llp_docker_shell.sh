@@ -674,23 +674,39 @@ if [[ -z "${SWUPDATE_PASSWORD_FILE:-}" ]] || [[ ! -f "${SWUPDATE_PASSWORD_FILE:-
     "swupdate-password.txt" "swupdate_key_password" || true
 fi
 
-if [[ -z "${MOSQUITTO_PSK_FILE:-}" ]]; then
-  if [[ -f "${_keys_root}/mosquitto-psk.txt" ]]; then
-    MOSQUITTO_PSK_FILE="${_keys_root}/mosquitto-psk.txt"
-  fi
-fi
-if [[ -z "${MOSQUITTO_PSK_FILE:-}" ]] || [[ ! -f "${MOSQUITTO_PSK_FILE:-}" ]]; then
-  echo "Warning: MOSQUITTO_PSK_FILE not found (expected ${_keys_root}/mosquitto-psk.txt). mosquitto recipes may fail." >&2
+# Mosquitto PSK / LPO datastation key are only relevant for LPO's own IoT
+# cloud/datastation integration (project-specific meta-liebherr-lpo-display
+# layer). Projects that don't check out that layer (e.g. LMT, which uses the
+# default local mosquitto broker with no PSK/cloud key) don't need them, so
+# skip resolution and warnings entirely in that case.
+lpo_cloud_secrets_required=0
+if [[ -d "${WORKDIR}/layers/meta-liebherr-lpo-display" ]]; then
+  lpo_cloud_secrets_required=1
 fi
 
-if [[ -z "${LPO_DATASTATION_PRIVATEKEY:-}" ]]; then
-  if [[ -f "${_keys_root}/id_rsa_lpo_datastation" ]]; then
-    LPO_DATASTATION_PRIVATEKEY="${_keys_root}/id_rsa_lpo_datastation"
+if [[ ${lpo_cloud_secrets_required} -eq 1 ]]; then
+  if [[ -z "${MOSQUITTO_PSK_FILE:-}" ]]; then
+    if [[ -f "${_keys_root}/mosquitto-psk.txt" ]]; then
+      MOSQUITTO_PSK_FILE="${_keys_root}/mosquitto-psk.txt"
+    fi
   fi
+  if [[ -z "${MOSQUITTO_PSK_FILE:-}" ]] || [[ ! -f "${MOSQUITTO_PSK_FILE:-}" ]]; then
+    echo "Warning: MOSQUITTO_PSK_FILE not found (expected ${_keys_root}/mosquitto-psk.txt). mosquitto recipes may fail." >&2
+  fi
+
+  if [[ -z "${LPO_DATASTATION_PRIVATEKEY:-}" ]]; then
+    if [[ -f "${_keys_root}/id_rsa_lpo_datastation" ]]; then
+      LPO_DATASTATION_PRIVATEKEY="${_keys_root}/id_rsa_lpo_datastation"
+    fi
+  fi
+  if [[ -z "${LPO_DATASTATION_PRIVATEKEY:-}" ]]; then
+    echo "Warning: LPO_DATASTATION_PRIVATEKEY not found (expected ${_keys_root}/id_rsa_lpo_datastation)." >&2
+  fi
+else
+  MOSQUITTO_PSK_FILE="${MOSQUITTO_PSK_FILE:-}"
+  LPO_DATASTATION_PRIVATEKEY="${LPO_DATASTATION_PRIVATEKEY:-}"
 fi
-if [[ -z "${LPO_DATASTATION_PRIVATEKEY:-}" ]]; then
-  echo "Warning: LPO_DATASTATION_PRIVATEKEY not found (expected ${_keys_root}/id_rsa_lpo_datastation)." >&2
-fi
+unset lpo_cloud_secrets_required
 
 if [[ -z "${SWUPDATE_PRIVATE_KEY:-}" ]] || [[ ! -f "${SWUPDATE_PRIVATE_KEY:-}" ]]; then
   resolve_secret_from_keys_root SWUPDATE_PRIVATE_KEY \
