@@ -1,0 +1,3 @@
+[submodule ".secrets"]
+	path = .secrets
+	url = ssh://ugreen-nas/volume1/data/repos/dotfiles-secrets.git

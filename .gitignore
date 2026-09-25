@@ -9,8 +9,7 @@ ai/gemini/cache/*
 # no secrets in git
 ai/gemini/oauth_creds.json
 
-# ignore secrets private repo and temporary folder .tmp
-.secrets/
+# ignore private repo and temporary folder .tmp
 .tmp/
 ~.tmp/.gitkeep
 

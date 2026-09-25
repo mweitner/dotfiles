@@ -19,6 +19,9 @@ Commands:
   status [project] [session]      Show active context and recording state
   create-minutes [options]        Extract audio, transcribe parts, generate minutes
   update-minutes [options]        Alias for create-minutes (idempotent re-run)
+  apply-speaker-map [options]     Re-apply a corrected speaker-map.tsv to already
+                                  -transcribed parts (no re-transcription/diarization),
+                                  then refresh the merged transcript and minutes skeleton
   paths                            Show resolved config/state/cache/runtime paths
   doctor                           Check writable directories and state file health
   project activate <name> [session]
@@ -39,6 +42,22 @@ create-minutes / update-minutes options:
   --manual-transcripts            Disable ASR and create transcript placeholders
   --overwrite                     Overwrite existing audio and transcript files
   --force-minutes                 Overwrite existing minutes skeleton file
+
+apply-speaker-map options:
+  --title <text>                  Meeting title (passed through to minutes skeleton)
+  --owner <name>                  Default owner (passed through to minutes skeleton)
+  --date <YYYY-MM-DD>             Meeting date (passed through to minutes skeleton)
+  --speaker-roster <file>         TSV file with known speakers (alias, display, role)
+  --speaker-map <file>            TSV file mapping diarized speaker IDs to aliases
+                                  (edit this file with corrected aliases before running)
+
+  Two-pass diarization workflow:
+    1. Run create-minutes --diarize once (anonymous diarized speaker IDs).
+    2. Review <session>-speaker-stats.md and correct
+       <session>-speaker-map.tsv (detected_speaker -> alias).
+    3. Run apply-speaker-map to re-label already-transcribed parts and
+       regenerate the merged transcript + minutes skeleton, without
+       re-running WhisperX transcription/diarization.
 
 Environment:
   AI_SESSION_DIR                  Override session artifacts directory (default: ~/.ai-sessions)
@@ -655,6 +674,387 @@ project_clear() {
 }
 
 # ---------------------------------------------------------------------------
+# Transcript / speaker-map helpers.
+# Defined at top level (not nested inside create_minutes) so they are
+# available to any subcommand, e.g. apply_speaker_map(), regardless of
+# whether create_minutes() has already run in this invocation.
+# ---------------------------------------------------------------------------
+
+transcript_marker_path() {
+  local transcript_file="$1"
+  local transcript_dir base marker_name
+  transcript_dir="$(dirname "$transcript_file")"
+  base="$(basename "$transcript_file")"
+  if [[ "$base" =~ -part([0-9]+)\.txt$ ]]; then
+    marker_name=".part${BASH_REMATCH[1]}"
+  else
+    marker_name=".${base%.txt}"
+  fi
+  printf '%s/%s' "$transcript_dir" "$marker_name"
+}
+
+transcript_is_legacy_placeholder() {
+  local transcript_file="$1"
+  [[ -s "$transcript_file" ]] || return 1
+  grep -q '^TODO: raw text transcript' "$transcript_file" 2>/dev/null
+}
+
+sync_transcript_marker() {
+  local transcript_file="$1"
+  local marker_file
+  marker_file="$(transcript_marker_path "$transcript_file")"
+
+  if [[ -s "$transcript_file" ]]; then
+    : > "$marker_file"
+    return 0
+  fi
+}
+
+ensure_transcript_placeholder() {
+  local wav_file="$1"
+  local transcript_file="${wav_file%.wav}.txt"
+  local marker_file
+  marker_file="$(transcript_marker_path "$transcript_file")"
+
+  if [[ ! -e "$transcript_file" ]]; then
+    : > "$transcript_file"
+    echo "      Placeholder: $(basename "$transcript_file")"
+  else
+    echo "      Empty transcript placeholder: $(basename "$transcript_file")"
+  fi
+
+  : > "$marker_file"
+}
+
+transcript_is_real() {
+  local transcript_file="$1"
+  [[ -s "$transcript_file" ]] && ! transcript_is_legacy_placeholder "$transcript_file"
+}
+
+format_whisper_srt_to_timestamped_txt() {
+  local srt_file="$1"
+  local txt_file="$2"
+  local speaker_label="${AI_ASR_SPEAKER_LABEL:-speaker-unknown}"
+  local tmp_file
+
+  tmp_file="$(mktemp)"
+  awk -v speaker="$speaker_label" '
+    function flush_line() {
+      gsub(/^[ \t]+|[ \t]+$/, "", text)
+      if (start != "" && text != "") {
+        printf("[%s][%s] %s\n", start, speaker, text)
+      }
+      start = ""
+      text = ""
+    }
+    {
+      gsub(/\r/, "", $0)
+    }
+    $0 ~ /^[0-9]+$/ {
+      next
+    }
+    $0 ~ / --> / {
+      split($0, ts, " --> ")
+      start = ts[1]
+      sub(/,.*/, "", start)
+      next
+    }
+    $0 == "" {
+      flush_line()
+      next
+    }
+    {
+      if (text == "") {
+        text = $0
+      } else {
+        text = text " " $0
+      }
+    }
+    END {
+      flush_line()
+    }
+  ' "$srt_file" > "$tmp_file"
+
+  if [[ -s "$tmp_file" ]]; then
+    mv "$tmp_file" "$txt_file"
+  else
+    rm -f "$tmp_file"
+  fi
+}
+
+format_whisperx_json_to_timestamped_txt() {
+  local json_file="$1"
+  local txt_file="$2"
+  local tmp_file
+
+  require_cmd python3
+  tmp_file="$(mktemp)"
+
+  python3 - "$json_file" > "$tmp_file" <<'PY'
+import json
+import re
+import sys
+
+json_file = sys.argv[1]
+
+with open(json_file, "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+segments = data.get("segments", [])
+
+def hhmmss(seconds: float) -> str:
+    total = max(0, int(seconds))
+    h = total // 3600
+    m = (total % 3600) // 60
+    s = total % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+def normalize_speaker(raw: str) -> str:
+    value = (raw or "speaker-unknown").strip()
+    if not value:
+        value = "speaker-unknown"
+    value = value.replace(" ", "-")
+    value = re.sub(r"[^A-Za-z0-9_-]", "", value)
+    if not value:
+        value = "speaker-unknown"
+    return value.lower()
+
+for seg in segments:
+    start = seg.get("start")
+    text = (seg.get("text") or "").replace("\n", " ").strip()
+    speaker = normalize_speaker(seg.get("speaker", "speaker-unknown"))
+    if start is None or not text:
+        continue
+    print(f"[{hhmmss(float(start))}][{speaker}] {text}")
+PY
+
+  if [[ -s "$tmp_file" ]]; then
+    mv "$tmp_file" "$txt_file"
+  else
+    rm -f "$tmp_file"
+  fi
+}
+
+ensure_speaker_roster_template() {
+  local roster_file="$1"
+  if [[ -f "$roster_file" ]]; then
+    return 0
+  fi
+
+  printf '%s\n' \
+    '# alias<TAB>display_name<TAB>role' \
+    $'short-unique-name1\tfull-name1\tname1-context1, name1-context2' \
+    $'short-unique-name2\tfull-name2\tname2-context1, name2-context2' \
+    > "$roster_file"
+  echo "      Created speaker roster template: $(basename "$roster_file")"
+}
+
+# NOTE: the embedded python heredocs below must start at column 0 (module-level
+# statements cannot be indented) - do not reintroduce leading whitespace here.
+refresh_speaker_map_and_stats() {
+  local roster_file="$1"
+  local map_file="$2"
+  local stats_file="$3"
+  shift 3
+  local json_files=("$@")
+
+  [[ ${#json_files[@]} -gt 0 ]] || return 0
+
+  require_cmd python3
+  python3 - "$roster_file" "$map_file" "$stats_file" "${json_files[@]}" <<'PY'
+import json
+import pathlib
+import re
+import sys
+from collections import defaultdict
+
+roster_file = pathlib.Path(sys.argv[1])
+map_file = pathlib.Path(sys.argv[2])
+stats_file = pathlib.Path(sys.argv[3])
+json_files = [pathlib.Path(p) for p in sys.argv[4:]]
+
+def read_roster(path: pathlib.Path):
+    roster = {}
+    if not path.exists():
+        return roster
+    for line in path.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        parts = [p.strip() for p in line.split("\t")]
+        if len(parts) < 1 or not parts[0]:
+            continue
+        alias = parts[0]
+        display = parts[1] if len(parts) > 1 else ""
+        role = parts[2] if len(parts) > 2 else ""
+        roster[alias] = {"display": display, "role": role}
+    return roster
+
+def read_map(path: pathlib.Path):
+    mapping = {}
+    if not path.exists():
+        return mapping
+    for line in path.read_text(encoding="utf-8").splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        parts = [p.strip() for p in line.split("\t")]
+        if len(parts) >= 2 and parts[0]:
+            mapping[parts[0]] = parts[1]
+    return mapping
+
+def norm_speaker(value: str) -> str:
+    value = (value or "speaker-unknown").strip().replace(" ", "-")
+    value = re.sub(r"[^A-Za-z0-9_-]", "", value)
+    return value.lower() if value else "speaker-unknown"
+
+def part_scope(path: pathlib.Path) -> str:
+    # WhisperX diarizes each part file independently, so raw speaker IDs
+    # (speaker_00, speaker_01, ...) are NOT comparable across parts - the
+    # same ID in part01 and part02 can be different physical people. Scope
+    # the detected-speaker key by part so each part gets its own mapping.
+    m = re.search(r"-part(\d+)\.", path.name)
+    return f"part{m.group(1)}" if m else ""
+
+roster = read_roster(roster_file)
+mapping = read_map(map_file)
+totals = defaultdict(float)
+
+for json_path in json_files:
+    if not json_path.exists():
+        continue
+    scope = part_scope(json_path)
+    data = json.loads(json_path.read_text(encoding="utf-8"))
+    for seg in data.get("segments", []):
+        spk = norm_speaker(seg.get("speaker", "speaker-unknown"))
+        key = f"{scope}/{spk}" if scope else spk
+        start = seg.get("start")
+        end = seg.get("end")
+        dur = 0.0
+        try:
+            if start is not None and end is not None:
+                dur = max(0.0, float(end) - float(start))
+        except Exception:
+            dur = 0.0
+        totals[key] += dur
+
+roster_order = list(roster.keys())
+all_speakers = sorted(totals.keys())
+
+# Prefer any user-supplied map entries, but when the map is empty or stale,
+# fall back to the roster order so diarized IDs resolve to known aliases.
+for idx, spk in enumerate(all_speakers):
+    current = (mapping.get(spk) or "").strip()
+    if not current:
+        if roster_order:
+            mapping[spk] = roster_order[min(idx, len(roster_order) - 1)]
+        else:
+            mapping[spk] = ""
+
+lines = [
+    "# detected_speaker<TAB>alias",
+    "# Aliases are auto-filled from the roster in stable order when blank.",
+    "# For multi-part sessions, keys are scoped as 'partNN/speaker_id' because",
+    "# WhisperX diarizes each part independently (the same speaker_id in",
+    "# different parts is not guaranteed to be the same physical person).",
+    "#",
+    "# Available aliases from roster:",
+]
+for alias, meta in sorted(roster.items()):
+    lines.append(f"# - {alias}\t{meta['display']}\t{meta['role']}")
+lines.append("")
+
+for spk in sorted(mapping.keys()):
+    lines.append(f"{spk}\t{mapping.get(spk, '')}")
+
+map_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+total_sec = sum(totals.values())
+stats = [
+    "# Diarization Speaker Stats",
+    "",
+    "| Detected Speaker | Seconds | Share % | Alias | Display Name | Role |",
+    "| --- | ---: | ---: | --- | --- | --- |",
+]
+for spk, sec in sorted(totals.items(), key=lambda kv: kv[1], reverse=True):
+    pct = (sec / total_sec * 100.0) if total_sec > 0 else 0.0
+    alias = mapping.get(spk, "")
+    display = roster.get(alias, {}).get("display", "") if alias else ""
+    role = roster.get(alias, {}).get("role", "") if alias else ""
+    stats.append(f"| {spk} | {sec:.1f} | {pct:.1f} | {alias} | {display} | {role} |")
+
+stats_file.write_text("\n".join(stats) + "\n", encoding="utf-8")
+PY
+}
+
+apply_speaker_alias_map_to_transcript() {
+  local map_file="$1"
+  local txt_file="$2"
+
+  [[ -f "$map_file" ]] || return 0
+  [[ -f "$txt_file" ]] || return 0
+
+  require_cmd python3
+  python3 - "$map_file" "$txt_file" <<'PY'
+import pathlib
+import re
+import sys
+
+map_file = pathlib.Path(sys.argv[1])
+txt_file = pathlib.Path(sys.argv[2])
+
+mapping = {}
+for line in map_file.read_text(encoding="utf-8").splitlines():
+    s = line.strip()
+    if not s or s.startswith("#"):
+        continue
+    parts = [p.strip() for p in line.split("\t")]
+    if len(parts) >= 2 and parts[0] and parts[1]:
+        mapping[parts[0].lower()] = parts[1]
+
+def part_scope(path: pathlib.Path) -> str:
+    m = re.search(r"-part(\d+)\.", path.name)
+    return f"part{m.group(1)}" if m else ""
+
+scope = part_scope(txt_file)
+
+content = txt_file.read_text(encoding="utf-8")
+out = []
+pat = re.compile(r"^\[(\d{2}:\d{2}:\d{2})\]\[([^\]]+)\]\s?(.*)$")
+changed = False
+for line in content.splitlines():
+    m = pat.match(line)
+    if not m:
+        out.append(line)
+        continue
+    ts, speaker, text = m.groups()
+    lookup_keys = []
+    if scope:
+        lookup_keys.append(f"{scope}/{speaker.lower()}")
+    lookup_keys.append(speaker.lower())
+    mapped = None
+    for key in lookup_keys:
+        mapped = mapping.get(key)
+        if mapped:
+            break
+    if mapped:
+        out.append(f"[{ts}][{mapped}] {text}")
+        if mapped != speaker:
+            changed = True
+    else:
+        out.append(line)
+
+if changed:
+    txt_file.write_text("\n".join(out) + "\n", encoding="utf-8")
+PY
+}
+
+is_master_part_wav() {
+  local wav_file="$1"
+  [[ "$wav_file" =~ -part[0-9]+\.wav$ ]]
+}
+
+# ---------------------------------------------------------------------------
 # create_minutes / update_minutes
 # Both commands are identical – update-minutes is a robust idempotent re-run.
 # ---------------------------------------------------------------------------
@@ -714,351 +1114,6 @@ create_minutes() {
   local speaker_roster_file="${opt_speaker_roster:-$session_dir/$session_id-speaker-roster.tsv}"
   local speaker_map_file="${opt_speaker_map:-$session_dir/$session_id-speaker-map.tsv}"
   local speaker_stats_file="$session_dir/$session_id-speaker-stats.md"
-
-  transcript_marker_path() {
-    local transcript_file="$1"
-    local transcript_dir base marker_name
-    transcript_dir="$(dirname "$transcript_file")"
-    base="$(basename "$transcript_file")"
-    if [[ "$base" =~ -part([0-9]+)\.txt$ ]]; then
-      marker_name=".part${BASH_REMATCH[1]}"
-    else
-      marker_name=".${base%.txt}"
-    fi
-    printf '%s/%s' "$transcript_dir" "$marker_name"
-  }
-
-  transcript_is_legacy_placeholder() {
-    local transcript_file="$1"
-    [[ -s "$transcript_file" ]] || return 1
-    grep -q '^TODO: raw text transcript' "$transcript_file" 2>/dev/null
-  }
-
-  sync_transcript_marker() {
-    local transcript_file="$1"
-    local marker_file
-    marker_file="$(transcript_marker_path "$transcript_file")"
-
-    if [[ -s "$transcript_file" ]]; then
-      : > "$marker_file"
-      return 0
-    fi
-  }
-
-  ensure_transcript_placeholder() {
-    local wav_file="$1"
-    local transcript_file="${wav_file%.wav}.txt"
-    local marker_file
-    marker_file="$(transcript_marker_path "$transcript_file")"
-
-    if [[ ! -e "$transcript_file" ]]; then
-      : > "$transcript_file"
-      echo "      Placeholder: $(basename "$transcript_file")"
-    else
-      echo "      Empty transcript placeholder: $(basename "$transcript_file")"
-    fi
-
-    : > "$marker_file"
-  }
-
-  transcript_is_real() {
-    local transcript_file="$1"
-    [[ -s "$transcript_file" ]] && ! transcript_is_legacy_placeholder "$transcript_file"
-  }
-
-  format_whisper_srt_to_timestamped_txt() {
-    local srt_file="$1"
-    local txt_file="$2"
-    local speaker_label="${AI_ASR_SPEAKER_LABEL:-speaker-unknown}"
-    local tmp_file
-
-    tmp_file="$(mktemp)"
-    awk -v speaker="$speaker_label" '
-      function flush_line() {
-        gsub(/^[ \t]+|[ \t]+$/, "", text)
-        if (start != "" && text != "") {
-          printf("[%s][%s] %s\n", start, speaker, text)
-        }
-        start = ""
-        text = ""
-      }
-      {
-        gsub(/\r/, "", $0)
-      }
-      $0 ~ /^[0-9]+$/ {
-        next
-      }
-      $0 ~ / --> / {
-        split($0, ts, " --> ")
-        start = ts[1]
-        sub(/,.*/, "", start)
-        next
-      }
-      $0 == "" {
-        flush_line()
-        next
-      }
-      {
-        if (text == "") {
-          text = $0
-        } else {
-          text = text " " $0
-        }
-      }
-      END {
-        flush_line()
-      }
-    ' "$srt_file" > "$tmp_file"
-
-    if [[ -s "$tmp_file" ]]; then
-      mv "$tmp_file" "$txt_file"
-    else
-      rm -f "$tmp_file"
-    fi
-  }
-
-  format_whisperx_json_to_timestamped_txt() {
-    local json_file="$1"
-    local txt_file="$2"
-    local tmp_file
-
-    require_cmd python3
-    tmp_file="$(mktemp)"
-
-    python3 - "$json_file" > "$tmp_file" <<'PY'
-import json
-import re
-import sys
-
-json_file = sys.argv[1]
-
-with open(json_file, "r", encoding="utf-8") as f:
-    data = json.load(f)
-
-segments = data.get("segments", [])
-
-def hhmmss(seconds: float) -> str:
-    total = max(0, int(seconds))
-    h = total // 3600
-    m = (total % 3600) // 60
-    s = total % 60
-    return f"{h:02d}:{m:02d}:{s:02d}"
-
-def normalize_speaker(raw: str) -> str:
-    value = (raw or "speaker-unknown").strip()
-    if not value:
-        value = "speaker-unknown"
-    value = value.replace(" ", "-")
-    value = re.sub(r"[^A-Za-z0-9_-]", "", value)
-    if not value:
-        value = "speaker-unknown"
-    return value.lower()
-
-for seg in segments:
-    start = seg.get("start")
-    text = (seg.get("text") or "").replace("\n", " ").strip()
-    speaker = normalize_speaker(seg.get("speaker", "speaker-unknown"))
-    if start is None or not text:
-        continue
-    print(f"[{hhmmss(float(start))}][{speaker}] {text}")
-PY
-
-    if [[ -s "$tmp_file" ]]; then
-      mv "$tmp_file" "$txt_file"
-    else
-      rm -f "$tmp_file"
-    fi
-  }
-
-    ensure_speaker_roster_template() {
-    local roster_file="$1"
-    if [[ -f "$roster_file" ]]; then
-      return 0
-    fi
-
-    printf '%s\n' \
-      '# alias<TAB>display_name<TAB>role' \
-      $'short-unique-name1\tfull-name1\tname1-context1, name1-context2' \
-      $'short-unique-name2\tfull-name2\tname2-context1, name2-context2' \
-      > "$roster_file"
-    echo "      Created speaker roster template: $(basename "$roster_file")"
-    }
-
-    refresh_speaker_map_and_stats() {
-    local roster_file="$1"
-    local map_file="$2"
-    local stats_file="$3"
-    shift 3
-    local json_files=("$@")
-
-    [[ ${#json_files[@]} -gt 0 ]] || return 0
-
-    require_cmd python3
-    python3 - "$roster_file" "$map_file" "$stats_file" "${json_files[@]}" <<'PY'
-  import json
-  import pathlib
-  import re
-  import sys
-  from collections import defaultdict
-
-  roster_file = pathlib.Path(sys.argv[1])
-  map_file = pathlib.Path(sys.argv[2])
-  stats_file = pathlib.Path(sys.argv[3])
-  json_files = [pathlib.Path(p) for p in sys.argv[4:]]
-
-  def read_roster(path: pathlib.Path):
-    roster = {}
-    if not path.exists():
-      return roster
-    for line in path.read_text(encoding="utf-8").splitlines():
-      s = line.strip()
-      if not s or s.startswith("#"):
-        continue
-      parts = [p.strip() for p in line.split("\t")]
-      if len(parts) < 1 or not parts[0]:
-        continue
-      alias = parts[0]
-      display = parts[1] if len(parts) > 1 else ""
-      role = parts[2] if len(parts) > 2 else ""
-      roster[alias] = {"display": display, "role": role}
-    return roster
-
-  def read_map(path: pathlib.Path):
-    mapping = {}
-    if not path.exists():
-      return mapping
-    for line in path.read_text(encoding="utf-8").splitlines():
-      s = line.strip()
-      if not s or s.startswith("#"):
-        continue
-      parts = [p.strip() for p in line.split("\t")]
-      if len(parts) >= 2 and parts[0]:
-        mapping[parts[0]] = parts[1]
-    return mapping
-
-  def norm_speaker(value: str) -> str:
-    value = (value or "speaker-unknown").strip().replace(" ", "-")
-    value = re.sub(r"[^A-Za-z0-9_-]", "", value)
-    return value.lower() if value else "speaker-unknown"
-
-  roster = read_roster(roster_file)
-  mapping = read_map(map_file)
-  totals = defaultdict(float)
-
-  for json_path in json_files:
-    if not json_path.exists():
-      continue
-    data = json.loads(json_path.read_text(encoding="utf-8"))
-    for seg in data.get("segments", []):
-      spk = norm_speaker(seg.get("speaker", "speaker-unknown"))
-      start = seg.get("start")
-      end = seg.get("end")
-      dur = 0.0
-      try:
-        if start is not None and end is not None:
-          dur = max(0.0, float(end) - float(start))
-      except Exception:
-        dur = 0.0
-      totals[spk] += dur
-
-  roster_order = list(roster.keys())
-  all_speakers = sorted(totals.keys())
-
-  # Prefer any user-supplied map entries, but when the map is empty or stale,
-  # fall back to the roster order so diarized IDs resolve to known aliases.
-  for idx, spk in enumerate(all_speakers):
-    current = (mapping.get(spk) or "").strip()
-    if not current:
-      if roster_order:
-        mapping[spk] = roster_order[min(idx, len(roster_order) - 1)]
-      else:
-        mapping[spk] = ""
-
-  lines = [
-    "# detected_speaker<TAB>alias",
-    "# Aliases are auto-filled from the roster in stable order when blank.",
-    "#",
-    "# Available aliases from roster:",
-  ]
-  for alias, meta in sorted(roster.items()):
-    lines.append(f"# - {alias}\t{meta['display']}\t{meta['role']}")
-  lines.append("")
-
-  for spk in sorted(mapping.keys()):
-    lines.append(f"{spk}\t{mapping.get(spk, '')}")
-
-  map_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-  total_sec = sum(totals.values())
-  stats = [
-    "# Diarization Speaker Stats",
-    "",
-    "| Detected Speaker | Seconds | Share % | Alias | Display Name | Role |",
-    "| --- | ---: | ---: | --- | --- | --- |",
-  ]
-  for spk, sec in sorted(totals.items(), key=lambda kv: kv[1], reverse=True):
-    pct = (sec / total_sec * 100.0) if total_sec > 0 else 0.0
-    alias = mapping.get(spk, "")
-    display = roster.get(alias, {}).get("display", "") if alias else ""
-    role = roster.get(alias, {}).get("role", "") if alias else ""
-    stats.append(f"| {spk} | {sec:.1f} | {pct:.1f} | {alias} | {display} | {role} |")
-
-  stats_file.write_text("\n".join(stats) + "\n", encoding="utf-8")
-PY
-    }
-
-    apply_speaker_alias_map_to_transcript() {
-    local map_file="$1"
-    local txt_file="$2"
-
-    [[ -f "$map_file" ]] || return 0
-    [[ -f "$txt_file" ]] || return 0
-
-    require_cmd python3
-    python3 - "$map_file" "$txt_file" <<'PY'
-  import pathlib
-  import re
-  import sys
-
-  map_file = pathlib.Path(sys.argv[1])
-  txt_file = pathlib.Path(sys.argv[2])
-
-  mapping = {}
-  for line in map_file.read_text(encoding="utf-8").splitlines():
-    s = line.strip()
-    if not s or s.startswith("#"):
-      continue
-    parts = [p.strip() for p in line.split("\t")]
-    if len(parts) >= 2 and parts[0] and parts[1]:
-      mapping[parts[0].lower()] = parts[1]
-
-  content = txt_file.read_text(encoding="utf-8")
-  out = []
-  pat = re.compile(r"^\[(\d{2}:\d{2}:\d{2})\]\[([^\]]+)\]\s?(.*)$")
-  changed = False
-  for line in content.splitlines():
-    m = pat.match(line)
-    if not m:
-      out.append(line)
-      continue
-    ts, speaker, text = m.groups()
-    mapped = mapping.get(speaker.lower())
-    if mapped:
-      out.append(f"[{ts}][{mapped}] {text}")
-      if mapped != speaker:
-        changed = True
-    else:
-      out.append(line)
-
-  if changed:
-    txt_file.write_text("\n".join(out) + "\n", encoding="utf-8")
-PY
-    }
-
-  is_master_part_wav() {
-    local wav_file="$1"
-    [[ "$wav_file" =~ -part[0-9]+\.wav$ ]]
-  }
 
   split_part_wav_for_gemini() {
     local wav_file="$1"
@@ -1241,6 +1296,14 @@ PY
 
     if [[ "$opt_asr" == "false" && ${#wav_files[@]} -gt 0 ]]; then
       for wav in "${wav_files[@]}"; do
+        local existing_txt="${wav%.wav}.txt"
+        if transcript_is_real "$existing_txt"; then
+          # Already has a real transcript (e.g. from a previous --diarize
+          # run) - keep using the master wav/txt directly. No need to split
+          # for Gemini or create fresh placeholder chunks for it.
+          effective_wav_files+=("$wav")
+          continue
+        fi
         while IFS= read -r chunk_file; do
           [[ -n "$chunk_file" ]] && effective_wav_files+=("$chunk_file")
         done < <(split_part_wav_for_gemini "$wav" "$opt_overwrite" "$session_dir")
@@ -1327,6 +1390,7 @@ PY
         fi
         if transcript_is_real "$txt" && [[ "$opt_overwrite" != "true" ]]; then
           echo "      Skip existing: $(basename "$txt")"
+          [[ -f "$json" ]] && diarize_json_files+=("$json")
           continue
         fi
         echo "      Diarizing+Transcribing: $(basename "$wav")"
@@ -1549,6 +1613,116 @@ PY
   echo "======================================================================="
 }
 
+# ---------------------------------------------------------------------------
+# apply_speaker_map
+# Re-applies an already-corrected speaker-map.tsv to transcript parts that
+# were previously produced by `create-minutes --diarize`, without
+# re-running WhisperX transcription/diarization. Intended for the two-pass
+# workflow: (1) diarize once to get anonymous speaker IDs + speaking-time
+# stats, (2) review stats and correct the map, (3) run this command to sync
+# the corrected aliases into the transcripts and regenerate the merged
+# transcript + minutes skeleton.
+# ---------------------------------------------------------------------------
+
+apply_speaker_map() {
+  local opt_title=""
+  local opt_owner=""
+  local opt_date=""
+  local opt_speaker_roster=""
+  local opt_speaker_map=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --title)          opt_title="${2:-}";          shift 2 ;;
+      --owner)          opt_owner="${2:-}";           shift 2 ;;
+      --date)           opt_date="${2:-}";            shift 2 ;;
+      --speaker-roster) opt_speaker_roster="${2:-}";  shift 2 ;;
+      --speaker-map)    opt_speaker_map="${2:-}";     shift 2 ;;
+      -h|--help)
+        echo "Usage: ai-session-manager.sh apply-speaker-map [--title <t>] [--owner <n>]"
+        echo "       [--date <YYYY-MM-DD>] [--speaker-roster <file>] [--speaker-map <file>]"
+        return 0 ;;
+      *) echo "error: unknown option: $1" >&2; return 1 ;;
+    esac
+  done
+
+  # ---- resolve active session context -------------------------------------
+  load_session_state
+  [[ -n "$CURRENT_PROJECT" ]]    || { echo "error: no active project (run prepare first)" >&2; return 1; }
+  [[ -n "$CURRENT_AI_SESSION" ]] || { echo "error: no active session (run prepare first)" >&2; return 1; }
+
+  local session_dir="$SESSION_FOLDER"
+  local session_id="${CURRENT_PROJECT}-${CURRENT_AI_SESSION}"
+  local speaker_roster_file="${opt_speaker_roster:-$session_dir/$session_id-speaker-roster.tsv}"
+  local speaker_map_file="${opt_speaker_map:-$session_dir/$session_id-speaker-map.tsv}"
+  local speaker_stats_file="$session_dir/$session_id-speaker-stats.md"
+
+  if [[ ! -f "$speaker_map_file" ]]; then
+    echo "error: speaker map file not found: $speaker_map_file" >&2
+    echo "       Run 'create-minutes --diarize' first to generate an initial map," >&2
+    echo "       then edit it with corrected aliases before running apply-speaker-map." >&2
+    return 1
+  fi
+
+  echo "=== apply-speaker-map =================================================="
+  echo "Project  : $CURRENT_PROJECT"
+  echo "Session  : $CURRENT_AI_SESSION"
+  echo "Folder   : $session_dir"
+  echo "Map      : $speaker_map_file"
+  echo "======================================================================="
+
+  local transcript_dirs=("$session_dir")
+  if [[ -d "$session_dir/.audio-split" ]]; then
+    transcript_dirs+=("$session_dir/.audio-split")
+  fi
+
+  local txt_files=()
+  local json_files=()
+  for d in "${transcript_dirs[@]}"; do
+    shopt -s nullglob
+    local part_txt=("$d"/*part*.txt)
+    local part_json=("$d"/*part*.json)
+    shopt -u nullglob
+    [[ ${#part_txt[@]} -gt 0 ]] && txt_files+=("${part_txt[@]}")
+    [[ ${#part_json[@]} -gt 0 ]] && json_files+=("${part_json[@]}")
+  done
+
+  if [[ ${#txt_files[@]} -eq 0 ]]; then
+    echo "error: no transcript (*part*.txt) files found in $session_dir" >&2
+    echo "       Run 'create-minutes --diarize' first." >&2
+    return 1
+  fi
+
+  echo
+  echo "[1/2] Re-applying speaker map to ${#txt_files[@]} transcript file(s)"
+  for t in "${txt_files[@]}"; do
+    apply_speaker_alias_map_to_transcript "$speaker_map_file" "$t"
+    echo "      Updated: $(basename "$t")"
+  done
+
+  if [[ ${#json_files[@]} -gt 0 ]]; then
+    refresh_speaker_map_and_stats \
+      "$speaker_roster_file" \
+      "$speaker_map_file" \
+      "$speaker_stats_file" \
+      "${json_files[@]}"
+    echo "      Speaker stats refreshed: $(basename "$speaker_stats_file")"
+  else
+    echo "      No diarization JSON files found – skipped speaker-stats refresh."
+  fi
+
+  echo
+  echo "[2/2] Regenerating merged transcript and minutes skeleton"
+  local passthrough=(--manual-transcripts --force-minutes)
+  [[ -n "$opt_title" ]] && passthrough+=(--title "$opt_title")
+  [[ -n "$opt_owner" ]] && passthrough+=(--owner "$opt_owner")
+  [[ -n "$opt_date" ]] && passthrough+=(--date "$opt_date")
+  [[ -n "$opt_speaker_roster" ]] && passthrough+=(--speaker-roster "$opt_speaker_roster")
+  [[ -n "$opt_speaker_map" ]] && passthrough+=(--speaker-map "$opt_speaker_map")
+
+  create_minutes "update-minutes" "${passthrough[@]}"
+}
+
 if [[ $# -lt 1 ]]; then
   usage
   exit 1
@@ -1627,6 +1801,10 @@ case "$command_name" in
   create-minutes|update-minutes)
     shift
     create_minutes "$command_name" "$@"
+    ;;
+  apply-speaker-map)
+    shift
+    apply_speaker_map "$@"
     ;;
   paths)
     print_paths
