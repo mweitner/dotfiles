@@ -104,11 +104,11 @@ release_index() {
 
 release_root_path() {
   local release_name="$1"
-  if [[ "${release_name}" == "kirkstone" ]]; then
-    echo "/opt/yocto/shared"
-  else
-    echo "/opt/yocto/shared-${release_name}"
-  fi
+  # Every release, including kirkstone, uses an explicit shared-<release> root.
+  # /opt/yocto/shared is kept as a compatibility symlink to shared-kirkstone
+  # (the original/default release) for tooling that still hardcodes the
+  # generic path.
+  echo "/opt/yocto/shared-${release_name}"
 }
 
 print_yocto_release_history() {
@@ -472,9 +472,9 @@ if [[ -n "${YOCTO_RELEASE}" ]]; then
   if [[ ${PROJECT_SHARED_ROOT_SET_BY_CLI} -eq 0 ]]; then
     PROJECT_SHARED_ROOT="$(release_root_path "${YOCTO_RELEASE}")"
   fi
-  # Automatically ensure the share root exists for non-default (non-kirkstone) releases.
-  # Kirkstone uses /opt/yocto/shared which is created by install-fedora.sh; no auto-create needed.
-  if [[ "${YOCTO_RELEASE}" != "kirkstone" ]] && [[ ${PROJECT_SHARED_ROOT_SET_BY_CLI} -eq 0 ]]; then
+  # Automatically ensure the share root exists for any release (kirkstone
+  # included) when the caller did not explicitly override the path.
+  if [[ ${PROJECT_SHARED_ROOT_SET_BY_CLI} -eq 0 ]]; then
     if [[ ! -d "${PROJECT_SHARED_ROOT}" ]]; then
       echo "Info: share root for '${YOCTO_RELEASE}' not found; creating skeleton: ${PROJECT_SHARED_ROOT}" >&2
     fi

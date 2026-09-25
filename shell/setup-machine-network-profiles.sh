@@ -180,11 +180,20 @@ replace_profile() {
     connection.autoconnect no
 
   if [ -n "$gateway" ]; then
-    # NOTE: nmcli silently drops ipv4.gateway when passed alongside other
-    # properties to "connection add" - it only takes effect via a separate
-    # "connection modify" after the connection exists. Without this follow-up
-    # step, profiles would end up with an empty gateway despite being asked
-    # for one (observed on Machine-concrete-mixing-plant-GW/-TU).
+    # NOTE (confirmed 21.09.2026): on this nmcli/NetworkManager version,
+    # ipv4.gateway and ipv4.never-default=yes are mutually exclusive -
+    # setting either one clears/negates the other, regardless of order or
+    # whether they're set together in one call. Since these profiles always
+    # keep ipv4.never-default=yes for safety (avoid hijacking the system
+    # default route, see the 19.11.2025 WIFI-conflict incident), this modify
+    # call will NOT persist - the gateway ends up empty (verified via audit:
+    # all Machine-*-GW/-TU profiles show ipv4.gateway=-- despite requesting
+    # one here). This is harmless: every gateway used by these profiles is
+    # inside the same /24 as the profile's own address, so it's already
+    # reachable via the automatic connected-route without a gateway, and
+    # never-default=yes blocks it from ever being used as a default route
+    # even if it *could* be set. Kept for documentation/intent only; do not
+    # rely on this actually taking effect.
     run_nmcli connection modify "$name" ipv4.gateway "$gateway"
   fi
 }
