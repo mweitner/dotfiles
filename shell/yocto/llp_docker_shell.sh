@@ -558,6 +558,10 @@ fi
      TEMPLATECONF="/opt/yocto/workspace/layers/meta-liebherr-lpo-display/conf/templates/default"
    elif [[ -f "${WORKDIR}/layers/meta-liebherr-lpo-display/conf/bblayers.conf.sample" ]]; then
      TEMPLATECONF="/opt/yocto/workspace/layers/meta-liebherr-lpo-display/conf"
+   elif [[ -d "${WORKDIR}/layers/meta-liebherr-lmt-display/conf/templates/default" ]]; then
+     TEMPLATECONF="/opt/yocto/workspace/layers/meta-liebherr-lmt-display/conf/templates/default"
+   elif [[ -f "${WORKDIR}/layers/meta-liebherr-lmt-display/conf/bblayers.conf.sample" ]]; then
+     TEMPLATECONF="/opt/yocto/workspace/layers/meta-liebherr-lmt-display/conf"
    elif [[ -d "${WORKDIR}/layers/liebherr/meta-liebherr-distro/conf/templates/default" ]]; then
      # llp distro: meta-liebherr-distro lives inside layers/liebherr/
      TEMPLATECONF="/opt/yocto/workspace/layers/liebherr/meta-liebherr-distro/conf/templates/default"
