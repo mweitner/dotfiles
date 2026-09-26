@@ -75,6 +75,54 @@ function print_feature_summary() {
   cat "${project_root}/build/conf/feature_summary.txt"
 }
 
+function write_llp_build_info() {
+  # Mirror .llp-share-info (created by llp_docker_shell.sh's --create-share) and
+  # .llp-build-info (created by llp_docker_shell.sh's docker preflight): leave a
+  # breadcrumb in the build dir so anyone cd-ing into it can tell at a glance
+  # which project/workdir/TEMPLATECONF this build belongs to.
+  local build_dir="$1"
+  local project="$2"
+  local workdir="$3"
+  local distro_layer="$4"
+  local templateconf="$5"
+  local container_build_dir="$6"
+  local info_file="${build_dir}/.llp-build-info"
+  local created_at=""
+  local yocto_release="unknown"
+
+  if [[ -f "${info_file}" ]]; then
+    created_at="$(grep -m1 '^created_at=' "${info_file}" 2>/dev/null | cut -d= -f2-)"
+  fi
+  created_at="${created_at:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+
+  # Best-effort release guess from the project folder name, e.g.
+  # linux-lmt-display-scarthgap -> scarthgap. Falls back to "unknown" for
+  # release-less names like linux-lpo (kirkstone, no suffix).
+  case "${project}" in
+    *-kirkstone) yocto_release="kirkstone" ;;
+    *-langdale) yocto_release="langdale" ;;
+    *-nanbield) yocto_release="nanbield" ;;
+    *-scarthgap) yocto_release="scarthgap" ;;
+    *-styhead) yocto_release="styhead" ;;
+    *-walnascar) yocto_release="walnascar" ;;
+    *-whinlatter) yocto_release="whinlatter" ;;
+  esac
+
+  mkdir -p "${build_dir}"
+  {
+    echo "project=${project}"
+    echo "workdir=${workdir}"
+    echo "build_root=${build_dir}"
+    echo "distro_layer=${distro_layer}"
+    echo "templateconf=${templateconf}"
+    echo "container_build_dir=${container_build_dir}"
+    echo "yocto_release=${yocto_release}"
+    echo "created_at=${created_at}"
+    echo "last_run_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "${info_file}"
+  echo "[llp_init_build] wrote build info: ${info_file}"
+}
+
 function append_passthrough_var() {
   local var_name="$1"
   if [[ -z "${var_name}" ]]; then
@@ -335,6 +383,14 @@ fi
 echo "devtool_workspace_active=${devtool_workspace_active}"
 
 create_feature_summary
+
+llp_build_info_container_dir="n/a (host-native build)"
+if [[ "${mixed_build_support}" = "1" ]]; then
+  llp_build_info_container_dir="/opt/yocto/build/${project_name}"
+fi
+write_llp_build_info "${project_build_root}" "${project_name}" "${project_root}" \
+  "${project_distro_layer}" "${TEMPLATECONF}" "${llp_build_info_container_dir}"
+unset llp_build_info_container_dir
 
 filter_arguments "$@"
 set -- "${llp_filter_result}"

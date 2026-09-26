@@ -17,6 +17,7 @@ NFS_EXPORT_LINES=()
 NETBOOT_PROFILES=(
   "imx6s-mcg-netboot"
   "imx6qleg-mcg-netboot"
+  "imx6q-display5-netboot"
 )
 
 is_netboot_profile() {
@@ -41,6 +42,12 @@ set_nfs_export_lines() {
       NFS_EXPORT_LINES=(
         "/opt/netboot/linux-dps-kirkstone/root/imx6qleg-mcg 192.168.3.0/24(rw,no_root_squash,no_subtree_check)"
         "/opt/netboot/linux-dps-kirkstone/image/imx6qleg-mcg 192.168.3.0/24(rw,no_root_squash,no_subtree_check)"
+      )
+      ;;
+    imx6q-display5-netboot)
+      NFS_EXPORT_LINES=(
+        "/opt/netboot/linux-lmt-display-scarthgap/root/imx6q-display5 192.168.2.0/24(rw,no_root_squash,no_subtree_check)"
+        "/opt/netboot/linux-lmt-display-scarthgap/image/imx6q-display5 192.168.2.0/24(rw,no_root_squash,no_subtree_check)"
       )
       ;;
     *)

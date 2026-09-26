@@ -183,6 +183,31 @@ create_share_root_for_release() {
   echo "${target_root}"
 }
 
+write_docker_build_info() {
+  local build_dir="$1"
+  local project="$2"
+  local workdir="$3"
+  local yocto_release="$4"
+  local container_build_dir="$5"
+  local info_file="${build_dir}/.llp-build-info"
+  local created_at=""
+
+  if [[ -f "${info_file}" ]]; then
+    created_at="$(grep -m1 '^created_at=' "${info_file}" 2>/dev/null | cut -d= -f2-)"
+  fi
+  created_at="${created_at:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+
+  {
+    echo "project=${project}"
+    echo "workdir=${workdir}"
+    echo "build_root=${build_dir}"
+    echo "container_build_dir=${container_build_dir}"
+    echo "yocto_release=${yocto_release:-unknown}"
+    echo "created_at=${created_at}"
+    echo "last_run_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "${info_file}"
+}
+
 resolve_seed_source_root() {
   local source_spec="$1"
   local source_index
@@ -948,6 +973,13 @@ if [[ ${PRINT_ONLY} -ne 1 ]]; then
     fi
     mkdir -p "${DOCKER_BUILD_DIR}"
   fi
+
+  # Mirror .llp-share-info: leave a breadcrumb in the build dir so anyone cd-ing
+  # into the dev-host build-docker/ (or the container's /opt/yocto/build/<project>)
+  # can tell at a glance which project/release/workdir this build belongs to.
+  mkdir -p "${DOCKER_BUILD_DIR}"
+  write_docker_build_info "${DOCKER_BUILD_DIR}" "${PROJECT}" "${WORKDIR}" "${YOCTO_RELEASE}" "/opt/yocto/build/${PROJECT}"
+  echo "Preflight: wrote build info: ${DOCKER_BUILD_DIR}/.llp-build-info" >&2
 fi
 
 x11_mount="/tmp/.X11-unix:/tmp/.X11-unix:rw"

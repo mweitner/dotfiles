@@ -29,6 +29,8 @@ Options:
   --manifest <path>      Manifest path inside manifest repo (default: manifest/default.xml)
   --branch <name>        Repo branch (default: main)
   --distro-layer <name>  Layer for llp_init_build.sh hint (default depends on project)
+  --target-hint <name>   bitbake target hint printed in the follow-up commands
+                         (default depends on project; "custom" defaults to <target>)
   --sync-jobs <n>        Pass -j <n> to repo sync (default: repo default)
   --skip-sync            Run repo init only
   --force-reinit         Remove existing .repo and re-run repo init
@@ -39,6 +41,14 @@ Examples:
   setup-yocto-project --project linux-dps
   setup-yocto-project --project linux-lpo --sync-jobs 8
   setup-yocto-project --project custom --workdir ~/dev/custom-yocto --repo-url https://example.com/org/repo.git --distro-layer meta-liebherr-dps
+
+  # linux-lmt-display-scarthgap has no first-class preset yet: its repo manifest
+  # still lives at a local-only .manifest-src (not pushed to a Liebherr git remote).
+  # Use --project custom with a file:// URL until that changes:
+  setup-yocto-project --project custom \
+    --workdir /opt/yocto/projects/linux-lmt-display-scarthgap \
+    --repo-url /opt/yocto/projects/linux-lmt-display-scarthgap/.manifest-src \
+    --distro-layer meta-liebherr-lmt-display --target-hint lmt-display-image
 EOF
 }
 
@@ -69,7 +79,7 @@ apply_project_defaults() {
         exit 2
       fi
       : "${DISTRO_LAYER:=meta-liebherr-distro}"
-      TARGET_HINT="<target>"
+      : "${TARGET_HINT:=<target>}"
       ;;
     *)
       echo "Error: unsupported --project '$PROJECT'" >&2
@@ -102,6 +112,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --distro-layer)
       DISTRO_LAYER="${2:-}"
+      shift 2
+      ;;
+    --target-hint)
+      TARGET_HINT="${2:-}"
       shift 2
       ;;
     --sync-jobs)
