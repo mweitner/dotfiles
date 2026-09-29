@@ -20,6 +20,16 @@ NETBOOT_PROFILES=(
   "imx6q-display5-netboot"
 )
 
+# Profiles hand out dhcp-option=option:ntp-server pointing at this dev
+# machine's own listen-address, but chronyd default-denies client queries
+# from other hosts. Without this, boards with no RTC/internet route (e.g.
+# imx6q-display5) get "Timed out waiting for reply" and never sync - see
+# lmt-dev/analysis/2026.09.29-lmt-display-image-improvements/
+# 04-timesync-problem.txt. confdir lets us swap a single managed drop-in
+# in/out per active profile instead of hand-editing /etc/chrony.conf.
+CHRONY_CONFDIR="/etc/chrony.d"
+CHRONY_DROPIN_FILE="$CHRONY_CONFDIR/10-dotfiles-active.conf"
+
 is_netboot_profile() {
   local candidate
   for candidate in "${NETBOOT_PROFILES[@]}"; do
@@ -87,6 +97,10 @@ Examples:
 Notes:
   - This helper is implemented in Bash and is shell-agnostic when executed as a command.
   - Keep shared docs/examples in Bash/POSIX syntax; when using fish interactively, run Bash snippets via: bash -lc '<command>'.
+  - When the active profile advertises dhcp-option=option:ntp-server pointing at this
+    dev machine's own listen-address, a chrony drop-in (/etc/chrony.d/10-dotfiles-active.conf)
+    is written so chronyd actually answers NTP requests from that profile's dhcp-range
+    subnet (chronyd default-denies client queries otherwise).
 EOF
 }
 
@@ -124,6 +138,13 @@ show_status() {
 
   if has_systemd_unit nfs-server.service; then
     systemctl --no-pager --full status rpcbind nfs-server 2>/dev/null | sed -n '1,20p' || true
+  fi
+
+  if [[ -f "$CHRONY_DROPIN_FILE" ]]; then
+    echo "Active chrony NTP drop-in: $CHRONY_DROPIN_FILE"
+    sudo cat "$CHRONY_DROPIN_FILE" 2>/dev/null || true
+  else
+    echo "Active chrony NTP drop-in: none"
   fi
 }
 
@@ -189,6 +210,94 @@ ensure_nfs_stack() {
   if ! command -v rpcinfo >/dev/null 2>&1; then
     echo "ERROR: rpcinfo command not found after nfs-utils install." >&2
     return 1
+  fi
+}
+
+ensure_chrony_confdir() {
+  if [[ ! -f /etc/chrony.conf ]]; then
+    return 1
+  fi
+
+  if ! grep -Eq '^[[:space:]]*confdir[[:space:]]+/etc/chrony\.d[[:space:]]*$' /etc/chrony.conf; then
+    printf '\n# Per-profile NTP-serving drop-ins (managed by dotfiles setup-dnsmasq-profile)\nconfdir %s\n' "$CHRONY_CONFDIR" \
+      | sudo tee -a /etc/chrony.conf >/dev/null
+    echo "==> Added 'confdir $CHRONY_CONFDIR' to /etc/chrony.conf"
+  fi
+
+  sudo mkdir -p "$CHRONY_CONFDIR"
+}
+
+# Prints the /24 subnet served by the active profile's first dhcp-range, e.g.
+# dhcp-range=192.168.2.10,192.168.2.100,12h -> 192.168.2.0/24. Every profile
+# in $PROFILE_DIR currently uses a /24 machine network, matching this.
+derive_chrony_allow_subnet() {
+  local first_range first_ip octet1 octet2 octet3 rest
+
+  first_range="$(grep -m1 '^dhcp-range=' "$SRC_FILE" || true)"
+  if [[ -z "$first_range" ]]; then
+    return 1
+  fi
+
+  first_ip="${first_range#dhcp-range=}"
+  first_ip="${first_ip%%,*}"
+
+  IFS='.' read -r octet1 octet2 octet3 rest <<<"$first_ip"
+  if [[ -z "$octet1" || -z "$octet2" || -z "$octet3" ]]; then
+    return 1
+  fi
+
+  printf '%s.%s.%s.0/24' "$octet1" "$octet2" "$octet3"
+}
+
+# Only serve NTP for profiles that actually advertise this dev machine's own
+# listen-address as the DHCP ntp-server (defensive: don't widen chrony's
+# allow list based on a profile that isn't actually pointing clients at us).
+profile_serves_ntp() {
+  local ntp_target
+
+  ntp_target="$(grep -m1 '^dhcp-option=option:ntp-server,' "$SRC_FILE" | cut -d, -f2 || true)"
+  [[ -n "$ntp_target" ]] && grep -Fxq "listen-address=$ntp_target" "$SRC_FILE"
+}
+
+activate_chrony_ntp() {
+  local subnet
+
+  if ! command -v chronyd >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if ! profile_serves_ntp; then
+    deactivate_chrony_ntp
+    return 0
+  fi
+
+  subnet="$(derive_chrony_allow_subnet)" || {
+    echo "WARN: could not derive subnet for chrony allow from $SRC_FILE; skipping NTP-serving setup." >&2
+    deactivate_chrony_ntp
+    return 0
+  }
+
+  ensure_chrony_confdir
+  sudo tee "$CHRONY_DROPIN_FILE" >/dev/null <<EOF
+# Managed by dotfiles setup-dnsmasq-profile for active profile: $PROFILE
+# Allow NTP client access from the dhcp-range subnet this profile serves.
+allow $subnet
+# Serve time even if this dev machine's own clock isn't itself synchronized
+# (it may be VPN-disconnected/offline while still serving the bench subnet).
+local stratum 10
+EOF
+
+  sudo systemctl enable --now chronyd >/dev/null 2>&1 || true
+  sudo systemctl restart chronyd
+  echo "==> chronyd now serves NTP to $subnet (profile: $PROFILE)"
+}
+
+deactivate_chrony_ntp() {
+  if [[ -f "$CHRONY_DROPIN_FILE" ]]; then
+    sudo rm -f "$CHRONY_DROPIN_FILE"
+    if command -v chronyd >/dev/null 2>&1 && systemctl is-active --quiet chronyd; then
+      sudo systemctl restart chronyd
+    fi
   fi
 }
 
@@ -265,6 +374,8 @@ if is_netboot_profile; then
 else
   deactivate_netboot_nfs
 fi
+
+activate_chrony_ntp
 
 echo "$PROFILE" | sudo tee "$STATE_FILE" >/dev/null
 
