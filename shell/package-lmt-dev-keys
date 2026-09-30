@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+
+# Package the LMT dev board SSH keys (OpenSSH + PuTTY) and README into a zip,
+# ready to hand off (e.g. via the Liebherr file exchange service).
+#
+# Usage: package-lmt-dev-keys [--out-dir DIR]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES="${DOTFILES:-$(dirname "$SCRIPT_DIR")}"
+
+PACKAGE_DIR="$DOTFILES/.secrets/lmt-dev-keys"
+OUT_DIR="$DOTFILES/.secrets/tmp"
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --out-dir)
+      OUT_DIR="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      echo "Usage: package-lmt-dev-keys [--out-dir DIR]"
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [ ! -d "$PACKAGE_DIR" ]; then
+  echo "Error: package directory not found: $PACKAGE_DIR" >&2
+  exit 1
+fi
+
+if ! command -v zip >/dev/null 2>&1; then
+  echo "Error: zip not found. Install it (e.g. dnf install zip)." >&2
+  exit 1
+fi
+
+mkdir -p "$OUT_DIR"
+
+ZIP_NAME="lmt-dev-ssh-keys-$(date +%Y%m%d).zip"
+ZIP_PATH="$OUT_DIR/$ZIP_NAME"
+
+rm -f "$ZIP_PATH"
+
+(
+  cd "$PACKAGE_DIR"
+  zip -q -r "$ZIP_PATH" . -x '.gitkeep'
+)
+
+echo "Created: $ZIP_PATH"

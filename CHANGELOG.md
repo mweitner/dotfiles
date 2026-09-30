@@ -17,6 +17,8 @@ and changes are grouped using a Semantic Versioning style when tagged releases a
     artifacts over SSH into target `swupdate-client` socket mode.
 - Added `--uplink-if` and `--no-internet-sharing` options to
     `shell/setup-machine-network-profiles.sh`.
+- Added `shell/package-lmt-dev-keys` helper to zip the LMT dev board SSH key
+    package (`.secrets/lmt-dev-keys`) for handoff.
 
 ### Changed (Unreleased)
 
