@@ -15,6 +15,8 @@ and changes are grouped using a Semantic Versioning style when tagged releases a
 - Added `gh-account list` subcommand for a compact host-to-user overview.
 - Added `shell/yocto/swupdate-ssh-stream` helper to precheck and stream SWU
     artifacts over SSH into target `swupdate-client` socket mode.
+- Added `--uplink-if` and `--no-internet-sharing` options to
+    `shell/setup-machine-network-profiles.sh`.
 
 ### Changed (Unreleased)
 
@@ -27,6 +29,10 @@ and changes are grouped using a Semantic Versioning style when tagged releases a
     usage for cross-project local update workflows.
 - `README.md` now reflects the current linux-dps Scarthgap rc2 validation flow
     using the Yocto helper wrappers for build and WIC-focused verification.
+- `shell/setup-machine-network-profiles.sh` now reactivates any `*-GW` profile
+    that was already active before the refresh, and automatically enables
+    internet sharing (IP forwarding + NAT to the uplink) for it via
+    `setup-machine-internet-sharing`.
 
 ### Fixed (Unreleased)
 

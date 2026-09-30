@@ -7,10 +7,15 @@ set -euo pipefail
 
 USB_MAC=""
 DRY_RUN=0
+ENABLE_INTERNET_SHARING=1
+UPLINK_IF=""
 
 declare -A GROUP_MAC_OVERRIDES=()
 declare -A PROFILE_MAC_OVERRIDES=()
 declare -a ONLY_GROUPS=()
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INTERNET_SHARING_SCRIPT="$SCRIPT_DIR/setup-machine-internet-sharing"
 
 usage() {
   cat <<'EOF'
@@ -25,6 +30,9 @@ Options:
   --profile-mac <name=MAC>  Override adapter MAC for an exact profile name
   --only-group <group>      Create/update profiles only for this group (repeatable)
   --list-groups             Print known groups and exit
+  --uplink-if <ifname>      Uplink interface for internet sharing (default: autodetect via
+                            the current default route)
+  --no-internet-sharing     Skip internet-sharing setup for active -GW profiles
   --dry-run                 Print nmcli commands without executing them
   -h, --help        Show help
 
@@ -33,6 +41,10 @@ Notes:
   - All profiles are set to autoconnect=no and ipv4.method=manual.
   - Precedence for MAC selection is: profile override > group override > --usb-mac.
   - Known groups: crane, concrete, mining, lpo, ho.
+  - Any profile named *-GW represents the dev PC acting as the machine network's
+    gateway/router. Whenever such a profile is currently the active connection on its
+    device, internet sharing (IP forwarding + NAT to the uplink interface) is enabled
+    for it automatically, unless --no-internet-sharing is given.
 EOF
 }
 
@@ -117,6 +129,14 @@ while [ "$#" -gt 0 ]; do
       list_groups
       exit 0
       ;;
+    --uplink-if)
+      UPLINK_IF="${2:-}"
+      shift 2
+      ;;
+    --no-internet-sharing)
+      ENABLE_INTERNET_SHARING=0
+      shift
+      ;;
     --dry-run)
       DRY_RUN=1
       shift
@@ -167,6 +187,11 @@ replace_profile() {
   local addresses="$2"
   local gateway="$3"
   local mac="$4"
+  local was_active_device
+
+  # Capture whether this profile is currently the active connection (and on
+  # which device) before tearing it down, so we can reactivate it afterwards.
+  was_active_device="$(nmcli -g GENERAL.DEVICES connection show "$name" 2>/dev/null || true)"
 
   # Delete first so reruns are deterministic.
   run_nmcli connection delete "$name" >/dev/null 2>&1 || true
@@ -196,6 +221,12 @@ replace_profile() {
     # rely on this actually taking effect.
     run_nmcli connection modify "$name" ipv4.gateway "$gateway"
   fi
+
+  if [ -n "$was_active_device" ]; then
+    echo "Reactivating '$name' on $was_active_device (was active before refresh)"
+    run_nmcli connection up "$name" ifname "$was_active_device" >/dev/null 2>&1 \
+      || echo "WARN: failed to reactivate '$name' on $was_active_device" >&2
+  fi
 }
 
 pick_mac_for_profile() {
@@ -213,6 +244,64 @@ pick_mac_for_profile() {
   fi
 
   printf '%s' "$USB_MAC"
+}
+
+default_uplink_if() {
+  ip route show default 0.0.0.0/0 2>/dev/null | awk '/default/ { print $5; exit }'
+}
+
+# For *-GW profiles (dev PC acting as the machine network's own gateway/router),
+# enable internet sharing automatically whenever the profile is currently the
+# active connection on its device. No-op if the profile isn't active (e.g. its
+# adapter isn't plugged in / connected right now), or if internet sharing is
+# disabled via --no-internet-sharing.
+maybe_enable_internet_sharing() {
+  local name="$1"
+  local addresses="$2"
+  local device
+  local cidr
+  local uplink_if="$UPLINK_IF"
+
+  if [ "$ENABLE_INTERNET_SHARING" -eq 0 ] || [ "$DRY_RUN" -eq 1 ]; then
+    return 0
+  fi
+
+  case "$name" in
+    *-GW) ;;
+    *) return 0 ;;
+  esac
+
+  device="$(nmcli -g GENERAL.DEVICES connection show "$name" 2>/dev/null || true)"
+  if [ -z "$device" ]; then
+    return 0
+  fi
+
+  if [ -z "$uplink_if" ]; then
+    uplink_if="$(default_uplink_if)"
+  fi
+  if [ -z "$uplink_if" ]; then
+    echo "WARN: '$name' is active on $device but no uplink interface could be" \
+      "determined (no default route); skipping internet sharing." >&2
+    return 0
+  fi
+  if [ "$uplink_if" = "$device" ]; then
+    return 0
+  fi
+
+  # Only the first address entry defines the machine subnet; iptables/nft
+  # normalize a host address with a prefix (e.g. 192.168.5.120/24) down to
+  # its network automatically, so no manual network-address computation
+  # is needed here.
+  cidr="${addresses%%,*}"
+
+  if [ ! -x "$INTERNET_SHARING_SCRIPT" ]; then
+    echo "WARN: internet-sharing helper not found/executable at" \
+      "$INTERNET_SHARING_SCRIPT; skipping for '$name'." >&2
+    return 0
+  fi
+
+  echo "Enabling internet sharing for '$name' ($cidr via $device -> $uplink_if)"
+  "$INTERNET_SHARING_SCRIPT" --in-if "$device" --cidr "$cidr" --out-if "$uplink_if"
 }
 
 apply_profile() {
@@ -234,6 +323,7 @@ apply_profile() {
 
   replace_profile "$name" "$addresses" "$gateway" "$mac"
   echo "Mapped '$name' -> $mac"
+  maybe_enable_internet_sharing "$name" "$addresses"
 }
 
 # Legacy machine networks
