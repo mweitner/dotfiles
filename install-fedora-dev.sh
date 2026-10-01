@@ -99,10 +99,13 @@ echo "── Dev: Embedded / Yocto tooling ────────────�
 sudo dnf install -y \
   uboot-tools \
   nfs-utils \
-  protobuf-compiler
+  protobuf-compiler \
+  putty
 
 echo "==> U-Boot host tools installed (mkimage, dumpimage, fw_printenv tooling)."
 echo "==> NFS host tools installed (exportfs, showmount, rpcinfo)."
+echo "==> puttygen installed (convert OpenSSH keys to PuTTY .ppk for Windows-based"
+echo "    dev boards/delivery packages, e.g. dotfiles/.secrets/yocto/keys/*/lmt-delivery)."
 
 echo "==> PDF documentation support installed (latexmk + XeLaTeX + Sphinx LaTeX helpers)."
 echo "    Use: make -C doc-engine latexpdf"
