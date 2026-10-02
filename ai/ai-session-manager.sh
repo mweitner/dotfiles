@@ -1522,7 +1522,11 @@ create_minutes() {
 
   for d in "${transcript_dirs[@]}"; do
     shopt -s nullglob
-    local part_txt=($d/*part*.txt)
+    # Anchored to '-partNN.' (not a bare '*part*' substring match) so this
+    # cannot accidentally pick up files whose session id itself contains the
+    # substring "part" (e.g. a session named "...-partner"), such as the
+    # session's own -merged-transcript.txt output file.
+    local part_txt=($d/*-part[0-9]*.txt)
     shopt -u nullglob
     if [[ ${#part_txt[@]} -gt 0 ]]; then
       txt_files+=("${part_txt[@]}")
@@ -1680,15 +1684,18 @@ apply_speaker_map() {
   local json_files=()
   for d in "${transcript_dirs[@]}"; do
     shopt -s nullglob
-    local part_txt=("$d"/*part*.txt)
-    local part_json=("$d"/*part*.json)
+    # Anchored to '-partNN.' for the same reason as the merge-step glob above:
+    # a bare '*part*' substring match would also hit e.g. a '...-partner-...'
+    # session id's own non-part output files.
+    local part_txt=("$d"/*-part[0-9]*.txt)
+    local part_json=("$d"/*-part[0-9]*.json)
     shopt -u nullglob
     [[ ${#part_txt[@]} -gt 0 ]] && txt_files+=("${part_txt[@]}")
     [[ ${#part_json[@]} -gt 0 ]] && json_files+=("${part_json[@]}")
   done
 
   if [[ ${#txt_files[@]} -eq 0 ]]; then
-    echo "error: no transcript (*part*.txt) files found in $session_dir" >&2
+    echo "error: no transcript (-partNN.txt) files found in $session_dir" >&2
     echo "       Run 'create-minutes --diarize' first." >&2
     return 1
   fi
@@ -1696,6 +1703,17 @@ apply_speaker_map() {
   echo
   echo "[1/2] Re-applying speaker map to ${#txt_files[@]} transcript file(s)"
   for t in "${txt_files[@]}"; do
+    local json_counterpart="${t%.txt}.json"
+    if [[ -f "$json_counterpart" ]]; then
+      # Regenerate from the raw WhisperX JSON first, so the transcript always
+      # starts from the true detected speaker_NN labels before the (possibly
+      # newly-corrected) map is applied. Applying the map directly onto an
+      # already-aliased .txt is a no-op once a previous run has baked aliases
+      # into the bracket labels - they no longer match any partNN/speaker_id
+      # key in the map, so edits to speaker-map.tsv would silently not take
+      # effect on a second apply-speaker-map run.
+      format_whisperx_json_to_timestamped_txt "$json_counterpart" "$t"
+    fi
     apply_speaker_alias_map_to_transcript "$speaker_map_file" "$t"
     echo "      Updated: $(basename "$t")"
   done
