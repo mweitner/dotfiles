@@ -51,6 +51,15 @@ echo "── Dev: Languages ─────────────────�
 sudo dnf install -y golang
 
 echo ""
+echo "── Dev: Python 3.12 (project interpreter) ──────────────────────────────"
+# Fedora's default python3 tracks the latest release (3.14+), but the
+# dataflow components pin `python = "^3.12, <3.14"` in pyproject.toml to
+# match the scarthgap Yocto target's python3 (3.12.14). Install 3.12
+# side-by-side (does not replace the default python3) so
+# `poetry env use python3.12` has a compatible interpreter to pick up.
+sudo dnf install -y python3.12
+
+echo ""
 echo "── Dev: Rust toolchain ──────────────────────────────────────────────────"
 
 if ! command -v cargo >/dev/null 2>&1 || ! command -v rustup >/dev/null 2>&1; then
@@ -113,6 +122,13 @@ echo "    Use: make -C doc-engine latexpdf"
 echo ""
 echo "── Dev: Git hooks ───────────────────────────────────────────────────────"
 sudo dnf install -y pre-commit
+
+echo ""
+echo "── Dev: Python unversioned command ─────────────────────────────────────"
+# Fedora ships python3 only, no `python` on PATH. Several project scripts use
+# `#!/usr/bin/env python` shebangs (e.g. dataflow's scripts/run_all_tests.py),
+# which fail with "env: 'python': No such file or directory" without this.
+sudo dnf install -y python-unversioned-command
 
 echo ""
 echo "── Dev: Python package manager (uv) ────────────────────────────────────"
