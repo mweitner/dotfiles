@@ -3,11 +3,69 @@ set -euo pipefail
 
 # Wayland-native monitor configuration for Ulm office docking
 # Dell WD19TB Thunderbolt Dock + 2x Dell U2415 (1920x1200)
-# Layout: DP-5 (left) | DP-6 (center) | eDP-1 (right)
+# Layout: left | center | eDP-1 (right)
 # Logical positions: 0 | 1920 | 3840
+#
+# Connector names (DP-5, DP-6, DP-7, DP-8, ...) are NOT stable across
+# dock/undock cycles - the Thunderbolt/KVM USB-C re-enumeration order can
+# change which connector name each physical monitor gets. Identifying
+# outputs by hardcoded connector name caused left/right to swap silently
+# (the script matched no output, so Sway fell back to its own enumeration
+# order for placement). Resolve by serial number instead, like
+# monitor-home-office does.
+#
+# Override via environment if needed:
+#   ULM_OFFICE_LEFT_SERIAL=... ULM_OFFICE_RIGHT_SERIAL=... monitor-ulm-office
+ULM_OFFICE_LEFT_SERIAL="${ULM_OFFICE_LEFT_SERIAL:-XKV0P06G07FL}"
+ULM_OFFICE_RIGHT_SERIAL="${ULM_OFFICE_RIGHT_SERIAL:-XKV0P0661E5U}"
 
-swaymsg output DP-5  mode 1920x1200@59.950Hz position 0    0 scale 1
-swaymsg output DP-6  mode 1920x1200@59.950Hz position 1920 0 scale 1
-swaymsg output eDP-1 mode 2560x1600@120Hz   position 3840 0 scale 1.5
+if ! command -v jq >/dev/null 2>&1; then
+	echo "ERROR: jq is required for monitor-ulm-office" >&2
+	exit 1
+fi
+
+get_known_outputs() {
+	swaymsg -t get_outputs -r | jq -r '.[] | .name'
+}
+
+get_output_by_serial() {
+	local serial="$1"
+	swaymsg -t get_outputs -r | jq -r --arg s "$serial" '.[] | select(.serial == $s) | .name' | head -n1
+}
+
+mapfile -t ALL_OUTPUTS < <(get_known_outputs)
+mapfile -t EXTERNAL_OUTPUTS < <(printf '%s\n' "${ALL_OUTPUTS[@]}" | grep -Ev '^eDP' || true)
+
+if [[ ${#EXTERNAL_OUTPUTS[@]} -lt 2 ]]; then
+	echo "ERROR: expected at least 2 external outputs, found ${#EXTERNAL_OUTPUTS[@]}" >&2
+	echo "Known outputs: ${ALL_OUTPUTS[*]:-none}" >&2
+	exit 1
+fi
+
+# Prefer serial-based mapping for deterministic physical placement.
+LEFT_OUT="$(get_output_by_serial "$ULM_OFFICE_LEFT_SERIAL")"
+RIGHT_OUT="$(get_output_by_serial "$ULM_OFFICE_RIGHT_SERIAL")"
+
+# Fallback if serials are unavailable (new monitor, EDID change, etc.).
+if [[ -z "$LEFT_OUT" || -z "$RIGHT_OUT" || "$LEFT_OUT" == "$RIGHT_OUT" ]]; then
+	IFS=$'\n' EXTERNAL_OUTPUTS=($(printf '%s\n' "${EXTERNAL_OUTPUTS[@]}" | sort))
+	LEFT_OUT="${EXTERNAL_OUTPUTS[0]}"
+	RIGHT_OUT="${EXTERNAL_OUTPUTS[1]}"
+fi
+
+swaymsg output "$LEFT_OUT"  mode 1920x1200@59.950Hz position 0    0 scale 1
+swaymsg output "$RIGHT_OUT" mode 1920x1200@59.950Hz position 1920 0 scale 1
+swaymsg output eDP-1        mode 2560x1600@120Hz    position 3840 0 scale 1.5
 
 echo "✓ Ulm office docking display profile applied"
+echo "  left=${LEFT_OUT} center=${RIGHT_OUT} laptop=eDP-1"
+echo "  expected-left-serial=${ULM_OFFICE_LEFT_SERIAL} expected-center-serial=${ULM_OFFICE_RIGHT_SERIAL}"
+
+if command -v notify-send >/dev/null 2>&1; then
+	(
+		sleep 1
+		notify-send "Ulm office display profile applied" \
+			"left=${LEFT_OUT} center=${RIGHT_OUT} laptop=eDP-1" \
+			--icon=video-display
+	) >/dev/null 2>&1 &
+fi

@@ -74,6 +74,7 @@ Examples:
   llp_docker_shell.sh --project linux-dps --project-keys dps --yocto-release kirkstone
   llp_docker_shell.sh --project linux-dps --project-keys dps --create-share whinlatter --seed-from scarthgap
   llp_docker_shell.sh --project linux-dps --project-keys dps --yocto-release whinlatter --create-share whinlatter --seed-from scarthgap
+  llp_docker_shell.sh --project linux-dps-scarthgap --project-keys dps --status
 EOF
 }
 
@@ -208,6 +209,174 @@ write_docker_build_info() {
   } > "${info_file}"
 }
 
+# Print the non-comment, non-blank variable assignment lines of a local.conf
+# append-style file (local.conf.append / local.conf.netboot.append), along
+# with its last-modified time. Used by --status.
+_print_conf_append_status() {
+  local label="$1"
+  local file_path="$2"
+  local enabled="$3"
+
+  echo "--- ${label}: ${file_path} ---"
+  if [[ "${enabled}" -ne 1 ]]; then
+    echo "  (disabled)"
+    echo
+    return 0
+  fi
+  if [[ ! -f "${file_path}" ]]; then
+    echo "  (not found)"
+    echo
+    return 0
+  fi
+  local mtime
+  mtime="$(date -r "${file_path}" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo unknown)"
+  echo "  last modified: ${mtime}"
+  grep -Ev '^[[:space:]]*(#.*)?$' "${file_path}" | sed 's/^/  /'
+  echo
+}
+
+# Heuristic check: for any FOO_SRC_URI pointing at a .local-repos/*.git bare
+# repo, with sibling FOO_BRANCH / FOO_SRCREV variables defined in the same
+# append file, compare the pinned FOO_SRCREV hash against the bare repo's
+# actual current HEAD for that branch and flag drift. This directly targets
+# the "pinned SRCREV instead of AUTOREV" local-dev workflow (see
+# .local-conf/local.conf.append comments) so stale pins after a push are
+# caught before they silently mislead a build. Used by --status.
+_print_srcrev_drift_check() {
+  local file_path="$1"
+  [[ -f "${file_path}" ]] || return 0
+
+  local -A vals
+  local line name value
+  while IFS= read -r line; do
+    [[ "${line}" =~ ^[[:space:]]*#.*$ ]] && continue
+    [[ -z "${line//[[:space:]]/}" ]] && continue
+    if [[ "${line}" =~ ^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*(\?=|=)[[:space:]]*\"(.*)\"[[:space:]]*$ ]]; then
+      name="${BASH_REMATCH[1]}"
+      value="${BASH_REMATCH[3]}"
+      vals["${name}"]="${value}"
+    fi
+  done < "${file_path}"
+
+  local printed_header=0
+  local key prefix uri branch srcrev git_path actual
+  for key in "${!vals[@]}"; do
+    [[ "${key}" == *_SRC_URI ]] || continue
+    uri="${vals[${key}]}"
+    [[ "${uri}" == *".local-repos/"* ]] || continue
+    prefix="${key%_SRC_URI}"
+    branch="${vals[${prefix}_BRANCH]:-}"
+    srcrev="${vals[${prefix}_SRCREV]:-}"
+    [[ -z "${branch}" || -z "${srcrev}" ]] && continue
+    [[ "${srcrev}" == *'${AUTOREV}'* || "${srcrev}" == "AUTOREV" ]] && continue
+    # The path embedded in SRC_URI is a container-rooted absolute path (e.g.
+    # /opt/yocto/workspace/.local-repos/foo.git), since .local-conf/local.conf.append
+    # is written in terms of the in-container workspace mount. Re-derive the
+    # equivalent HOST path via WORKDIR (same bind-mounted files) rather than
+    # trusting the embedded prefix directly, so this works when run on the host.
+    [[ "${uri}" =~ \.local-repos/([^\;]+\.git) ]] || continue
+    git_path="${WORKDIR}/.local-repos/${BASH_REMATCH[1]}"
+
+    if [[ ${printed_header} -eq 0 ]]; then
+      echo "--- pinned SRCREV drift check ---"
+      printed_header=1
+    fi
+
+    if [[ ! -d "${git_path}" ]]; then
+      echo "  ${prefix}: bare repo not found: ${git_path}"
+      continue
+    fi
+
+    actual="$(git -C "${git_path}" rev-parse "${branch}" 2>/dev/null || echo "")"
+    if [[ -z "${actual}" ]]; then
+      echo "  ${prefix}: branch '${branch}' not found in ${git_path}"
+    elif [[ "${actual}" == "${srcrev}" ]]; then
+      echo "  ${prefix}: OK (pinned ${srcrev:0:12} matches ${branch} HEAD)"
+    else
+      echo "  ${prefix}: DRIFT - pinned ${srcrev:0:12} but ${branch} HEAD is ${actual:0:12} - update ${file_path}"
+    fi
+  done
+
+  if [[ ${printed_header} -eq 1 ]]; then
+    echo
+  fi
+}
+
+# The "injected overrides" section shared by both --status and the
+# container startup banner: local.conf.append / netboot.append contents,
+# local bare repos under .local-repos/ with their branches and latest
+# commits, and the pinned-SRCREV drift check. Kept separate from
+# print_llp_status so it can also be captured into a file and shown inside
+# the container every time a shell is started (like devtool's active
+# workspace NOTE), without duplicating the host-only "running containers"
+# check that doesn't make sense to run again from inside the container.
+print_injected_overrides() {
+  _print_conf_append_status "local.conf.append" "${LOCAL_CONF_APPEND_FILE}" "${ENABLE_LOCAL_CONF_APPEND}"
+  if [[ ${NETBOOT_SUPPORT} -eq 1 ]]; then
+    _print_conf_append_status "netboot.append" "${NETBOOT_APPEND_FILE}" "${ENABLE_NETBOOT_APPEND}"
+  fi
+
+  echo "--- local bare repos (${WORKDIR}/.local-repos) ---"
+  local local_repos_dir="${WORKDIR}/.local-repos"
+  if [[ -d "${local_repos_dir}" ]]; then
+    local repo_dir repo_name branch sha date subject found_any=0
+    for repo_dir in "${local_repos_dir}"/*.git; do
+      [[ -d "${repo_dir}" ]] || continue
+      found_any=1
+      repo_name="$(basename "${repo_dir}")"
+      echo "  ${repo_name}  (${repo_dir})"
+      while IFS= read -r branch; do
+        [[ -z "${branch}" ]] && continue
+        if read -r sha date subject < <(git -C "${repo_dir}" log -1 --format='%h %cd %s' --date=short "${branch}" 2>/dev/null); then
+          printf '    %-30s %s %s %s\n' "${branch}" "${sha}" "${date}" "${subject}"
+        fi
+      done < <(git -C "${repo_dir}" for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)
+    done
+    if [[ ${found_any} -eq 0 ]]; then
+      echo "  (none found)"
+    fi
+  else
+    echo "  (directory not present)"
+  fi
+  echo
+
+  _print_srcrev_drift_check "${LOCAL_CONF_APPEND_FILE}"
+}
+
+# Full --status report: project/workdir summary, running containers for this
+# project (matched via the docker-compose config_files label, which encodes
+# the absolute COMPOSE_FILE path and is therefore unique per checkout), plus
+# the injected-overrides section above.
+print_llp_status() {
+  echo "=== llp_docker_shell status: ${PROJECT} (${PROJECT_KEYS}) ==="
+  echo "workdir:              ${WORKDIR}"
+  echo "yocto_release:        ${YOCTO_RELEASE:-(unset)}"
+  echo "project_shared_root:  ${PROJECT_SHARED_ROOT}"
+  echo "docker_build_dir:     ${DOCKER_BUILD_DIR}"
+  if [[ -L "/opt/yocto/build/${PROJECT}" ]]; then
+    echo "build_symlink:        /opt/yocto/build/${PROJECT} -> $(readlink -f "/opt/yocto/build/${PROJECT}" 2>/dev/null || echo '?')"
+  else
+    echo "build_symlink:        (not present)"
+  fi
+  echo
+
+  echo "--- running containers (project config: ${COMPOSE_FILE}) ---"
+  if command -v docker >/dev/null 2>&1; then
+    local running
+    running="$(docker ps --filter "label=com.docker.compose.project.config_files=${COMPOSE_FILE}" --format '{{.ID}}  {{.Names}}  {{.Status}}' 2>/dev/null || true)"
+    if [[ -n "${running}" ]]; then
+      echo "${running}"
+    else
+      echo "(none running)"
+    fi
+  else
+    echo "(docker command not found, skipping)"
+  fi
+  echo
+
+  print_injected_overrides
+}
+
 resolve_seed_source_root() {
   local source_spec="$1"
   local source_index
@@ -297,6 +466,7 @@ YOCTO_RELEASE=""
 CREATE_SHARE_RELEASE=""
 SEED_FROM=""
 LIST_YOCTO_RELEASES=0
+STATUS=0
 NETRC_FILE="${NETRC_FILE:-$HOME/.netrc}"
 ENABLE_NETRC=1
 WGETRC_FILE="${WGETRC_FILE:-$HOME/.config/wgetrc}" # default to XDG config, will be symlinked
@@ -430,6 +600,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --list-yocto-releases)
       LIST_YOCTO_RELEASES=1
+      shift
+      ;;
+    --status)
+      STATUS=1
       shift
       ;;
     --netrc-file)
@@ -637,6 +811,11 @@ fi
 if [[ ! -d "${WORKDIR}" ]]; then
   echo "Error: workdir not found: ${WORKDIR}" >&2
   exit 1
+fi
+
+if [[ ${STATUS} -eq 1 ]]; then
+  print_llp_status
+  exit 0
 fi
 
 if [[ ! -f "${SWUPDATE_PASSWORD_FILE}" ]]; then
@@ -1067,6 +1246,27 @@ if [[ ${NETBOOT_SUPPORT} -eq 1 ]] && [[ ${ENABLE_NETBOOT_APPEND} -eq 1 ]]; then
   fi
 fi
 
+# Generate a "devtool-style" active workspace banner (local.conf.append /
+# netboot.append content, .local-repos/*.git state, pinned-SRCREV drift) and
+# have the container print it right when the interactive shell starts, so
+# it's obvious what local-dev overrides are in effect without having to
+# remember to run `--status` separately. Written to a host temp file and
+# bind-mounted read-only, same pattern as the append files above; cleaned up
+# on exit via the trap below.
+container_status_banner_file="/tmp/llp-status-banner.txt"
+if [[ ${INIT_BUILD_ENV} -eq 1 ]]; then
+  status_banner_file="$(mktemp "${TMPDIR:-/tmp}/llp-status-banner.XXXXXX")"
+  trap 'rm -f "${status_banner_file}"' EXIT
+  {
+    echo "==> llp_docker_shell: active local dev workspace overrides (see --status for more) <=="
+    echo
+    print_injected_overrides
+  } > "${status_banner_file}"
+  cmd+=(
+    -v "${status_banner_file}:${container_status_banner_file}:ro"
+  )
+fi
+
 # SSH agent and ~/.ssh support for devtool workflows
 if [[ ${ENABLE_SSH_AGENT} -eq 1 ]]; then
   if [[ -n "${SSH_AUTH_SOCK:-}" ]] && [[ -S "${SSH_AUTH_SOCK}" ]]; then
@@ -1102,7 +1302,7 @@ cmd+=(
 if [[ ${INIT_BUILD_ENV} -eq 1 ]]; then
   cmd+=(
     bash -lc
-    "cd /opt/yocto/workspace && source layers/poky/oe-init-build-env /opt/yocto/build/${PROJECT} && if [[ -f ${container_localconf_append_file} ]]; then printf '\n# llp_docker_shell local.conf.append injection\n' >> /opt/yocto/build/${PROJECT}/conf/local.conf && cat ${container_localconf_append_file} >> /opt/yocto/build/${PROJECT}/conf/local.conf; fi && if [[ ${NETBOOT_SUPPORT} -eq 1 ]]; then if [[ -f ${container_netboot_append_file} ]]; then printf '\n# llp_docker_shell netboot_support injection (file)\n' >> /opt/yocto/build/${PROJECT}/conf/local.conf && cat ${container_netboot_append_file} >> /opt/yocto/build/${PROJECT}/conf/local.conf; else printf '\n# llp_docker_shell netboot_support injection (builtin)\nIMAGE_INSTALL:append = \" nfs-utils-client\"\n' >> /opt/yocto/build/${PROJECT}/conf/local.conf; fi; fi && exec bash -i"
+    "cd /opt/yocto/workspace && source layers/poky/oe-init-build-env /opt/yocto/build/${PROJECT} && if [[ -f ${container_localconf_append_file} ]]; then printf '\n# llp_docker_shell local.conf.append injection\n' >> /opt/yocto/build/${PROJECT}/conf/local.conf && cat ${container_localconf_append_file} >> /opt/yocto/build/${PROJECT}/conf/local.conf; fi && if [[ ${NETBOOT_SUPPORT} -eq 1 ]]; then if [[ -f ${container_netboot_append_file} ]]; then printf '\n# llp_docker_shell netboot_support injection (file)\n' >> /opt/yocto/build/${PROJECT}/conf/local.conf && cat ${container_netboot_append_file} >> /opt/yocto/build/${PROJECT}/conf/local.conf; else printf '\n# llp_docker_shell netboot_support injection (builtin)\nIMAGE_INSTALL:append = \" nfs-utils-client\"\n' >> /opt/yocto/build/${PROJECT}/conf/local.conf; fi; fi && if [[ -f ${container_status_banner_file} ]]; then cat ${container_status_banner_file}; fi && exec bash -i"
   )
 fi
 

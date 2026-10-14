@@ -40,7 +40,7 @@ Notes:
   - Existing profiles with the same name are replaced.
   - All profiles are set to autoconnect=no and ipv4.method=manual.
   - Precedence for MAC selection is: profile override > group override > --usb-mac.
-  - Known groups: crane, concrete, mining, lpo, ho.
+  - Known groups: crane, concrete, mining, lpo, ho, egb.
   - Any profile named *-GW represents the dev PC acting as the machine network's
     gateway/router. Whenever such a profile is currently the active connection on its
     device, internet sharing (IP forwarding + NAT to the uplink interface) is enabled
@@ -55,6 +55,7 @@ concrete
 mining
 lpo
 ho
+egb
 EOF
 }
 
@@ -205,21 +206,27 @@ replace_profile() {
     connection.autoconnect no
 
   if [ -n "$gateway" ]; then
-    # NOTE (confirmed 21.09.2026): on this nmcli/NetworkManager version,
-    # ipv4.gateway and ipv4.never-default=yes are mutually exclusive -
-    # setting either one clears/negates the other, regardless of order or
-    # whether they're set together in one call. Since these profiles always
-    # keep ipv4.never-default=yes for safety (avoid hijacking the system
-    # default route, see the 19.11.2025 WIFI-conflict incident), this modify
-    # call will NOT persist - the gateway ends up empty (verified via audit:
-    # all Machine-*-GW/-TU profiles show ipv4.gateway=-- despite requesting
-    # one here). This is harmless: every gateway used by these profiles is
-    # inside the same /24 as the profile's own address, so it's already
+    # NOTE (confirmed 21.09.2026, re-confirmed 13.10.2026): on this
+    # nmcli/NetworkManager version, ipv4.gateway and ipv4.never-default=yes
+    # are mutually exclusive - setting either one clears/negates the other,
+    # regardless of order or whether they're set together in one call. Which
+    # one "wins" has been observed to depend on the NM version/state at the
+    # time (historically gateway lost and ended up empty - verified via audit
+    # of Machine-*-GW/-TU profiles; but on 13.10.2026, for a freshly created
+    # profile, gateway instead persisted and silently flipped
+    # never-default to "no", installing a low-metric (route-metric 1)
+    # default route via the machine-network gateway that out-competed the
+    # laptop's WiFi default route (metric 600) and broke internet access -
+    # see the EGB BC7 pilot Teltonika-router incident). Because of this, we
+    # can NOT rely on the gateway modify leaving never-default alone, so we
+    # unconditionally re-assert never-default=yes right after, as a safety
+    # net. This is harmless either way: every gateway used by these profiles
+    # is inside the same /24 as the profile's own address, so it's already
     # reachable via the automatic connected-route without a gateway, and
     # never-default=yes blocks it from ever being used as a default route
-    # even if it *could* be set. Kept for documentation/intent only; do not
-    # rely on this actually taking effect.
+    # even if it *could* be set.
     run_nmcli connection modify "$name" ipv4.gateway "$gateway"
+    run_nmcli connection modify "$name" ipv4.never-default yes
   fi
 
   if [ -n "$was_active_device" ]; then
@@ -348,6 +355,20 @@ apply_profile "lpo" "Machine-lpo-dc5" "192.168.2.130/24" ""
 
 # Home-office simulation network (dev-pc acts as gateway)
 apply_profile "ho" "Machine-ho-dev-pc-GW" "192.168.1.1/24" ""
+
+# EGB BC7 Baustromverteiler pilot: Teltonika router at the smart PDU (LDC lab /
+# on-site) is the real gateway/router, MCG Global is statically assigned
+# 192.168.1.180 by EGB (Thomas). CSM (customer service maintenance) role: dev
+# pc joins as a regular client, representing a maintenance pc accessing the
+# smart PDU, same pattern as Machine-lpo-CSM.
+apply_profile "egb" "Machine-egb-ldc-lab-CSM" "192.168.1.150/24" "192.168.1.1"
+# TU (telematic unit) role: MCG Global's real static IP is not yet reachable
+# at the LDC lab, so the dev pc temporarily assumes MCG Global's address
+# (192.168.1.180) to receive the Liebherr TwinCAT module's MQTT telemetry
+# directly for verification, same pattern as Machine-mining-excavator-TU /
+# Machine-crane-rope-testrig-TU. Only one of Machine-egb-ldc-lab-CSM /
+# Machine-egb-ldc-lab-TU can be active on the adapter at a time.
+apply_profile "egb" "Machine-egb-ldc-lab-TU" "192.168.1.180/24" "192.168.1.1"
 
 if [ "$DRY_RUN" -eq 0 ]; then
   if [ -n "$USB_MAC" ]; then

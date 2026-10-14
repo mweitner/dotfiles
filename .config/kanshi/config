@@ -1,9 +1,13 @@
 # kanshi display profiles for multi-monitor docking station setup
 # HP ZBook Power G11 + Dell WD19TB Thunderbolt Dock + 2× Samsung U28E850 (4K 28")
 #
-# Thunderbolt dock output names: DP-7 (left), DP-6 (center)
-# Logical layout:  [DP-7 1920px] [DP-6 1920px] [eDP-1 1707px]
-# Physical:        3840x2160@scale2 + 3840x2160@scale2 + 2560x1600@scale1.5
+# Connector names (DP-5, DP-6, DP-7, DP-8, ...) are NOT stable across
+# dock/undock cycles - Thunderbolt/KVM USB-C re-enumeration order can change
+# which connector name each physical monitor gets on reconnect. Profiles
+# below identify external monitors by "<Manufacturer> <Model> <Serial>"
+# instead of connector name, so matching/placement stays correct regardless
+# of enumeration order. Look up current values with:
+#   swaymsg -t get_outputs -r | jq -r '.[] | "\(.make) \(.model) \(.serial) -> \(.name)"'
 
 # Laptop only (no dock)
 profile laptop-only {
@@ -11,7 +15,12 @@ profile laptop-only {
 }
 
 # Home office: Dell WD19TB via Thunderbolt — two Samsung 4K + laptop
-# Layout: DP-6 (left) | DP-7 (center) | eDP-1 (right)
+# Layout: DP-7 (left) | DP-6 (center) | eDP-1 (right)
+# NOTE: still connector-name based (DP-6/DP-7) - unverified serial/make
+# strings for these Samsung monitors, see troubleshooting section in
+# LDH - ZBook Hardware Setup.md if left/center appear swapped after
+# dock/undock; use monitor-home-office (serial-based) instead of this
+# kanshi profile when in doubt.
 profile home-office {
   output DP-7  enable mode 3840x2160@30Hz position 0,0    scale 2
   output DP-6  enable mode 3840x2160@60Hz position 1920,0 scale 2
@@ -19,8 +28,9 @@ profile home-office {
 }
 
 # Ulm office: Dell WD19TB + 2x Dell U2415 (1920x1200)
+# Layout: left | center | eDP-1 (right)
 profile ulm-office {
-  output DP-5  enable mode 1920x1200@59.950Hz position 0,0    scale 1
-  output DP-6  enable mode 1920x1200@59.950Hz position 1920,0 scale 1
+  output "Dell Inc. DELL U2415 XKV0P06G07FL" enable mode 1920x1200@59.950Hz position 0,0    scale 1
+  output "Dell Inc. DELL U2415 XKV0P0661E5U" enable mode 1920x1200@59.950Hz position 1920,0 scale 1
   output eDP-1 enable mode 2560x1600@120Hz   position 3840,0 scale 1.5
 }
