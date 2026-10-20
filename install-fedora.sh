@@ -590,6 +590,7 @@ if [[ "$SKIP_SYMLINKS" == false ]]; then
   [[ -f "$DOTFILES/shell/setup-machine-network-profiles.sh" ]] && ln -sf "$DOTFILES/shell/setup-machine-network-profiles.sh" "$HOME/.local/bin/setup-machine-network-profiles"
   [[ -f "$DOTFILES/shell/setup-adapters.sh" ]] && ln -sf "$DOTFILES/shell/setup-adapters.sh" "$HOME/.local/bin/setup-adapters"
   [[ -f "$DOTFILES/shell/setup-dnsmasq-profile" ]] && ln -sf "$DOTFILES/shell/setup-dnsmasq-profile" "$HOME/.local/bin/setup-dnsmasq-profile"
+  [[ -f "$DOTFILES/shell/setup-iotcore-srv-dns" ]] && ln -sf "$DOTFILES/shell/setup-iotcore-srv-dns" "$HOME/.local/bin/setup-iotcore-srv-dns"
   [[ -f "$DOTFILES/shell/setup-netboot-profile" ]] && ln -sf "$DOTFILES/shell/setup-netboot-profile" "$HOME/.local/bin/setup-netboot-profile"
   [[ -f "$DOTFILES/shell/setup-ulm-office-mode" ]] && ln -sf "$DOTFILES/shell/setup-ulm-office-mode" "$HOME/.local/bin/setup-ulm-office-mode"
   [[ -f "$DOTFILES/shell/setup-machine-internet-sharing" ]] && ln -sf "$DOTFILES/shell/setup-machine-internet-sharing" "$HOME/.local/bin/setup-machine-internet-sharing"

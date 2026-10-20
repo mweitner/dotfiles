@@ -9,6 +9,7 @@ USB_MAC=""
 DRY_RUN=0
 ENABLE_INTERNET_SHARING=1
 UPLINK_IF=""
+ENABLE_IOTCORE_SRV=0
 
 declare -A GROUP_MAC_OVERRIDES=()
 declare -A PROFILE_MAC_OVERRIDES=()
@@ -16,6 +17,7 @@ declare -a ONLY_GROUPS=()
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INTERNET_SHARING_SCRIPT="$SCRIPT_DIR/setup-machine-internet-sharing"
+IOTCORE_SRV_SCRIPT="$SCRIPT_DIR/setup-iotcore-srv-dns"
 
 usage() {
   cat <<'EOF'
@@ -33,6 +35,11 @@ Options:
   --uplink-if <ifname>      Uplink interface for internet sharing (default: autodetect via
                             the current default route)
   --no-internet-sharing     Skip internet-sharing setup for active -GW profiles
+  --iotcore-srv             Also enable the authbuddy *.machine.internal. SRV
+                            zone (setup-iotcore-srv-dns --enable), so real
+                            IoT-Core 2.0 authbuddy can resolve endpoints.idp_srv
+                            on dev-pc regardless of which machine network this
+                            profile represents (lab PDU, bench rig, ...).
   --dry-run                 Print nmcli commands without executing them
   -h, --help        Show help
 
@@ -136,6 +143,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-internet-sharing)
       ENABLE_INTERNET_SHARING=0
+      shift
+      ;;
+    --iotcore-srv)
+      ENABLE_IOTCORE_SRV=1
       shift
       ;;
     --dry-run)
@@ -377,4 +388,16 @@ if [ "$DRY_RUN" -eq 0 ]; then
     echo "Created/updated Machine-* profiles using per-group/per-profile MAC mappings"
   fi
   echo "Check with: nmcli connection show | grep '^Machine-'"
+fi
+
+if [ "$ENABLE_IOTCORE_SRV" -eq 1 ]; then
+  if [ "$DRY_RUN" -eq 1 ]; then
+    echo "[dry-run] $IOTCORE_SRV_SCRIPT --enable"
+  elif [ -x "$IOTCORE_SRV_SCRIPT" ]; then
+    echo "Enabling authbuddy *.machine.internal. SRV zone..."
+    "$IOTCORE_SRV_SCRIPT" --enable
+  else
+    echo "WARN: --iotcore-srv given but helper not found/executable at" \
+      "$IOTCORE_SRV_SCRIPT; skipping." >&2
+  fi
 fi

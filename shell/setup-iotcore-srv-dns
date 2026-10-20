@@ -1,0 +1,199 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Serve the IoT-Core 2.0 machine-stack's `*.machine.internal.` DNS SRV zone
+# locally on dev-pc, so the real `authbuddy` binary (lh_iotcore_machinestack)
+# can resolve `endpoints.idp_srv` without any on-site/real-device dnsmasq.
+#
+# On a real device image, this zone is answered by the device's own dnsmasq
+# instance (rendered by `iotconfigd` from the live service registry - see
+# lh_iotcore_machinestack/services/iotconfigd/README.md). Dev-pc has no
+# iotconfigd, so this script is the dev-pc stand-in: a static drop-in with
+# one real SRV answer (idp_srv) and three schema-required placeholder
+# answers (registry_srv/mqtt_srv/quic_tunnel_srv - authbuddy itself never
+# resolves these; only iotconfigd/iotedgeagent/dc-quic-client would).
+#
+# This is independent of whichever dotfiles dnsmasq profile (lpo, mining,
+# egb, ...) is currently active: every profile already listens on
+# 127.0.0.1, and the system dnsmasq.service merges *all* files under
+# conf-dir=/etc/dnsmasq.d, not just the active-profile symlink. So this
+# drop-in persists across `setup-dnsmasq-profile --profile <other>` calls
+# and across `setup-machine-network-profiles.sh` runs for any machine
+# network - it only restarts dnsmasq when its own content actually changes.
+#
+# systemd-resolved is pointed at it for just the `machine.internal` domain via
+# a global resolved.conf.d drop-in (DNS=127.0.0.1 / Domains=~machine.internal).
+# Per-link scoping (resolvectl dns/domain on "lo") was tried first but
+# systemd-resolved hardcodes a refusal to manage loopback links at all
+# (confirmed via SYSTEMD_LOG_LEVEL=debug: resolve1.Manager.SetLinkDNSEx
+# returns org.freedesktop.resolve1.LinkBusy "Link lo is loopback device." -
+# this is resolved's own policy, unrelated to firewalld/Fedora Server; the
+# follow-up "The name is not activatable" error some tools show is just
+# resolvectl's fallback to systemd-networkd failing because this system uses
+# NetworkManager, not networkd). The global Resolve drop-in has no such
+# restriction and still leaves every other domain/link resolving exactly as
+# before. /etc/resolv.conf itself is not touched.
+
+DROPIN_FILE="/etc/dnsmasq.d/20-iotcore-authbuddy-srv.conf"
+RESOLVED_DROPIN_DIR="/etc/systemd/resolved.conf.d"
+RESOLVED_DROPIN_FILE="$RESOLVED_DROPIN_DIR/20-iotcore-authbuddy-srv.conf"
+IDP_SRV_NAME="_iotcore-idp-v1._tcp.machine.internal."
+IDP_TARGET="${IOTCORE_IDP_HOST:-dc-idp-v1.pre.eu.iotcore.liebherr.com}"
+IDP_PORT="${IOTCORE_IDP_PORT:-443}"
+PLACEHOLDER_HOST="localhost.invalid"
+
+ACTION=""
+
+usage() {
+  cat <<'EOF'
+Usage:
+  setup-iotcore-srv-dns --enable
+  setup-iotcore-srv-dns --disable
+  setup-iotcore-srv-dns --show
+
+Serves authbuddy's required *.machine.internal. SRV zone from the local
+system dnsmasq (loopback only) and adds a global systemd-resolved
+Domains=~machine.internal route to it, so real `authbuddy` can resolve
+endpoints.idp_srv on dev-pc. Does not disturb any active dotfiles dnsmasq
+profile (lpo/mining/egb/...), any interface's own DNS configuration, or
+resolution of any domain other than machine.internal.
+
+Options:
+  --enable    Install the SRV drop-in + resolved domain route, restart
+              dnsmasq/systemd-resolved only if their drop-in content changed.
+  --disable   Remove both drop-ins and restart the affected services.
+  --show      Print current drop-in content + resolved status for the domain.
+  -h, --help  Show this help.
+
+Env overrides:
+  IOTCORE_IDP_HOST  idp_srv SRV target host (default: dc-idp-v1.pre.eu.iotcore.liebherr.com)
+  IOTCORE_IDP_PORT  idp_srv SRV target port (default: 443)
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --enable|--disable|--show)
+      ACTION="${1#--}"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$ACTION" ]]; then
+  echo "Error: one of --enable/--disable/--show is required" >&2
+  usage
+  exit 1
+fi
+
+render_dropin() {
+  cat <<EOF
+# Managed by dotfiles setup-iotcore-srv-dns - do not edit by hand.
+# Only endpoints.idp_srv is ever actually resolved by authbuddy; the other
+# three SRV names are schema-required placeholders (non-empty, unused).
+srv-host=${IDP_SRV_NAME},${IDP_TARGET},${IDP_PORT}
+srv-host=_srv_registry_v1._tcp.machine.internal.,${PLACEHOLDER_HOST},1
+srv-host=_iotcore-mqtt-v1._tcp.machine.internal.,${PLACEHOLDER_HOST},1
+srv-host=_quic-tunnel._udp.machine.internal.,${PLACEHOLDER_HOST},1
+EOF
+}
+
+show_status() {
+  if [[ -f "$DROPIN_FILE" ]]; then
+    echo "==> $DROPIN_FILE:"
+    cat "$DROPIN_FILE"
+  else
+    echo "==> $DROPIN_FILE: not present (disabled)"
+  fi
+  echo "---"
+  if [[ -f "$RESOLVED_DROPIN_FILE" ]]; then
+    echo "==> $RESOLVED_DROPIN_FILE:"
+    cat "$RESOLVED_DROPIN_FILE"
+  else
+    echo "==> $RESOLVED_DROPIN_FILE: not present (disabled)"
+  fi
+  echo "---"
+  resolvectl query -t SRV "$IDP_SRV_NAME" 2>&1 || true
+}
+
+enable() {
+  local new_content
+  local changed=1
+
+  new_content="$(render_dropin)"
+
+  if [[ -f "$DROPIN_FILE" ]] && diff -q <(printf '%s' "$new_content") "$DROPIN_FILE" >/dev/null 2>&1; then
+    changed=0
+  fi
+
+  if [[ "$changed" -eq 1 ]]; then
+    sudo mkdir -p /etc/dnsmasq.d
+    printf '%s' "$new_content" | sudo tee "$DROPIN_FILE" >/dev/null
+
+    if ! sudo dnsmasq --test --conf-file=/etc/dnsmasq.conf >/dev/null; then
+      echo "ERROR: dnsmasq config test failed after adding $DROPIN_FILE. Reverting." >&2
+      sudo rm -f "$DROPIN_FILE"
+      exit 1
+    fi
+
+    sudo systemctl restart dnsmasq
+    echo "==> Installed/updated $DROPIN_FILE and restarted dnsmasq."
+  else
+    echo "==> $DROPIN_FILE already up to date; dnsmasq not restarted."
+  fi
+
+  local resolved_content="[Resolve]
+DNS=127.0.0.1
+Domains=~machine.internal
+"
+  local resolved_changed=1
+
+  if [[ -f "$RESOLVED_DROPIN_FILE" ]] && diff -q <(printf '%s' "$resolved_content") "$RESOLVED_DROPIN_FILE" >/dev/null 2>&1; then
+    resolved_changed=0
+  fi
+
+  if [[ "$resolved_changed" -eq 1 ]]; then
+    sudo mkdir -p "$RESOLVED_DROPIN_DIR"
+    printf '%s' "$resolved_content" | sudo tee "$RESOLVED_DROPIN_FILE" >/dev/null
+    sudo systemctl restart systemd-resolved
+    echo "==> Installed/updated $RESOLVED_DROPIN_FILE and restarted systemd-resolved."
+  else
+    echo "==> $RESOLVED_DROPIN_FILE already up to date; systemd-resolved not restarted."
+  fi
+
+  echo "==> *.machine.internal. queries now route to 127.0.0.1 (dnsmasq), every other domain unaffected."
+  show_status
+}
+
+disable() {
+  if [[ -f "$DROPIN_FILE" ]]; then
+    sudo rm -f "$DROPIN_FILE"
+    sudo systemctl restart dnsmasq
+    echo "==> Removed $DROPIN_FILE and restarted dnsmasq."
+  else
+    echo "==> $DROPIN_FILE not present; nothing to remove."
+  fi
+
+  if [[ -f "$RESOLVED_DROPIN_FILE" ]]; then
+    sudo rm -f "$RESOLVED_DROPIN_FILE"
+    sudo systemctl restart systemd-resolved
+    echo "==> Removed $RESOLVED_DROPIN_FILE and restarted systemd-resolved."
+  else
+    echo "==> $RESOLVED_DROPIN_FILE not present; nothing to remove."
+  fi
+}
+
+case "$ACTION" in
+  enable) enable ;;
+  disable) disable ;;
+  show) show_status ;;
+esac

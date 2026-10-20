@@ -506,6 +506,13 @@ fi
 echo "==> Yocto netboot helpers linked to ~/.local/bin (llp_provide_netboot.sh, llp_activate_netboot.sh)."
 
 echo ""
+echo "── Dev: IoT-Core 2.0 machine-stack helpers ──────────────────────────────"
+if [[ -f "$script_dir/shell/setup-iotcore-srv-dns" ]]; then
+  ln -sfn "$script_dir/shell/setup-iotcore-srv-dns" "$HOME/.local/bin/setup-iotcore-srv-dns"
+  echo "==> setup-iotcore-srv-dns linked to ~/.local/bin (authbuddy *.machine.internal. SRV zone stand-in)."
+fi
+
+echo ""
 echo "── Dev: VS Code ${VSCODE_VERSION:-(latest)} ─────────────────────────────────────────────────────"
 
 # Import Microsoft GPG key — rpm --import is idempotent (no-op if key already exists).
