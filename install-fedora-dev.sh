@@ -545,10 +545,10 @@ if [[ -f "$bluetooth_src" ]]; then
   ln -sfn "$bluetooth_src" "$install_dir/bluetooth-devices"
   chmod +x "$install_dir/bluetooth-devices" 2>/dev/null || true
   # Create convenience command names that point to the single helper
-  for cmd in connect-airpods connect-mouse connect-keyboard bt-show; do
+  for cmd in connect-airpods connect-jabra connect-mouse connect-keyboard bt-show; do
     ln -sfn "$install_dir/bluetooth-devices" "$install_dir/$cmd"
   done
-  echo "==> Bluetooth helper installed to $install_dir (connect-airpods, connect-mouse, connect-keyboard)"
+  echo "==> Bluetooth helper installed to $install_dir (connect-airpods, connect-jabra, connect-mouse, connect-keyboard)"
 else
   echo "INFO: $bluetooth_src not found; skipping bluetooth helper installation."
   echo "      To install: place the helper at $bluetooth_src and rerun this script."
